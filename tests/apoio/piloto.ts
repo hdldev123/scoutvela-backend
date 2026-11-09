@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { semear } from "../../seed/semear.js";
 import type { Db } from "../../src/db/db.js";
 import { cabecalhoAuth, criarAppDeTeste, tokenPara } from "./app.js";
+import { criarArmazenamentoFake, type ArmazenamentoFake } from "./armazenamento.js";
 import { criarBancoDeTeste } from "./banco.js";
 
 export const EMAILS_DEMO = {
@@ -14,6 +15,7 @@ export const EMAILS_DEMO = {
 export interface Piloto {
   db: Db;
   app: FastifyInstance;
+  armazenamento: ArmazenamentoFake;
   /** Cabeçalho de autenticação do usuário do seed. */
   como(email: string): Promise<{ authorization: string }>;
   /** id do atleta pelo código VelaID (ex.: SP-T07). */
@@ -31,10 +33,12 @@ export async function criarPiloto(agora?: () => Date): Promise<Piloto> {
     auth.set(email, id);
     await db.query("update usuarios set auth_user_id = $1 where email = $2", [id, email]);
   }
-  const app = await criarAppDeTeste(db, agora ? { agora } : {});
+  const armazenamento = criarArmazenamentoFake();
+  const app = await criarAppDeTeste(db, { armazenamento, ...(agora ? { agora } : {}) });
   return {
     db,
     app,
+    armazenamento,
     async como(email) {
       return cabecalhoAuth(await tokenPara(auth.get(email)!));
     },

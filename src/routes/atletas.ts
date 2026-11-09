@@ -1,10 +1,12 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { funcaoNaClasse, idadeEm } from "../domain/index.js";
+import { funcaoNaClasse, idadeEm, sugerirPlano } from "../domain/index.js";
 import { esquemaErro, naoEncontrado } from "../erros.js";
 import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
 import { carregarParametros } from "../repositories/parametros.js";
+import { buscarPlanoAtual } from "../repositories/plano.js";
+import { esquemaPlanoRegistrado, esquemaTextosPlano } from "./plano.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 
 const NOMES_GATES: Record<number, string> = {
@@ -29,6 +31,7 @@ const esquemaIndicador = z.object({
   lancadoEm: z.string().nullable().describe("Instante ISO"),
   resposta: z.string().nullable(),
   sugestaoPendente: z.object({ valor: z.number().int(), lancadoEm: z.string() }).nullable(),
+  anexo: z.object({ id: z.string(), nomeArquivo: z.string() }).nullable(),
 });
 
 const esquemaFicha = z.object({
@@ -124,6 +127,8 @@ const esquemaFicha = z.object({
       z.object({ perfilSuporte: z.enum(["A", "B", "C", "D"]) }),
     ])
     .nullable(),
+  plano: esquemaPlanoRegistrado.nullable().describe("Plano registrado por uma pessoa. Nulo para o IBVAR ou sem plano."),
+  sugestaoPlano: esquemaTextosPlano.nullable().describe("Sugestão calculada pelo sistema. Nula para o IBVAR."),
 });
 
 export async function rotasAtletas(app: FastifyInstance): Promise<void> {
@@ -181,6 +186,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                   lancadoEm: nota == null ? null : m.pesoMedidoEm,
                   resposta: dados.respostas[i.id] ?? null,
                   sugestaoPendente: null,
+                  anexo: null,
                 };
               }
               return {
@@ -193,6 +199,8 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                 lancadoEm: lancada?.lancadoEm ?? null,
                 resposta: ibvar ? null : (dados.respostas[i.id] ?? null),
                 sugestaoPendente: ibvar ? null : sug,
+                // O IBVAR não vê evidências anexadas.
+                anexo: ibvar ? null : (lancada?.anexo ?? null),
               };
             });
         return {
@@ -235,6 +243,19 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
           : ibvar
             ? { perfilSuporte: fin.perfilSuporte }
             : null;
+
+      // O IBVAR não vê plano individual (nem a sugestão).
+      const plano = ibvar ? null : await buscarPlanoAtual(app.db, atleta.id);
+      const sugestaoPlano = ibvar
+        ? null
+        : sugerirPlano({
+            pilares: parametros.pilares.map((p) => ({ nome: p.nome, nota: pilaresCalc.get(p.id)?.nota ?? null })),
+            temResultadoMundial: dados.resultados.some((r) => r.nivel === "mundial"),
+            statusFinal: calculo.statusFinal,
+            gatesNaoAptos: calculo.gates.filter((g) => g.status !== "apto").map((g) => NOMES_GATES[g.gate] ?? `G${g.gate}`),
+            perfilSuporte: dados.financeiro?.perfilSuporte ?? null,
+            faixaNome: calculo.faixa.nome,
+          });
 
       return {
         atleta: {
@@ -280,6 +301,8 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         classFit,
         resultados: dados.resultados,
         financeiro,
+        plano,
+        sugestaoPlano,
       };
     },
   );

@@ -3,6 +3,7 @@ import { criarVerificadorSupabase } from "./auth/jwt.js";
 import { carregarEnvLocal, lerConfig } from "./config.js";
 import { criarDbPg, type Db } from "./db/db.js";
 import { criarProvedorEmail, loggerConsole } from "./email/index.js";
+import { criarArmazenamentoDaConfig } from "./storage/index.js";
 
 carregarEnvLocal();
 const config = lerConfig();
@@ -22,6 +23,7 @@ const app = await criarApp({
   db,
   config,
   email: criarProvedorEmail(config, loggerConsole),
+  armazenamento: criarArmazenamentoDaConfig(config),
   verificarToken: criarVerificadorSupabase({
     supabaseUrl: config.SUPABASE_URL,
     jwtSecret: config.SUPABASE_JWT_SECRET,

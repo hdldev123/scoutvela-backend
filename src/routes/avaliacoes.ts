@@ -26,6 +26,8 @@ const esquemaNota = z
     indicadorId: z.string().min(1).max(64),
     valor: z.number().int().min(0).max(5),
     evidencia: z.string().trim().min(3).max(500),
+    /** Evidência anexada antes (POST /atletas/:id/evidencias), do mesmo atleta. A prévia ignora. */
+    anexoId: z.uuid().optional(),
   })
   .strict();
 
@@ -100,6 +102,7 @@ function aplicarProposta(dados: DadosAtleta, corpo: Corpo, agora: Date): DadosAt
       origem: dados.respostas[n.indicadorId] ? "resposta_confirmada" : "avaliacao",
       avaliador: null,
       lancadoEm: agora.toISOString(),
+      anexo: null,
     });
   }
   const medida = { ...dados.medida };
@@ -225,6 +228,15 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
       const parametros = await carregarParametros(app.db);
       validarNotas(parametros, body);
 
+      const anexoIds = [...new Set(body.notas.flatMap((n) => (n.anexoId ? [n.anexoId] : [])))];
+      if (anexoIds.length > 0) {
+        const ok = await app.db.query<{ id: string }>(
+          `select id from evidencias_anexos where atleta_id = $1::uuid and id = any($2::uuid[])`,
+          [base.id, anexoIds],
+        );
+        if (ok.rows.length !== anexoIds.length) throw requisicaoInvalida("Anexo inexistente ou de outro atleta.");
+      }
+
       const resultado = await app.db.transacao(async (tx) => {
         const antes = await avaliarUm(tx, parametros, base, referencia);
         const ciclo = await tx.query<{ id: string }>(
@@ -234,8 +246,8 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
 
         for (const n of body.notas) {
           await tx.query(
-            `insert into avaliacoes (atleta_id, indicador_id, ciclo_id, valor, evidencia, origem, avaliador_id, lancado_em)
-             values ($1, $2, $3, $4, $5, $6, $7, $8)`,
+            `insert into avaliacoes (atleta_id, indicador_id, ciclo_id, valor, evidencia, origem, avaliador_id, lancado_em, anexo_id)
+             values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
             [
               base.id,
               n.indicadorId,
@@ -245,6 +257,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
               antes.dados.respostas[n.indicadorId] ? "resposta_confirmada" : "avaliacao",
               usuario.id,
               referencia,
+              n.anexoId ?? null,
             ],
           );
         }
@@ -270,6 +283,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
             base.id,
             JSON.stringify({
               indicadores: body.notas.map((n) => n.indicadorId),
+              comAnexo: body.notas.some((n) => n.anexoId),
               medida: m ? [m.pesoKg !== undefined ? "pesoKg" : null, m.alturaCm !== undefined ? "alturaCm" : null].filter(Boolean) : [],
               cicloId,
             }),
