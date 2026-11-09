@@ -167,7 +167,7 @@ describe("painel do atleta, respostas, consentimento e revisões", () => {
     expect(porIndicador.pilar.id).toBe("amb");
     expect(porIndicador.indicador.id).toBe("amb_apoio_familiar");
 
-    expect((await chamar(EMAILS_DEMO.treinadora, "GET", "/revisoes")).status).toBe(403);
+    expect((await chamar(EMAILS_DEMO.treinadora, "GET", "/revisoes")).corpo).toHaveLength(2); // Helena é atleta da Ana
     expect((await chamar(EMAILS_DEMO.ibvar, "GET", "/revisoes")).status).toBe(403);
 
     const todos = await chamar(EMAILS_DEMO.gestor, "GET", "/revisoes");
@@ -205,5 +205,61 @@ describe("painel do atleta, respostas, consentimento e revisões", () => {
     const aud = await p.db.query<{ detalhes: unknown }>("select detalhes from auditoria where entidade = 'pedidos_revisao'");
     expect(aud.rows.length).toBeGreaterThan(0);
     expect(JSON.stringify(aud.rows)).not.toContain("Discordo");
+  });
+});
+
+describe("revisões para o treinador", () => {
+  let p: Piloto;
+  beforeAll(async () => {
+    p = await criarPiloto(AGORA);
+  });
+  afterAll(() => p.encerrar());
+
+  const ler = async (email: string, url = "/revisoes") => {
+    const r = await p.app.inject({ method: "GET", url, headers: await p.como(email) });
+    return { status: r.statusCode, corpo: r.json() };
+  };
+
+  it("treinadora vê só os pedidos dos próprios atletas; filtro de status; não responde", async () => {
+    const gestorId = (await p.db.query<{ id: string }>("select id from usuarios where email = $1", [EMAILS_DEMO.gestor])).rows[0]!.id;
+    const ana = (await p.db.query<{ id: string }>("select id from usuarios where email = $1", [EMAILS_DEMO.treinadora])).rows[0]!.id;
+    const meu = (await p.db.query<{ id: string }>("select id from atletas where treinador_id = $1 limit 1", [ana])).rows[0]!.id;
+    const alheio = (await p.db.query<{ id: string }>("select id from atletas where treinador_id <> $1 limit 1", [ana])).rows[0]!.id;
+    const ins = (atleta: string, motivo: string) =>
+      p.db.query<{ id: string }>(
+        "insert into pedidos_revisao (atleta_id, motivo, criado_por) values ($1, $2, $3) returning id::text as id",
+        [atleta, motivo, gestorId],
+      );
+    const dele = (await ins(meu, "Pedido de um atleta da Ana."))
+      .rows[0]!.id;
+    await ins(alheio, "Pedido de atleta de outro treinador, sigiloso.");
+
+    const lista = await ler(EMAILS_DEMO.treinadora);
+    expect(lista.status).toBe(200);
+    expect(lista.corpo.map((r: { id: string }) => r.id)).toEqual([dele]);
+    expect(JSON.stringify(lista.corpo)).not.toContain("sigiloso");
+
+    const gestor = await ler(EMAILS_DEMO.gestor);
+    expect(gestor.corpo).toHaveLength(2);
+
+    const put = await p.app.inject({
+      method: "PUT",
+      url: `/revisoes/${dele}`,
+      headers: await p.como(EMAILS_DEMO.treinadora),
+      payload: { resposta: "Tentando responder." },
+    });
+    expect(put.statusCode).toBe(403);
+
+    await p.app.inject({
+      method: "PUT",
+      url: `/revisoes/${dele}`,
+      headers: await p.como(EMAILS_DEMO.gestor),
+      payload: { resposta: "Nota mantida com a evidência." },
+    });
+    expect((await ler(EMAILS_DEMO.treinadora, "/revisoes?status=aberto")).corpo).toEqual([]);
+    expect((await ler(EMAILS_DEMO.treinadora, "/revisoes?status=respondido")).corpo).toHaveLength(1);
+    expect((await ler(EMAILS_DEMO.gestor, "/revisoes?status=aberto")).corpo).toHaveLength(1);
+    expect((await ler(EMAILS_DEMO.gestor, "/revisoes?status=outro")).status).toBe(400);
+    expect((await ler(EMAILS_DEMO.ibvar)).status).toBe(403);
   });
 });

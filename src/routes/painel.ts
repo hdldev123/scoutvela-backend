@@ -382,11 +382,12 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
   rotas.get(
     "/revisoes",
     {
-      preHandler: [app.autenticar, exigirPapel("gestor", "atleta")],
+      preHandler: [app.autenticar, exigirPapel("gestor", "treinador", "atleta")],
       schema: {
         tags: ["revisoes"],
-        summary: "Lista pedidos de revisão (gestor: todos, abertos primeiro; atleta: os seus)",
+        summary: "Lista pedidos de revisão (gestor: todos, abertos primeiro; treinador: dos próprios atletas; atleta: os seus)",
         security: seguranca,
+        querystring: z.object({ status: z.enum(["aberto", "respondido"]).optional() }),
         response: { 200: z.array(esquemaRevisao), 401: esquemaErro, 403: esquemaErro },
       },
     },
@@ -394,11 +395,24 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       const usuario = req.usuario;
       const proprio = usuario.papel === "atleta";
       if (proprio && !usuario.atletaId) return [];
+      const condicoes: string[] = [];
+      const params: unknown[] = [];
+      if (proprio) {
+        params.push(usuario.atletaId);
+        condicoes.push(`r.atleta_id = $${params.length}::uuid`);
+      } else if (usuario.papel === "treinador") {
+        params.push(usuario.id);
+        condicoes.push(`a.treinador_id = $${params.length}::uuid`);
+      }
+      if (req.query.status) {
+        params.push(req.query.status);
+        condicoes.push(`r.status = $${params.length}`);
+      }
       const r = await app.db.query<LinhaRevisao>(
         `${SQL_REVISAO}
-          ${proprio ? "where r.atleta_id = $1::uuid" : ""}
+          ${condicoes.length ? `where ${condicoes.join(" and ")}` : ""}
           order by (r.status = 'aberto') desc, r.criado_em desc, r.id desc`,
-        proprio ? [usuario.atletaId] : [],
+        params,
       );
       return r.rows.map(paraRevisao);
     },
