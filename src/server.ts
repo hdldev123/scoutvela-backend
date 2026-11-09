@@ -1,11 +1,22 @@
 import { criarApp } from "./app.js";
 import { criarVerificadorSupabase } from "./auth/jwt.js";
 import { carregarEnvLocal, lerConfig } from "./config.js";
-import { criarDbPg } from "./db/db.js";
+import { criarDbPg, type Db } from "./db/db.js";
 
 carregarEnvLocal();
 const config = lerConfig();
-const db = criarDbPg({ url: config.DATABASE_URL, caCert: config.DATABASE_CA_CERT });
+const db = await criarDbDaConfig();
+
+async function criarDbDaConfig(): Promise<Db> {
+  const url = config.DATABASE_URL;
+  if (!url.startsWith("pglite:")) return criarDbPg({ url, caCert: config.DATABASE_CA_CERT });
+  // Banco local em disco, só para desenvolvimento (npm run dev:local usa isso).
+  if (config.APP_ENV !== "desenvolvimento") {
+    throw new Error("DATABASE_URL=pglite: só é permitido com APP_ENV=desenvolvimento.");
+  }
+  const { criarDbPglite } = await import("./db/pglite.js");
+  return criarDbPglite(url.slice("pglite:".length) || undefined);
+}
 const app = await criarApp({
   db,
   config,
