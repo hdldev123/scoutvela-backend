@@ -1,0 +1,4124 @@
+openapi: 3.0.3
+info:
+  title: Scout Vela API
+  version: 0.1.0
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas: {}
+paths:
+  /health:
+    get:
+      summary: Verificação de saúde (sem autenticação, não toca dados)
+      tags:
+        - sessao
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                      - true
+                required:
+                  - ok
+                additionalProperties: false
+  /me:
+    get:
+      summary: "Quem sou eu: papel, telas liberadas e atleta vinculado"
+      tags:
+        - sessao
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usuario:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                      email:
+                        type: string
+                      papel:
+                        type: string
+                        enum:
+                          - gestor
+                          - treinador
+                          - atleta
+                          - ibvar
+                          - responsavel
+                    required:
+                      - id
+                      - nome
+                      - email
+                      - papel
+                    additionalProperties: false
+                  atleta:
+                    nullable: true
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  telas:
+                    type: array
+                    items:
+                      type: string
+                  telaInicial:
+                    type: string
+                required:
+                  - usuario
+                  - atleta
+                  - telas
+                  - telaInicial
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /ranking:
+    get:
+      summary: Ranking de atletas do piloto, conforme a matriz de acesso do papel
+      tags:
+        - ranking
+      description: Gestor vê todos; treinador, os próprios; IBVAR, só atletas com
+        consentimento (os demais entram apenas na contagem).
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 60
+          in: query
+          name: classe
+          required: false
+          description: "Evento da classe, ex.: ILCA 7"
+        - schema:
+            type: string
+            enum:
+              - F
+              - M
+          in: query
+          name: categoria
+          required: false
+        - schema:
+            type: string
+            enum:
+              - f1
+              - f2
+              - f3
+              - f4
+          in: query
+          name: faixa
+          required: false
+        - schema:
+            default: score
+            type: string
+            enum:
+              - score
+              - pontos_cbvela
+          in: query
+          name: ordem
+          required: false
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ciclo:
+                    nullable: true
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                      prazo:
+                        type: string
+                        description: AAAA-MM-DD
+                    required:
+                      - nome
+                      - prazo
+                    additionalProperties: false
+                  itens:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        posicao:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        atleta:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                            velaid:
+                              type: string
+                            numeroVela:
+                              nullable: true
+                              type: string
+                            uf:
+                              nullable: true
+                              type: string
+                            idade:
+                              type: integer
+                              minimum: -9007199254740991
+                              maximum: 9007199254740991
+                            genero:
+                              type: string
+                              enum:
+                                - F
+                                - M
+                            classe:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                nome:
+                                  type: string
+                                evento:
+                                  type: string
+                              required:
+                                - id
+                                - nome
+                                - evento
+                              additionalProperties: false
+                          required:
+                            - id
+                            - nome
+                            - velaid
+                            - numeroVela
+                            - uf
+                            - idade
+                            - genero
+                            - classe
+                          additionalProperties: false
+                        score:
+                          type: number
+                        faixa:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                            nomeCurto:
+                              type: string
+                          required:
+                            - id
+                            - nome
+                            - nomeCurto
+                          additionalProperties: false
+                        completo:
+                          type: boolean
+                        pilares:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              nomeCurto:
+                                type: string
+                              nota:
+                                nullable: true
+                                type: number
+                            required:
+                              - id
+                              - nomeCurto
+                              - nota
+                            additionalProperties: false
+                        statusGates:
+                          type: string
+                          enum:
+                            - apto
+                            - condicional
+                            - nao_prioritario
+                          description: Status final pelos 4 gates (P7)
+                        pontosCbvela:
+                          type: number
+                      required:
+                        - posicao
+                        - atleta
+                        - score
+                        - faixa
+                        - completo
+                        - pilares
+                        - statusGates
+                        - pontosCbvela
+                      additionalProperties: false
+                  ocultosSemConsentimento:
+                    nullable: true
+                    description: Só para o IBVAR; nulo para os demais
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - ciclo
+                  - itens
+                  - ocultosSemConsentimento
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}:
+    get:
+      summary: Ficha do atleta, conforme a matriz de acesso do papel
+      tags:
+        - atletas
+      description: "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo
+        404. IBVAR: sem indicadores sensíveis, Class Fit, contato e financeiro
+        detalhado."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  atleta:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                      velaid:
+                        type: string
+                      numeroVela:
+                        nullable: true
+                        type: string
+                      genero:
+                        type: string
+                        enum:
+                          - F
+                          - M
+                      idade:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                      funcao:
+                        type: string
+                      clube:
+                        nullable: true
+                        type: string
+                      cidade:
+                        nullable: true
+                        type: string
+                      uf:
+                        nullable: true
+                        type: string
+                      termoAceito:
+                        type: boolean
+                      classe:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                          evento:
+                            type: string
+                          posicao:
+                            type: string
+                            enum:
+                              - helm
+                              - crew
+                              - ind
+                        required:
+                          - id
+                          - nome
+                          - evento
+                          - posicao
+                        additionalProperties: false
+                    required:
+                      - id
+                      - nome
+                      - velaid
+                      - numeroVela
+                      - genero
+                      - idade
+                      - funcao
+                      - clube
+                      - cidade
+                      - uf
+                      - termoAceito
+                      - classe
+                    additionalProperties: false
+                  contato:
+                    nullable: true
+                    type: object
+                    properties:
+                      email:
+                        nullable: true
+                        type: string
+                      treinador:
+                        nullable: true
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                        additionalProperties: false
+                    required:
+                      - email
+                      - treinador
+                    additionalProperties: false
+                  ciclo:
+                    nullable: true
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                      prazo:
+                        type: string
+                    required:
+                      - nome
+                      - prazo
+                    additionalProperties: false
+                  score:
+                    type: number
+                  faixa:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                      nomeCurto:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                      - nomeCurto
+                    additionalProperties: false
+                  completo:
+                    type: boolean
+                  preenchidos:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  total:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  pontosCbvela:
+                    type: number
+                  historicoScore:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ciclo:
+                          type: string
+                        score:
+                          type: number
+                      required:
+                        - ciclo
+                        - score
+                      additionalProperties: false
+                  pilares:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                        nomeCurto:
+                          type: string
+                        peso:
+                          type: number
+                        nota:
+                          nullable: true
+                          type: number
+                        contribuicao:
+                          type: number
+                        preenchidos:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        total:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        restrito:
+                          type: boolean
+                          description: Detalhe oculto para este papel (só a nota do pilar)
+                        indicadores:
+                          nullable: true
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              nome:
+                                type: string
+                              tipo:
+                                type: string
+                                enum:
+                                  - T
+                                  - A
+                                  - R
+                              calculado:
+                                type: boolean
+                              nota:
+                                nullable: true
+                                type: number
+                              evidencia:
+                                nullable: true
+                                type: string
+                              origem:
+                                nullable: true
+                                type: string
+                                enum:
+                                  - avaliacao
+                                  - resposta_confirmada
+                                  - calculado
+                              avaliador:
+                                nullable: true
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                  nome:
+                                    type: string
+                                required:
+                                  - id
+                                  - nome
+                                additionalProperties: false
+                              lancadoEm:
+                                nullable: true
+                                description: Instante ISO
+                                type: string
+                              resposta:
+                                nullable: true
+                                type: string
+                              sugestaoPendente:
+                                nullable: true
+                                type: object
+                                properties:
+                                  valor:
+                                    type: integer
+                                    minimum: -9007199254740991
+                                    maximum: 9007199254740991
+                                  lancadoEm:
+                                    type: string
+                                required:
+                                  - valor
+                                  - lancadoEm
+                                additionalProperties: false
+                            required:
+                              - id
+                              - nome
+                              - tipo
+                              - calculado
+                              - nota
+                              - evidencia
+                              - origem
+                              - avaliador
+                              - lancadoEm
+                              - resposta
+                              - sugestaoPendente
+                            additionalProperties: false
+                      required:
+                        - id
+                        - nome
+                        - nomeCurto
+                        - peso
+                        - nota
+                        - contribuicao
+                        - preenchidos
+                        - total
+                        - restrito
+                        - indicadores
+                      additionalProperties: false
+                  gates:
+                    type: object
+                    properties:
+                      statusFinal:
+                        type: string
+                        enum:
+                          - apto
+                          - condicional
+                          - nao_prioritario
+                      itens:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            gate:
+                              type: integer
+                              minimum: -9007199254740991
+                              maximum: 9007199254740991
+                            nome:
+                              type: string
+                            status:
+                              type: string
+                              enum:
+                                - apto
+                                - condicional
+                                - alerta
+                            motivo:
+                              type: string
+                            sugestaoAutomatica:
+                              type: string
+                              enum:
+                                - apto
+                                - condicional
+                                - alerta
+                            ajustadoPeloGestor:
+                              type: boolean
+                          required:
+                            - gate
+                            - nome
+                            - status
+                            - motivo
+                            - sugestaoAutomatica
+                            - ajustadoPeloGestor
+                          additionalProperties: false
+                    required:
+                      - statusFinal
+                      - itens
+                    additionalProperties: false
+                  classFit:
+                    nullable: true
+                    type: object
+                    properties:
+                      pesoKg:
+                        type: number
+                      alturaCm:
+                        nullable: true
+                        type: number
+                      pesoMinKg:
+                        type: number
+                      pesoMedioKg:
+                        type: number
+                      pesoMaxKg:
+                        type: number
+                      deltaKg:
+                        type: number
+                      distanciaRelativa:
+                        type: number
+                    required:
+                      - pesoKg
+                      - alturaCm
+                      - pesoMinKg
+                      - pesoMedioKg
+                      - pesoMaxKg
+                      - deltaKg
+                      - distanciaRelativa
+                    additionalProperties: false
+                  resultados:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        data:
+                          type: string
+                        nivel:
+                          type: string
+                        evento:
+                          type: string
+                        posicao:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        tamanhoFrota:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        internacional:
+                          type: boolean
+                        pontosCbvela:
+                          nullable: true
+                          type: number
+                        fonte:
+                          type: string
+                          enum:
+                            - ranking_cbvela
+                            - manual
+                        linkOficial:
+                          nullable: true
+                          type: string
+                      required:
+                        - data
+                        - nivel
+                        - evento
+                        - posicao
+                        - tamanhoFrota
+                        - internacional
+                        - pontosCbvela
+                        - fonte
+                        - linkOficial
+                      additionalProperties: false
+                  financeiro:
+                    nullable: true
+                    anyOf:
+                      - type: object
+                        properties:
+                          perfilSuporte:
+                            type: string
+                            enum:
+                              - A
+                              - B
+                              - C
+                              - D
+                          mesesAssegurados:
+                            nullable: true
+                            type: integer
+                            minimum: -9007199254740991
+                            maximum: 9007199254740991
+                          patrocinioPrivado:
+                            nullable: true
+                            type: string
+                            enum:
+                              - sim
+                              - em_negociacao
+                              - nao
+                          componentes:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                nome:
+                                  type: string
+                                autonomia:
+                                  type: string
+                                apoioCbvela:
+                                  type: string
+                              required:
+                                - id
+                                - nome
+                                - autonomia
+                                - apoioCbvela
+                              additionalProperties: false
+                        required:
+                          - perfilSuporte
+                          - mesesAssegurados
+                          - patrocinioPrivado
+                          - componentes
+                        additionalProperties: false
+                      - type: object
+                        properties:
+                          perfilSuporte:
+                            type: string
+                            enum:
+                              - A
+                              - B
+                              - C
+                              - D
+                        required:
+                          - perfilSuporte
+                        additionalProperties: false
+                required:
+                  - atleta
+                  - contato
+                  - ciclo
+                  - score
+                  - faixa
+                  - completo
+                  - preenchidos
+                  - total
+                  - pontosCbvela
+                  - historicoScore
+                  - pilares
+                  - gates
+                  - classFit
+                  - resultados
+                  - financeiro
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/avaliacoes/previa:
+    post:
+      summary: "Prévia do lançamento: score antes e depois, sem gravar"
+      tags:
+        - avaliacoes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notas:
+                  default: []
+                  maxItems: 60
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      indicadorId:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                      valor:
+                        type: integer
+                        minimum: 0
+                        maximum: 5
+                      evidencia:
+                        type: string
+                        minLength: 3
+                        maxLength: 500
+                    required:
+                      - indicadorId
+                      - valor
+                      - evidencia
+                    additionalProperties: false
+                medida:
+                  type: object
+                  properties:
+                    pesoKg:
+                      type: number
+                      minimum: 30
+                      maximum: 160
+                    alturaCm:
+                      type: number
+                      minimum: 120
+                      maximum: 230
+                    evidencia:
+                      type: string
+                      minLength: 3
+                      maxLength: 200
+                  additionalProperties: false
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  antes:
+                    type: object
+                    properties:
+                      score:
+                        type: number
+                      faixa:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                          nomeCurto:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                          - nomeCurto
+                        additionalProperties: false
+                      pilares:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nota:
+                              nullable: true
+                              type: number
+                          required:
+                            - id
+                            - nota
+                          additionalProperties: false
+                    required:
+                      - score
+                      - faixa
+                      - pilares
+                    additionalProperties: false
+                  depois:
+                    type: object
+                    properties:
+                      score:
+                        type: number
+                      faixa:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                          nomeCurto:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                          - nomeCurto
+                        additionalProperties: false
+                      pilares:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nota:
+                              nullable: true
+                              type: number
+                          required:
+                            - id
+                            - nota
+                          additionalProperties: false
+                      statusGates:
+                        type: string
+                        enum:
+                          - apto
+                          - condicional
+                          - nao_prioritario
+                    required:
+                      - score
+                      - faixa
+                      - pilares
+                      - statusGates
+                    additionalProperties: false
+                required:
+                  - antes
+                  - depois
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/avaliacoes:
+    post:
+      summary: "Lança notas e/ou medida do atleta (série histórica: só insere)"
+      tags:
+        - avaliacoes
+      description: "Origem da nota: resposta_confirmada se o atleta respondeu à
+        pergunta do indicador, senão avaliacao. Indicador calculado (peso) ou
+        tipo R é recusado."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                notas:
+                  default: []
+                  maxItems: 60
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      indicadorId:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                      valor:
+                        type: integer
+                        minimum: 0
+                        maximum: 5
+                      evidencia:
+                        type: string
+                        minLength: 3
+                        maxLength: 500
+                    required:
+                      - indicadorId
+                      - valor
+                      - evidencia
+                    additionalProperties: false
+                medida:
+                  type: object
+                  properties:
+                    pesoKg:
+                      type: number
+                      minimum: 30
+                      maximum: 160
+                    alturaCm:
+                      type: number
+                      minimum: 120
+                      maximum: 230
+                    evidencia:
+                      type: string
+                      minLength: 3
+                      maxLength: 200
+                  additionalProperties: false
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  antes:
+                    type: object
+                    properties:
+                      score:
+                        type: number
+                      faixa:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                          nomeCurto:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                          - nomeCurto
+                        additionalProperties: false
+                    required:
+                      - score
+                      - faixa
+                    additionalProperties: false
+                  depois:
+                    type: object
+                    properties:
+                      score:
+                        type: number
+                      faixa:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                          nomeCurto:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                          - nomeCurto
+                        additionalProperties: false
+                      statusGates:
+                        type: string
+                        enum:
+                          - apto
+                          - condicional
+                          - nao_prioritario
+                    required:
+                      - score
+                      - faixa
+                      - statusGates
+                    additionalProperties: false
+                required:
+                  - antes
+                  - depois
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/gates:
+    put:
+      summary: Decisão do gestor sobre um gate (nulo ou igual à sugestão volta ao
+        automático)
+      tags:
+        - avaliacoes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                gate:
+                  type: integer
+                  minimum: 1
+                  maximum: 4
+                status:
+                  nullable: true
+                  type: string
+                  enum:
+                    - apto
+                    - condicional
+                    - alerta
+                justificativa:
+                  type: string
+                  maxLength: 500
+              required:
+                - gate
+                - status
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  statusFinal:
+                    type: string
+                    enum:
+                      - apto
+                      - condicional
+                      - nao_prioritario
+                  itens:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        gate:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        nome:
+                          type: string
+                        status:
+                          type: string
+                          enum:
+                            - apto
+                            - condicional
+                            - alerta
+                        motivo:
+                          type: string
+                        sugestaoAutomatica:
+                          type: string
+                          enum:
+                            - apto
+                            - condicional
+                            - alerta
+                        ajustadoPeloGestor:
+                          type: boolean
+                      required:
+                        - gate
+                        - nome
+                        - status
+                        - motivo
+                        - sugestaoAutomatica
+                        - ajustadoPeloGestor
+                      additionalProperties: false
+                required:
+                  - statusFinal
+                  - itens
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /velaid/busca:
+    post:
+      summary: Busca um atleta no VelaID pelo código
+      tags:
+        - cadastro
+      description: Não devolve e-mail. Menor de 18 anos e atleta já cadastrado vêm com
+        elegivel=false e o motivo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                codigo:
+                  type: string
+                  maxLength: 40
+                  description: "Código VelaID (ex.: MG-T15); espaços e minúsculas são
+                    normalizados"
+              required:
+                - codigo
+      security: &a1
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  codigo:
+                    type: string
+                  nome:
+                    type: string
+                  genero:
+                    type: string
+                    enum:
+                      - F
+                      - M
+                  dataNascimento:
+                    type: string
+                    description: AAAA-MM-DD
+                  idade:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  clube:
+                    nullable: true
+                    type: string
+                  cidade:
+                    nullable: true
+                    type: string
+                  uf:
+                    nullable: true
+                    type: string
+                  wsId:
+                    nullable: true
+                    type: string
+                  jaNoPiloto:
+                    type: boolean
+                  elegivel:
+                    type: boolean
+                  motivo:
+                    nullable: true
+                    description: Por que não é elegível; nulo quando elegível
+                    type: string
+                required:
+                  - codigo
+                  - nome
+                  - genero
+                  - dataNascimento
+                  - idade
+                  - clube
+                  - cidade
+                  - uf
+                  - wsId
+                  - jaNoPiloto
+                  - elegivel
+                  - motivo
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /treinadores:
+    get:
+      summary: Treinadores ativos (para escolher o responsável no cadastro)
+      tags:
+        - cadastro
+      security: *a1
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    nome:
+                      type: string
+                  required:
+                    - id
+                    - nome
+                  additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas:
+    post:
+      summary: Cadastra o atleta a partir do VelaID e registra o envio do termo
+      tags:
+        - cadastro
+      description: "Revalida tudo no servidor: existe no VelaID, 18+, ainda não
+        cadastrado, classe ativa e treinador válido. O atleta só entra no
+        ranking depois do aceite do termo."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                velaidCodigo:
+                  type: string
+                  maxLength: 40
+                classeId:
+                  type: string
+                  minLength: 1
+                  maxLength: 40
+                treinadorId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              required:
+                - velaidCodigo
+                - classeId
+                - treinadorId
+      security: *a1
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  nome:
+                    type: string
+                  termo:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                          - aguardando_aceite
+                      versao:
+                        type: string
+                    required:
+                      - status
+                      - versao
+                    additionalProperties: false
+                required:
+                  - id
+                  - nome
+                  - termo
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/pendentes:
+    get:
+      summary: Atletas cadastrados que ainda não aceitaram o termo do piloto
+      tags:
+        - cadastro
+      security: *a1
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    nome:
+                      type: string
+                    velaid:
+                      type: string
+                    classe:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                      required:
+                        - id
+                        - nome
+                      additionalProperties: false
+                    criadoEm:
+                      type: string
+                      description: Instante ISO
+                  required:
+                    - id
+                    - nome
+                    - velaid
+                    - classe
+                    - criadoEm
+                  additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/termo:
+    post:
+      summary: Registra o aceite do termo do piloto recebido do atleta
+      tags:
+        - cadastro
+      description: "Não concede o compartilhamento com o IBVAR: essa decisão é do
+        atleta (consentimento explícito). Depois do aceite o atleta entra no
+        ranking."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                versao:
+                  type: string
+                  enum:
+                    - Piloto 18+ · v1
+              required:
+                - versao
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: *a1
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                      - true
+                required:
+                  - ok
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /importacoes:
+    post:
+      summary: Importa CSV do VelaID ou do Ranking CBVela
+      tags:
+        - cadastro
+      description: "JSON com o CSV em texto. Separador ; ou , (detectado no
+        cabeçalho). VelaID:
+        codigo;nome;genero;data_nascimento;clube;cidade;uf;ws_id;email. Ranking
+        CBVela: velaid;nivel;evento;data;posicao;tamanho_frota;pontos (nível
+        brasileiro, estadual ou regional). Colunas cpf, rg, documento, endereço
+        e renda rejeitam o arquivo inteiro. Linha inválida vira erro da linha."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tipo:
+                  type: string
+                  enum:
+                    - velaid
+                    - ranking_cbvela
+                arquivoNome:
+                  type: string
+                  maxLength: 200
+                conteudo:
+                  type: string
+                  minLength: 1
+                  maxLength: 524288
+                  description: CSV em texto (UTF-8), até 512 KB
+              required:
+                - tipo
+                - conteudo
+      security: *a1
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  linhasOk:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  linhasErro:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  erros:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        linha:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        mensagem:
+                          type: string
+                      required:
+                        - linha
+                        - mensagem
+                      additionalProperties: false
+                    description: Até 200 erros; linhasErro traz a contagem total
+                required:
+                  - id
+                  - linhasOk
+                  - linhasErro
+                  - erros
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /painel:
+    get:
+      summary: "Painel do atleta: score, módulos do questionário e consentimento"
+      tags:
+        - painel
+      description: "Não expõe as notas sugeridas das opções: a resposta só vira nota
+        quando o treinador confirma."
+      security: &a2
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  atleta:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  ciclo:
+                    nullable: true
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                      prazo:
+                        type: string
+                    required:
+                      - nome
+                      - prazo
+                    additionalProperties: false
+                  score:
+                    type: number
+                  faixa:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                      nomeCurto:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                      - nomeCurto
+                    additionalProperties: false
+                  completo:
+                    type: boolean
+                  modulos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        pilarId:
+                          type: string
+                        nome:
+                          type: string
+                        nomeCurto:
+                          type: string
+                        peso:
+                          type: number
+                        quemPreenche:
+                          type: string
+                          enum:
+                            - atleta
+                            - treinador
+                            - ambos
+                        preenchidos:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        total:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        respostasFeitas:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        respostasTotal:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        situacao:
+                          type: string
+                          enum:
+                            - sua_vez
+                            - com_treinador
+                            - completo
+                        perguntas:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              indicadorId:
+                                type: string
+                              enunciado:
+                                type: string
+                              registradoNaoPontua:
+                                type: boolean
+                                description: Fica registrado, mas não entra na nota (tipo R)
+                              opcoes:
+                                type: array
+                                items:
+                                  type: object
+                                  properties:
+                                    ordem:
+                                      type: integer
+                                      minimum: -9007199254740991
+                                      maximum: 9007199254740991
+                                    texto:
+                                      type: string
+                                  required:
+                                    - ordem
+                                    - texto
+                                  additionalProperties: false
+                              resposta:
+                                nullable: true
+                                type: string
+                            required:
+                              - indicadorId
+                              - enunciado
+                              - registradoNaoPontua
+                              - opcoes
+                              - resposta
+                            additionalProperties: false
+                      required:
+                        - pilarId
+                        - nome
+                        - nomeCurto
+                        - peso
+                        - quemPreenche
+                        - preenchidos
+                        - total
+                        - respostasFeitas
+                        - respostasTotal
+                        - situacao
+                        - perguntas
+                      additionalProperties: false
+                  pendencias:
+                    type: array
+                    items:
+                      type: string
+                    description: nomeCurto dos pilares com resposta faltando
+                  consentimento:
+                    type: object
+                    properties:
+                      termoAceitoEm:
+                        nullable: true
+                        description: Instante ISO do aceite do termo do piloto
+                        type: string
+                      termoVersao:
+                        nullable: true
+                        type: string
+                      compartilharIbvar:
+                        type: boolean
+                      atualizadoEm:
+                        nullable: true
+                        description: Instante ISO da última decisão sobre o IBVAR
+                        type: string
+                    required:
+                      - termoAceitoEm
+                      - termoVersao
+                      - compartilharIbvar
+                      - atualizadoEm
+                    additionalProperties: false
+                required:
+                  - atleta
+                  - ciclo
+                  - score
+                  - faixa
+                  - completo
+                  - modulos
+                  - pendencias
+                  - consentimento
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /respostas:
+    post:
+      summary: Responde uma pergunta do questionário
+      tags:
+        - painel
+      description: "A resposta deve ser o texto exato de uma opção. Se a opção tem
+        nota sugerida, ela fica pendente: só entra no score quando o treinador
+        confirmar."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                indicadorId:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+                resposta:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+              required:
+                - indicadorId
+                - resposta
+      security: *a2
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                      - true
+                  notaSugerida:
+                    nullable: true
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - ok
+                  - notaSugerida
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /consentimento:
+    put:
+      summary: Concede ou retira o compartilhamento do score com o IBVAR
+      tags:
+        - painel
+      description: Cada decisão vira uma nova linha no histórico de consentimentos (LGPD).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                compartilharIbvar:
+                  type: boolean
+              required:
+                - compartilharIbvar
+      security: *a2
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  termoAceitoEm:
+                    nullable: true
+                    description: Instante ISO do aceite do termo do piloto
+                    type: string
+                  termoVersao:
+                    nullable: true
+                    type: string
+                  compartilharIbvar:
+                    type: boolean
+                  atualizadoEm:
+                    nullable: true
+                    description: Instante ISO da última decisão sobre o IBVAR
+                    type: string
+                required:
+                  - termoAceitoEm
+                  - termoVersao
+                  - compartilharIbvar
+                  - atualizadoEm
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /revisoes:
+    post:
+      summary: Pede revisão de uma nota (LGPD, art. 20)
+      tags:
+        - revisoes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pilarId:
+                  type: string
+                  minLength: 1
+                  maxLength: 40
+                indicadorId:
+                  type: string
+                  minLength: 1
+                  maxLength: 80
+                motivo:
+                  type: string
+                  minLength: 10
+                  maxLength: 2000
+              required:
+                - motivo
+      security: *a2
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  status:
+                    type: string
+                    enum:
+                      - aberto
+                required:
+                  - id
+                  - status
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    get:
+      summary: "Lista pedidos de revisão (gestor: todos, abertos primeiro; atleta: os
+        seus)"
+      tags:
+        - revisoes
+      security: *a2
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    atleta:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                      required:
+                        - id
+                        - nome
+                      additionalProperties: false
+                    pilar:
+                      nullable: true
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nomeCurto:
+                          type: string
+                      required:
+                        - id
+                        - nomeCurto
+                      additionalProperties: false
+                    indicador:
+                      nullable: true
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                      required:
+                        - id
+                        - nome
+                      additionalProperties: false
+                    motivo:
+                      type: string
+                    status:
+                      type: string
+                      enum:
+                        - aberto
+                        - respondido
+                    criadoEm:
+                      type: string
+                    resposta:
+                      nullable: true
+                      type: string
+                    respondidoEm:
+                      nullable: true
+                      type: string
+                  required:
+                    - id
+                    - atleta
+                    - pilar
+                    - indicador
+                    - motivo
+                    - status
+                    - criadoEm
+                    - resposta
+                    - respondidoEm
+                  additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /revisoes/{id}:
+    put:
+      summary: Responde um pedido de revisão
+      tags:
+        - revisoes
+      description: Pedido já respondido devolve 409 (código requisicao_invalida).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                resposta:
+                  type: string
+                  minLength: 3
+                  maxLength: 2000
+              required:
+                - resposta
+      parameters:
+        - schema:
+            type: string
+            pattern: ^\d{1,18}$
+          in: path
+          name: id
+          required: true
+      security: *a2
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  atleta:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  pilar:
+                    nullable: true
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nomeCurto:
+                        type: string
+                    required:
+                      - id
+                      - nomeCurto
+                    additionalProperties: false
+                  indicador:
+                    nullable: true
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  motivo:
+                    type: string
+                  status:
+                    type: string
+                    enum:
+                      - aberto
+                      - respondido
+                  criadoEm:
+                    type: string
+                  resposta:
+                    nullable: true
+                    type: string
+                  respondidoEm:
+                    nullable: true
+                    type: string
+                required:
+                  - id
+                  - atleta
+                  - pilar
+                  - indicador
+                  - motivo
+                  - status
+                  - criadoEm
+                  - resposta
+                  - respondidoEm
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /investimento:
+    get:
+      summary: "Painel de investimento: agregados do piloto e lista 'Onde investir'"
+      tags:
+        - investimento
+      description: Os números agregados incluem todos os atletas do piloto. A lista
+        'Onde investir' do IBVAR traz só quem consentiu, sem meses assegurados.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ciclo:
+                    nullable: true
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                      prazo:
+                        type: string
+                        description: AAAA-MM-DD
+                    required:
+                      - nome
+                      - prazo
+                    additionalProperties: false
+                  kpis:
+                    type: object
+                    properties:
+                      atletas:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                      scoreMedio:
+                        type: number
+                      aptos:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                        description: Aptos nos 4 gates
+                      dependentesApoio:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                        description: Perfil de suporte C ou D
+                    required:
+                      - atletas
+                      - scoreMedio
+                      - aptos
+                      - dependentesApoio
+                    additionalProperties: false
+                  funil:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        faixa:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                          required:
+                            - id
+                            - nome
+                          additionalProperties: false
+                        n:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                      required:
+                        - faixa
+                        - n
+                      additionalProperties: false
+                  gates:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        gate:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        nome:
+                          type: string
+                        apto:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        condicional:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        alerta:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                      required:
+                        - gate
+                        - nome
+                        - apto
+                        - condicional
+                        - alerta
+                      additionalProperties: false
+                  mediaPilares:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        pilarId:
+                          type: string
+                        nomeCurto:
+                          type: string
+                        media:
+                          nullable: true
+                          type: number
+                      required:
+                        - pilarId
+                        - nomeCurto
+                        - media
+                      additionalProperties: false
+                  ondeInvestir:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        atleta:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                            classe:
+                              type: object
+                              properties:
+                                nome:
+                                  type: string
+                              required:
+                                - nome
+                              additionalProperties: false
+                          required:
+                            - id
+                            - nome
+                            - classe
+                          additionalProperties: false
+                        score:
+                          type: number
+                        statusGates:
+                          type: string
+                          enum:
+                            - apto
+                            - condicional
+                            - nao_prioritario
+                        perfilSuporte:
+                          type: string
+                          enum:
+                            - C
+                            - D
+                        mesesAssegurados:
+                          nullable: true
+                          description: Nulo para o IBVAR (vê só o perfil A–D)
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                      required:
+                        - atleta
+                        - score
+                        - statusGates
+                        - perfilSuporte
+                        - mesesAssegurados
+                      additionalProperties: false
+                  ocultosSemConsentimento:
+                    nullable: true
+                    description: "Só para o IBVAR: atletas do recorte 'Onde investir' que ficaram
+                      fora da lista; nulo para o gestor"
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - ciclo
+                  - kpis
+                  - funil
+                  - gates
+                  - mediaPilares
+                  - ondeInvestir
+                  - ocultosSemConsentimento
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /parametros:
+    get:
+      summary: Parâmetros da metodologia (pesos, faixas, classes, rubricas, regras)
+      tags:
+        - parametros
+      description: Leitura para gestor e treinador (o treinador precisa da escala e
+        das rubricas na avaliação).
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pilares:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                        nomeCurto:
+                          type: string
+                        peso:
+                          type: number
+                        sensivel:
+                          type: boolean
+                        evidenciaPadrao:
+                          type: string
+                        indicadores:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              nome:
+                                type: string
+                              tipo:
+                                type: string
+                                enum:
+                                  - T
+                                  - A
+                                  - R
+                              calculado:
+                                type: boolean
+                            required:
+                              - id
+                              - nome
+                              - tipo
+                              - calculado
+                            additionalProperties: false
+                      required:
+                        - id
+                        - nome
+                        - nomeCurto
+                        - peso
+                        - sensivel
+                        - evidenciaPadrao
+                        - indicadores
+                      additionalProperties: false
+                  faixas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                        nomeCurto:
+                          type: string
+                        scoreMin:
+                          type: number
+                      required:
+                        - id
+                        - nome
+                        - nomeCurto
+                        - scoreMin
+                      additionalProperties: false
+                  classes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                        evento:
+                          type: string
+                        posicao:
+                          type: string
+                          enum:
+                            - helm
+                            - crew
+                            - ind
+                        pesoMinKg:
+                          type: number
+                        pesoMedioKg:
+                          type: number
+                        pesoMaxKg:
+                          type: number
+                      required:
+                        - id
+                        - nome
+                        - evento
+                        - posicao
+                        - pesoMinKg
+                        - pesoMedioKg
+                        - pesoMaxKg
+                      additionalProperties: false
+                  rubricas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        pilarId:
+                          nullable: true
+                          description: Nulo = escala geral de 0 a 5
+                          type: string
+                        nota:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        descricao:
+                          type: string
+                      required:
+                        - pilarId
+                        - nota
+                        - descricao
+                      additionalProperties: false
+                  regras:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        codigo:
+                          type: string
+                        descricao:
+                          type: string
+                        valor: {}
+                      required:
+                        - codigo
+                        - descricao
+                        - valor
+                      additionalProperties: false
+                  componentesCusto:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                      required:
+                        - id
+                        - nome
+                      additionalProperties: false
+                required:
+                  - pilares
+                  - faixas
+                  - classes
+                  - rubricas
+                  - regras
+                  - componentesCusto
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    put:
+      summary: Atualiza pesos dos pilares e faixas de peso das classes
+      tags:
+        - parametros
+      description: O ranking recalcula sozinho (o cálculo é feito na leitura). Grava
+        auditoria com antes e depois.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pesos:
+                  description: Peso de cada um dos 9 pilares; a soma precisa ser 100
+                  type: object
+                  additionalProperties:
+                    type: integer
+                    minimum: 0
+                    maximum: 100
+                classes:
+                  maxItems: 50
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        minLength: 1
+                        maxLength: 40
+                      pesoMinKg:
+                        type: number
+                        minimum: 0
+                        maximum: 400
+                      pesoMedioKg:
+                        type: number
+                        minimum: 0
+                        maximum: 400
+                      pesoMaxKg:
+                        type: number
+                        minimum: 0
+                        maximum: 400
+                    required:
+                      - id
+                      - pesoMinKg
+                      - pesoMedioKg
+                      - pesoMaxKg
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  pilares:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                        nomeCurto:
+                          type: string
+                        peso:
+                          type: number
+                        sensivel:
+                          type: boolean
+                        evidenciaPadrao:
+                          type: string
+                        indicadores:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              nome:
+                                type: string
+                              tipo:
+                                type: string
+                                enum:
+                                  - T
+                                  - A
+                                  - R
+                              calculado:
+                                type: boolean
+                            required:
+                              - id
+                              - nome
+                              - tipo
+                              - calculado
+                            additionalProperties: false
+                      required:
+                        - id
+                        - nome
+                        - nomeCurto
+                        - peso
+                        - sensivel
+                        - evidenciaPadrao
+                        - indicadores
+                      additionalProperties: false
+                  faixas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                        nomeCurto:
+                          type: string
+                        scoreMin:
+                          type: number
+                      required:
+                        - id
+                        - nome
+                        - nomeCurto
+                        - scoreMin
+                      additionalProperties: false
+                  classes:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                        evento:
+                          type: string
+                        posicao:
+                          type: string
+                          enum:
+                            - helm
+                            - crew
+                            - ind
+                        pesoMinKg:
+                          type: number
+                        pesoMedioKg:
+                          type: number
+                        pesoMaxKg:
+                          type: number
+                      required:
+                        - id
+                        - nome
+                        - evento
+                        - posicao
+                        - pesoMinKg
+                        - pesoMedioKg
+                        - pesoMaxKg
+                      additionalProperties: false
+                  rubricas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        pilarId:
+                          nullable: true
+                          description: Nulo = escala geral de 0 a 5
+                          type: string
+                        nota:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        descricao:
+                          type: string
+                      required:
+                        - pilarId
+                        - nota
+                        - descricao
+                      additionalProperties: false
+                  regras:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        codigo:
+                          type: string
+                        descricao:
+                          type: string
+                        valor: {}
+                      required:
+                        - codigo
+                        - descricao
+                        - valor
+                      additionalProperties: false
+                  componentesCusto:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                      required:
+                        - id
+                        - nome
+                      additionalProperties: false
+                required:
+                  - pilares
+                  - faixas
+                  - classes
+                  - rubricas
+                  - regras
+                  - componentesCusto
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false

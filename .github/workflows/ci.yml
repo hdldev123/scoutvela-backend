@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  pull_request:
+    branches: [main, staging]
+  push:
+    branches: [main, staging]
+
+permissions:
+  contents: read
+
+jobs:
+  verificar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .node-version
+          cache: npm
+      - run: npm ci
+      - name: Tipos
+        run: npm run typecheck
+      - name: Testes (domínio, permissões e banco em PGlite)
+        run: npm test
+      - name: Build
+        run: npm run build
+      - name: Contrato OpenAPI em dia
+        run: |
+          npm run openapi
+          git diff --exit-code openapi.yaml || (echo "openapi.yaml desatualizado: rode npm run openapi e versione o arquivo" && exit 1)
+      - name: Vulnerabilidades em dependências de produção
+        run: npm audit --omit=dev --audit-level=high
