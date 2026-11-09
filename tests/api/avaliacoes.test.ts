@@ -141,7 +141,10 @@ describe("avaliações, prévia e gates", () => {
     const m = await p.db.query<{ detalhes: unknown }>(
       `select detalhes from auditoria where acao = 'lancar_avaliacao' and detalhes::text like '%pesoKg%' limit 1`,
     );
-    expect(JSON.stringify(m.rows[0]!.detalhes)).not.toContain("70");
+    // Só nomes de campo: nenhum número (o cicloId é UUID e pode conter "70" por acaso).
+    const detalhesMedida = m.rows[0]!.detalhes as { medida?: unknown };
+    expect(detalhesMedida.medida).toContain("pesoKg");
+    expect(JSON.stringify(detalhesMedida)).not.toMatch(/[:[,]\s*-?\d+(\.\d+)?\s*[,\]}]/);
   });
 
   it("acesso: treinadora 404 em atleta do Marcos; atleta e ibvar 403; sem token 401", async () => {

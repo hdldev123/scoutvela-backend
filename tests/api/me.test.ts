@@ -19,8 +19,12 @@ describe("GET /me", () => {
   });
 
   const casos: { papel: Papel; telas: string[]; telaInicial: string }[] = [
-    { papel: "gestor", telas: ["ranking", "avaliar", "cadastro", "investimento", "parametros"], telaInicial: "ranking" },
-    { papel: "treinador", telas: ["ranking", "avaliar"], telaInicial: "ranking" },
+    {
+      papel: "gestor",
+      telas: ["ranking", "avaliar", "cadastro", "ciclos", "revisoes", "investimento", "usuarios", "parametros", "auditoria"],
+      telaInicial: "ranking",
+    },
+    { papel: "treinador", telas: ["ranking", "avaliar", "revisoes"], telaInicial: "ranking" },
     { papel: "atleta", telas: ["painel", "ficha"], telaInicial: "painel" },
     { papel: "ibvar", telas: ["investimento", "ranking"], telaInicial: "investimento" },
   ];
