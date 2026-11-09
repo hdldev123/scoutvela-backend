@@ -9,6 +9,13 @@ updates:
     groups:
       dependencias-menores:
         update-types: [minor, patch]
+    ignore:
+      # Os tipos acompanham o runtime do Render (Node 22, .node-version); major só junto com a troca do Node.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # Major de TypeScript só como demanda própria (tsx e o build precisam acompanhar).
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     target-branch: staging
