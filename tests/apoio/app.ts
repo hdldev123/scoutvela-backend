@@ -5,6 +5,8 @@ import { criarVerificadorSupabase } from "../../src/auth/jwt.js";
 import { lerConfig, type Config } from "../../src/config.js";
 import type { Db } from "../../src/db/db.js";
 import type { Papel } from "../../src/domain/tipos.js";
+import { criarArmazenamentoFake } from "./armazenamento.js";
+import type { ArmazenamentoEvidencias } from "../../src/storage/index.js";
 
 export const SUPABASE_URL_TESTE = "http://supabase.teste";
 export const SEGREDO_JWT_TESTE = "segredo-de-teste-com-pelo-menos-32-caracteres!!";
@@ -31,6 +33,8 @@ export interface OpcoesAppDeTeste {
   config?: Partial<Config>;
   agora?: () => Date;
   limiteRequisicoes?: { max: number; janelaMs: number };
+  /** Padrão: armazenamento em memória (nunca grava em disco). */
+  armazenamento?: ArmazenamentoEvidencias;
 }
 
 /** App completo sobre o banco de teste, com verificador HS256 real. */
@@ -45,6 +49,7 @@ export async function criarAppDeTeste(db: Db, opcoes: OpcoesAppDeTeste = {}): Pr
     }),
     ...(opcoes.agora ? { agora: opcoes.agora } : {}),
     ...(opcoes.limiteRequisicoes ? { limiteRequisicoes: opcoes.limiteRequisicoes } : {}),
+    armazenamento: opcoes.armazenamento ?? criarArmazenamentoFake(),
     logger: false,
   });
   await app.ready();

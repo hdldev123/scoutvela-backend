@@ -1,0 +1,66 @@
+import { mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { afterAll, describe, expect, it } from "vitest";
+import { criarArmazenamentoLocal, criarArmazenamentoSupabase } from "../../src/storage/index.js";
+
+const CAMINHO = "11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.pdf";
+
+describe("armazenamento Supabase", () => {
+  it("envia com a chave de servidor, sem upsert, e monta o link assinado absoluto", async () => {
+    const chamadas: { url: string; init: RequestInit }[] = [];
+    const fetchFalso = (async (url: string, init: RequestInit) => {
+      chamadas.push({ url, init });
+      return url.includes("/sign/")
+        ? new Response(JSON.stringify({ signedURL: `/object/sign/evidencias/${CAMINHO}?token=t` }), { status: 200 })
+        : new Response("{}", { status: 200 });
+    }) as unknown as typeof fetch;
+    const s = criarArmazenamentoSupabase({
+      supabaseUrl: "https://proj.supabase.co/",
+      chaveServico: "chave",
+      bucket: "evidencias",
+      fetchImpl: fetchFalso,
+      agora: () => new Date("2026-11-06T12:00:00Z"),
+    });
+    await s.salvar(CAMINHO, new Uint8Array([1, 2]), "application/pdf");
+    expect(chamadas[0]!.url).toBe(`https://proj.supabase.co/storage/v1/object/evidencias/${CAMINHO}`);
+    expect(chamadas[0]!.init.method).toBe("POST");
+    expect(chamadas[0]!.init.headers).toMatchObject({ Authorization: "Bearer chave", "x-upsert": "false", "Content-Type": "application/pdf" });
+
+    const link = await s.linkTemporario(CAMINHO, "application/pdf", "x.pdf");
+    expect(chamadas[1]!.url).toBe(`https://proj.supabase.co/storage/v1/object/sign/evidencias/${CAMINHO}`);
+    expect(JSON.parse(String(chamadas[1]!.init.body))).toEqual({ expiresIn: 300 });
+    expect(link).toEqual({
+      url: `https://proj.supabase.co/storage/v1/object/sign/evidencias/${CAMINHO}?token=t`,
+      expiraEm: "2026-11-06T12:05:00.000Z",
+    });
+  });
+
+  it("falha do Storage vira erro e caminho fora do padrão é recusado", async () => {
+    const s = criarArmazenamentoSupabase({
+      supabaseUrl: "https://proj.supabase.co",
+      chaveServico: "k",
+      bucket: "evidencias",
+      fetchImpl: (async () => new Response("erro", { status: 500 })) as unknown as typeof fetch,
+    });
+    await expect(s.salvar(CAMINHO, new Uint8Array([1]), "application/pdf")).rejects.toThrow();
+    await expect(s.salvar("../fora.pdf", new Uint8Array([1]), "application/pdf")).rejects.toThrow();
+  });
+});
+
+describe("armazenamento local", () => {
+  let dir: string | undefined;
+  afterAll(async () => {
+    if (dir) await rm(dir, { recursive: true, force: true });
+  });
+
+  it("grava no disco, não sobrescreve e devolve data URL", async () => {
+    dir = await mkdtemp(join(tmpdir(), "evid-"));
+    const s = criarArmazenamentoLocal(dir);
+    await s.salvar(CAMINHO, new Uint8Array([0x25, 0x50, 0x44, 0x46]), "application/pdf");
+    await expect(s.salvar(CAMINHO, new Uint8Array([1]), "application/pdf")).rejects.toThrow();
+    const link = await s.linkTemporario(CAMINHO, "application/pdf", "x.pdf");
+    expect(link.url).toBe("data:application/pdf;base64,JVBERg==");
+    await expect(s.salvar("../x.pdf", new Uint8Array([1]), "application/pdf")).rejects.toThrow();
+  });
+});

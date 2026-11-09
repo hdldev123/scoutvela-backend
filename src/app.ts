@@ -14,13 +14,20 @@ import { criarProvedorEmailLog, type ProvedorEmail } from "./email/index.js";
 import { registrarTratamentoDeErros } from "./erros.js";
 import { rotasHealth } from "./routes/health.js";
 import { rotasAtletas } from "./routes/atletas.js";
+import { rotasAuditoria } from "./routes/auditoria.js";
 import { rotasAvaliacoes } from "./routes/avaliacoes.js";
 import { rotasCadastro } from "./routes/cadastro.js";
+import { rotasCampanha } from "./routes/campanha.js";
+import { rotasCiclos } from "./routes/ciclos.js";
+import { rotasEvidencias } from "./routes/evidencias.js";
 import { rotasInvestimento } from "./routes/investimento.js";
 import { rotasMe } from "./routes/me.js";
 import { rotasPainel } from "./routes/painel.js";
+import { rotasPlano } from "./routes/plano.js";
 import { rotasParametros } from "./routes/parametros.js";
 import { rotasRanking } from "./routes/ranking.js";
+import { rotasTitular } from "./routes/titular.js";
+import { criarArmazenamentoLocal, type ArmazenamentoEvidencias } from "./storage/index.js";
 
 export interface DepsApp {
   db: Db;
@@ -33,12 +40,15 @@ export interface DepsApp {
   limiteRequisicoes?: { max: number; janelaMs: number };
   /** Provedor de e-mail. Padrão: provedor `log` (não envia). O server.ts escolhe pela config. */
   email?: ProvedorEmail;
+  /** Armazenamento das evidências. Padrão: disco local da config (só desenvolvimento). O server.ts escolhe pela config. */
+  armazenamento?: ArmazenamentoEvidencias;
 }
 
 declare module "fastify" {
   interface FastifyInstance {
     config: Config;
     email: ProvedorEmail;
+    armazenamento: ArmazenamentoEvidencias;
   }
 }
 
@@ -61,6 +71,12 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasPainel,
   rotasInvestimento,
   rotasParametros,
+  rotasCiclos,
+  rotasCampanha,
+  rotasAuditoria,
+  rotasTitular,
+  rotasPlano,
+  rotasEvidencias,
 ];
 
 export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
@@ -85,6 +101,7 @@ export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
   app.decorate("db", deps.db);
   app.decorate("config", config);
   app.decorate("email", deps.email ?? criarProvedorEmailLog(app.log));
+  app.decorate("armazenamento", deps.armazenamento ?? criarArmazenamentoLocal(config.STORAGE_DIR_LOCAL));
   app.decorate("agora", deps.agora ?? (() => new Date()));
   registrarAutenticacao(app, deps.verificarToken);
 

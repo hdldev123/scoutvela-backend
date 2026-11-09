@@ -112,9 +112,9 @@ describe("/parametros", () => {
       pesoMedioKg: 60.5,
       pesoMaxKg: 70,
     });
-    const aud = await p.db.query<{ detalhes: { classes: { depois: Record<string, number[]> } } }>(
+    const aud = await p.db.query<{ detalhes: { classes: { depois: Record<string, { pesoKg: number[]; ativa: boolean }> } } }>(
       "select detalhes from auditoria where acao = 'atualizar_parametros' order by id desc limit 1",
     );
-    expect(aud.rows[0]!.detalhes.classes.depois[classe.id]).toEqual([50, 60.5, 70]);
+    expect(aud.rows[0]!.detalhes.classes.depois[classe.id]).toEqual({ pesoKg: [50, 60.5, 70], ativa: true });
   });
 });

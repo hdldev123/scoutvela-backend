@@ -1,0 +1,94 @@
+# Blueprint do Render para a API do Scout Vela.
+#
+# Homologação e produção são serviços SEPARADOS: aplique este Blueprint uma vez em cada
+# ambiente, cada um apontando para o seu próprio projeto Supabase (DATABASE_URL, SUPABASE_*)
+# e para o seu front (CORS_ORIGINS, FRONT_URL). Nunca compartilhe banco entre os dois.
+# Produção usa plano pago (o gratuito hiberna o serviço e a primeira chamada demora);
+# em homologação dá para usar "free" no web service.
+#
+# Segredos têm `sync: false`: o Render pede o valor no painel e ele não vai para o git.
+# Para homologação troque APP_ENV por "homologacao" no painel.
+
+services:
+  - type: web
+    name: scout-vela-api
+    runtime: node
+    plan: starter
+    region: oregon
+    buildCommand: npm ci && npm run build
+    startCommand: npm start
+    preDeployCommand: npm run db:migrate:prod
+    healthCheckPath: /health
+    envVars:
+      - key: APP_ENV
+        value: producao
+      - key: EXIGIR_MFA
+        value: "true"
+      - key: EMAIL_PROVEDOR
+        value: smtp
+      - key: STORAGE_PROVEDOR
+        value: supabase
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_CA_CERT
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: CORS_ORIGINS
+        sync: false
+      - key: FRONT_URL
+        sync: false
+      - key: EMAIL_REMETENTE
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USUARIO
+        sync: false
+      - key: SMTP_SENHA
+        sync: false
+
+  # Lembretes do ciclo: todo dia às 08:00 de Brasília (11:00 UTC).
+  # O próprio job decide se hoje é dia de lembrete (7, 3, 1 e 0 dias do prazo, e todo dia depois).
+  - type: cron
+    name: scout-vela-lembretes
+    runtime: node
+    plan: starter
+    region: oregon
+    schedule: "0 11 * * *"
+    buildCommand: npm ci && npm run build
+    startCommand: npm run job:lembretes:prod
+    envVars:
+      - key: APP_ENV
+        value: producao
+      - key: EMAIL_PROVEDOR
+        value: smtp
+      - key: STORAGE_PROVEDOR
+        value: supabase
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_CA_CERT
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false
+      - key: FRONT_URL
+        sync: false
+      - key: EMAIL_REMETENTE
+        sync: false
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USUARIO
+        sync: false
+      - key: SMTP_SENHA
+        sync: false
