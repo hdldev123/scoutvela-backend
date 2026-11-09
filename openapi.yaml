@@ -3173,10 +3173,19 @@ paths:
                   - mensagem
                 additionalProperties: false
     get:
-      summary: "Lista pedidos de revisão (gestor: todos, abertos primeiro; atleta: os
-        seus)"
+      summary: "Lista pedidos de revisão (gestor: todos, abertos primeiro; treinador:
+        dos próprios atletas; atleta: os seus)"
       tags:
         - revisoes
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - aberto
+              - respondido
+          in: query
+          name: status
+          required: false
       security: *a2
       responses:
         "200":
@@ -3850,6 +3859,8 @@ paths:
                       properties:
                         id:
                           type: string
+                        ativa:
+                          type: boolean
                         nome:
                           type: string
                         evento:
@@ -3868,6 +3879,7 @@ paths:
                           type: number
                       required:
                         - id
+                        - ativa
                         - nome
                         - evento
                         - posicao
@@ -3905,10 +3917,14 @@ paths:
                         descricao:
                           type: string
                         valor: {}
+                        atualizadoEm:
+                          type: string
+                          description: Instante ISO
                       required:
                         - codigo
                         - descricao
                         - valor
+                        - atualizadoEm
                       additionalProperties: false
                   componentesCusto:
                     type: array
@@ -3980,7 +3996,7 @@ paths:
                   - mensagem
                 additionalProperties: false
     put:
-      summary: Atualiza pesos dos pilares e faixas de peso das classes
+      summary: Atualiza pesos, faixas de score, rubricas, regras e classes
       tags:
         - parametros
       description: O ranking recalcula sozinho (o cálculo é feito na leitura). Grava
@@ -3999,6 +4015,56 @@ paths:
                     type: integer
                     minimum: 0
                     maximum: 100
+                faixas:
+                  description: As 4 faixas; scoreMin estritamente decrescente na ordem das faixas
+                    e a última com 0
+                  maxItems: 10
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        minLength: 1
+                        maxLength: 40
+                      scoreMin:
+                        type: number
+                        minimum: 0
+                        maximum: 100
+                    required:
+                      - id
+                      - scoreMin
+                rubricas:
+                  description: Upsert por (pilarId, nota)
+                  maxItems: 100
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      pilarId:
+                        nullable: true
+                        description: Nulo = escala geral de 0 a 5
+                        type: string
+                        minLength: 1
+                        maxLength: 40
+                      nota:
+                        type: integer
+                        minimum: 0
+                        maximum: 5
+                      descricao:
+                        type: string
+                        minLength: 3
+                        maxLength: 300
+                    required:
+                      - pilarId
+                      - nota
+                      - descricao
+                regras:
+                  description: "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4,
+                    RANKING_CBVELA. O valor segue o formato lido em GET
+                    /parametros"
+                  type: object
+                  additionalProperties: {}
                 classes:
                   maxItems: 50
                   type: array
@@ -4021,11 +4087,11 @@ paths:
                         type: number
                         minimum: 0
                         maximum: 400
+                      ativa:
+                        description: Não dá para desativar classe com atleta ativo
+                        type: boolean
                     required:
                       - id
-                      - pesoMinKg
-                      - pesoMedioKg
-                      - pesoMaxKg
       security:
         - bearerAuth: []
       responses:
@@ -4111,6 +4177,8 @@ paths:
                       properties:
                         id:
                           type: string
+                        ativa:
+                          type: boolean
                         nome:
                           type: string
                         evento:
@@ -4129,6 +4197,7 @@ paths:
                           type: number
                       required:
                         - id
+                        - ativa
                         - nome
                         - evento
                         - posicao
@@ -4166,10 +4235,14 @@ paths:
                         descricao:
                           type: string
                         valor: {}
+                        atualizadoEm:
+                          type: string
+                          description: Instante ISO
                       required:
                         - codigo
                         - descricao
                         - valor
+                        - atualizadoEm
                       additionalProperties: false
                   componentesCusto:
                     type: array
@@ -4191,6 +4264,204 @@ paths:
                   - rubricas
                   - regras
                   - componentesCusto
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /auditoria:
+    get:
+      summary: Trilha de auditoria (só gestor), do mais novo para o mais antigo
+      tags:
+        - auditoria
+      description: "Filtros opcionais combinados com E. Paginação por cursor: use
+        `proximo` em `antesDe`."
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 60
+          in: query
+          name: entidade
+          required: false
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 60
+          in: query
+          name: acao
+          required: false
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: query
+          name: usuarioId
+          required: false
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+          in: query
+          name: atletaId
+          required: false
+          description: Identificador da entidade afetada (entidade_id), em geral o atleta
+        - schema:
+            type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          in: query
+          name: desde
+          required: false
+          description: AAAA-MM-DD, a partir das 00:00 de Brasília
+        - schema:
+            type: string
+            pattern: ^\d{4}-\d{2}-\d{2}$
+          in: query
+          name: ate
+          required: false
+          description: AAAA-MM-DD, até o fim do dia em Brasília
+        - schema:
+            default: 50
+            type: integer
+            minimum: 1
+            maximum: 200
+          in: query
+          name: limite
+          required: false
+        - schema:
+            type: string
+            pattern: ^\d{1,18}$
+          in: query
+          name: antesDe
+          required: false
+          description: id do último item da página anterior
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        em:
+                          type: string
+                          description: Instante ISO
+                        usuario:
+                          nullable: true
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                            papel:
+                              type: string
+                          required:
+                            - id
+                            - nome
+                            - papel
+                          additionalProperties: false
+                        acao:
+                          type: string
+                        entidade:
+                          type: string
+                        entidadeId:
+                          nullable: true
+                          type: string
+                        detalhes: {}
+                      required:
+                        - id
+                        - em
+                        - usuario
+                        - acao
+                        - entidade
+                        - entidadeId
+                        - detalhes
+                      additionalProperties: false
+                  proximo:
+                    nullable: true
+                    description: Passe em antesDe para a página seguinte; nulo = fim
+                    type: string
+                required:
+                  - itens
+                  - proximo
                 additionalProperties: false
         "400":
           description: Default Response
