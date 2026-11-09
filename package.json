@@ -17,6 +17,8 @@
     "test:watch": "vitest",
     "db:migrate": "tsx src/db/cli-migrar.ts",
     "db:migrate:prod": "node dist/src/db/cli-migrar.js",
+    "job:lembretes": "tsx src/jobs/cli-lembretes.ts",
+    "job:lembretes:prod": "node dist/src/jobs/cli-lembretes.js",
     "db:seed": "tsx seed/cli-seed.ts",
     "seed:auth": "tsx seed/cli-auth.ts",
     "openapi": "tsx src/cli-openapi.ts"
