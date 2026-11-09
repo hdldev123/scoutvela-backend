@@ -4,6 +4,8 @@ import { criarApp } from "../../src/app.js";
 import { criarVerificadorSupabase } from "../../src/auth/jwt.js";
 import { lerConfig, type Config } from "../../src/config.js";
 import type { Db } from "../../src/db/db.js";
+import type { ProvedorEmail } from "../../src/email/index.js";
+import { ContaJaExiste, type AdminAuth } from "../../src/integracoes/supabase-admin.js";
 import type { Papel } from "../../src/domain/tipos.js";
 
 export const SUPABASE_URL_TESTE = "http://supabase.teste";
@@ -31,6 +33,8 @@ export interface OpcoesAppDeTeste {
   config?: Partial<Config>;
   agora?: () => Date;
   limiteRequisicoes?: { max: number; janelaMs: number };
+  adminAuth?: AdminAuth | null;
+  email?: ProvedorEmail;
 }
 
 /** App completo sobre o banco de teste, com verificador HS256 real. */
@@ -45,6 +49,8 @@ export async function criarAppDeTeste(db: Db, opcoes: OpcoesAppDeTeste = {}): Pr
     }),
     ...(opcoes.agora ? { agora: opcoes.agora } : {}),
     ...(opcoes.limiteRequisicoes ? { limiteRequisicoes: opcoes.limiteRequisicoes } : {}),
+    ...(opcoes.adminAuth !== undefined ? { adminAuth: opcoes.adminAuth } : {}),
+    ...(opcoes.email ? { email: opcoes.email } : {}),
     logger: false,
   });
   await app.ready();
@@ -58,12 +64,14 @@ export interface OpcoesToken {
   /** Expiração: instante absoluto (Date) ou texto do jose (ex.: "1h"). */
   expiraEm?: Date | string;
   email?: string;
+  /** Nível de garantia da sessão (claim aal). Padrão: ausente. */
+  aal?: "aal1" | "aal2";
 }
 
 /** Assina um JWT no formato do Supabase Auth, só para testes. */
 export async function tokenPara(authUserId: string, opcoes: OpcoesToken = {}): Promise<string> {
   const exp = opcoes.expiraEm ?? "1h";
-  return new SignJWT(opcoes.email ? { email: opcoes.email } : {})
+  return new SignJWT({ ...(opcoes.email ? { email: opcoes.email } : {}), ...(opcoes.aal ? { aal: opcoes.aal } : {}) })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(authUserId)
     .setIssuer(opcoes.issuer ?? `${SUPABASE_URL_TESTE}/auth/v1`)
@@ -112,4 +120,29 @@ export async function criarUsuarioDeTeste(
     [authUserId, `${opcoes.papel}-${authUserId.slice(0, 8)}@teste.dev`, nome, opcoes.papel, atletaId, opcoes.ativo ?? true],
   );
   return { id: r.rows[0]!.id, authUserId, atletaId };
+}
+
+export interface AdminAuthFalso extends AdminAuth {
+  convites: { email: string; redirectTo: string; authUserId: string }[];
+  /** E-mails que já têm conta no Auth (convidar lança ContaJaExiste). */
+  contasExistentes: Set<string>;
+  /** Quando preenchido, convidar falha com este erro genérico. */
+  falhar: boolean;
+}
+
+/** AdminAuth em memória, só para testes. */
+export function criarAdminAuthFalso(): AdminAuthFalso {
+  const falso: AdminAuthFalso = {
+    convites: [],
+    contasExistentes: new Set(),
+    falhar: false,
+    async convidar(email, redirectTo) {
+      if (falso.falhar) throw new Error("falha simulada");
+      if (falso.contasExistentes.has(email)) throw new ContaJaExiste();
+      const authUserId = crypto.randomUUID();
+      falso.convites.push({ email, redirectTo, authUserId });
+      return { authUserId };
+    },
+  };
+  return falso;
 }

@@ -12,6 +12,7 @@ import type { Config } from "./config.js";
 import type { Db } from "./db/db.js";
 import { criarProvedorEmailLog, type ProvedorEmail } from "./email/index.js";
 import { registrarTratamentoDeErros } from "./erros.js";
+import type { AdminAuth } from "./integracoes/supabase-admin.js";
 import { rotasHealth } from "./routes/health.js";
 import { rotasAtletas } from "./routes/atletas.js";
 import { rotasAvaliacoes } from "./routes/avaliacoes.js";
@@ -21,6 +22,8 @@ import { rotasMe } from "./routes/me.js";
 import { rotasPainel } from "./routes/painel.js";
 import { rotasParametros } from "./routes/parametros.js";
 import { rotasRanking } from "./routes/ranking.js";
+import { rotasTermo } from "./routes/termo.js";
+import { rotasUsuarios } from "./routes/usuarios.js";
 
 export interface DepsApp {
   db: Db;
@@ -33,12 +36,15 @@ export interface DepsApp {
   limiteRequisicoes?: { max: number; janelaMs: number };
   /** Provedor de e-mail. Padrão: provedor `log` (não envia). O server.ts escolhe pela config. */
   email?: ProvedorEmail;
+  /** Cliente admin do Supabase Auth (convites). Ausente = convite indisponível. */
+  adminAuth?: AdminAuth | null;
 }
 
 declare module "fastify" {
   interface FastifyInstance {
     config: Config;
     email: ProvedorEmail;
+    adminAuth: AdminAuth | null;
   }
 }
 
@@ -61,6 +67,8 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasPainel,
   rotasInvestimento,
   rotasParametros,
+  rotasUsuarios,
+  rotasTermo,
 ];
 
 export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
@@ -85,6 +93,7 @@ export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
   app.decorate("db", deps.db);
   app.decorate("config", config);
   app.decorate("email", deps.email ?? criarProvedorEmailLog(app.log));
+  app.decorate("adminAuth", deps.adminAuth ?? null);
   app.decorate("agora", deps.agora ?? (() => new Date()));
   registrarAutenticacao(app, deps.verificarToken);
 

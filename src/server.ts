@@ -1,5 +1,6 @@
 import { criarApp } from "./app.js";
 import { criarVerificadorSupabase } from "./auth/jwt.js";
+import { criarAdminAuth } from "./integracoes/supabase-admin.js";
 import { carregarEnvLocal, lerConfig } from "./config.js";
 import { criarDbPg, type Db } from "./db/db.js";
 
@@ -20,6 +21,9 @@ async function criarDbDaConfig(): Promise<Db> {
 const app = await criarApp({
   db,
   config,
+  adminAuth: config.SUPABASE_SERVICE_ROLE_KEY
+    ? criarAdminAuth({ supabaseUrl: config.SUPABASE_URL, serviceRoleKey: config.SUPABASE_SERVICE_ROLE_KEY })
+    : null,
   verificarToken: criarVerificadorSupabase({
     supabaseUrl: config.SUPABASE_URL,
     jwtSecret: config.SUPABASE_JWT_SECRET,
