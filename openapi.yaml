@@ -1057,6 +1057,164 @@ paths:
                   - erro
                   - mensagem
                 additionalProperties: false
+    put:
+      summary: Edita classe, treinador, número de vela ou situação do atleta
+      tags:
+        - usuarios
+      description: Valida classe ativa e treinador ativo. numeroVela vazio limpa o campo.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                classeId:
+                  type: string
+                  minLength: 1
+                  maxLength: 40
+                treinadorId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                numeroVela:
+                  type: string
+                  maxLength: 20
+                ativo:
+                  type: boolean
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: &a6
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  classeId:
+                    type: string
+                  treinadorId:
+                    nullable: true
+                    type: string
+                  numeroVela:
+                    nullable: true
+                    type: string
+                  ativo:
+                    type: boolean
+                required:
+                  - id
+                  - classeId
+                  - treinadorId
+                  - numeroVela
+                  - ativo
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
   /atletas/{id}/avaliacoes/previa:
     post:
       summary: "Prévia do lançamento: score antes e depois, sem gravar"
@@ -2011,6 +2169,11 @@ paths:
                   type: string
                   format: uuid
                   pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                criarConta:
+                  default: true
+                  description: Cria a conta do atleta (papel atleta) e envia o convite, se houver
+                    e-mail no VelaID
+                  type: boolean
               required:
                 - velaidCodigo
                 - classeId
@@ -2041,10 +2204,21 @@ paths:
                       - status
                       - versao
                     additionalProperties: false
+                  conta:
+                    type: string
+                    enum:
+                      - convite_enviado
+                      - sem_email
+                      - indisponivel
+                    description: "convite_enviado: conta criada e convite enviado. sem_email:
+                      nenhuma conta criada (VelaID sem e-mail, e-mail já em uso
+                      ou criarConta=false). indisponivel: conta criada, mas o
+                      convite não foi enviado (use POST /usuarios/:id/convite)."
                 required:
                   - id
                   - nome
                   - termo
+                  - conta
                 additionalProperties: false
         "400":
           description: Default Response
@@ -2274,8 +2448,8 @@ paths:
               properties:
                 versao:
                   type: string
-                  enum:
-                    - Piloto 18+ · v1
+                  minLength: 1
+                  maxLength: 100
               required:
                 - versao
       parameters:
@@ -7057,6 +7231,905 @@ paths:
                   - mensagem
                 additionalProperties: false
         "503":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /usuarios:
+    get:
+      summary: Lista as contas do sistema
+      tags:
+        - usuarios
+      security: *a6
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    nome:
+                      type: string
+                    email:
+                      type: string
+                    papel:
+                      type: string
+                      enum:
+                        - gestor
+                        - treinador
+                        - atleta
+                        - ibvar
+                        - responsavel
+                    ativo:
+                      type: boolean
+                    atleta:
+                      nullable: true
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                      required:
+                        - id
+                        - nome
+                      additionalProperties: false
+                    contaVinculada:
+                      type: boolean
+                      description: Já existe login amarrado a este cadastro (auth_user_id)
+                    convidadoEm:
+                      nullable: true
+                      description: Instante ISO do último convite; nulo se nunca enviado
+                      type: string
+                  required:
+                    - id
+                    - nome
+                    - email
+                    - papel
+                    - ativo
+                    - atleta
+                    - contaVinculada
+                    - convidadoEm
+                  additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    post:
+      summary: Cria uma conta e envia o convite por e-mail
+      tags:
+        - usuarios
+      description: "Papel atleta exige atletaId de um atleta ativo ainda sem usuário.
+        O papel responsavel é recusado (fluxo de menores desligado).
+        convite=indisponivel: o usuário foi criado, mas o e-mail não foi enviado
+        (convite não configurado, falha do Auth ou e-mail que já tem conta); use
+        POST /usuarios/:id/convite ou 'Esqueci a senha'."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                email:
+                  type: string
+                papel:
+                  type: string
+                  enum:
+                    - gestor
+                    - treinador
+                    - ibvar
+                    - atleta
+                    - responsavel
+                atletaId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              required:
+                - nome
+                - email
+                - papel
+      security: *a6
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usuario:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                      email:
+                        type: string
+                      papel:
+                        type: string
+                        enum:
+                          - gestor
+                          - treinador
+                          - atleta
+                          - ibvar
+                          - responsavel
+                      ativo:
+                        type: boolean
+                      atleta:
+                        nullable: true
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                        additionalProperties: false
+                      contaVinculada:
+                        type: boolean
+                        description: Já existe login amarrado a este cadastro (auth_user_id)
+                      convidadoEm:
+                        nullable: true
+                        description: Instante ISO do último convite; nulo se nunca enviado
+                        type: string
+                    required:
+                      - id
+                      - nome
+                      - email
+                      - papel
+                      - ativo
+                      - atleta
+                      - contaVinculada
+                      - convidadoEm
+                    additionalProperties: false
+                  convite:
+                    type: string
+                    enum:
+                      - enviado
+                      - indisponivel
+                required:
+                  - usuario
+                  - convite
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /usuarios/{id}:
+    put:
+      summary: Edita nome ou ativa/desativa uma conta
+      tags:
+        - usuarios
+      description: O gestor não desativa a própria conta. Conta inativa perde o acesso
+        na próxima requisição.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome:
+                  type: string
+                  minLength: 1
+                  maxLength: 120
+                ativo:
+                  type: boolean
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: *a6
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  nome:
+                    type: string
+                  email:
+                    type: string
+                  papel:
+                    type: string
+                    enum:
+                      - gestor
+                      - treinador
+                      - atleta
+                      - ibvar
+                      - responsavel
+                  ativo:
+                    type: boolean
+                  atleta:
+                    nullable: true
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  contaVinculada:
+                    type: boolean
+                    description: Já existe login amarrado a este cadastro (auth_user_id)
+                  convidadoEm:
+                    nullable: true
+                    description: Instante ISO do último convite; nulo se nunca enviado
+                    type: string
+                required:
+                  - id
+                  - nome
+                  - email
+                  - papel
+                  - ativo
+                  - atleta
+                  - contaVinculada
+                  - convidadoEm
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /usuarios/{id}/convite:
+    post:
+      summary: Reenvia o convite de conta
+      tags:
+        - usuarios
+      description: "409 quando o e-mail já tem conta ativa: a pessoa deve usar
+        'Esqueci a senha'. 503 quando o convite não está configurado."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: *a6
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  convite:
+                    type: string
+                    enum:
+                      - enviado
+                required:
+                  - convite
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "503":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /termo:
+    get:
+      summary: Termo de consentimento vigente
+      tags:
+        - termo
+      description: Texto da versão vigente (a de maior vigente_desde). Qualquer
+        usuário autenticado lê.
+      security: &a7
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versao:
+                    type: string
+                  titulo:
+                    type: string
+                  texto:
+                    type: string
+                  vigenteDesde:
+                    type: string
+                    description: Instante ISO
+                required:
+                  - versao
+                  - titulo
+                  - texto
+                  - vigenteDesde
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /termo/aceite:
+    post:
+      summary: O atleta aceita o termo vigente
+      tags:
+        - termo
+      description: A versão enviada precisa ser a vigente. Não concede o
+        compartilhamento com o IBVAR (consentimento separado, em PUT
+        /consentimento).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                versao:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+              required:
+                - versao
+      security: *a7
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok:
+                    type: boolean
+                    enum:
+                      - true
+                required:
+                  - ok
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
           description: Default Response
           content:
             application/json:

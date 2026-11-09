@@ -1,6 +1,13 @@
 import { createRemoteJWKSet, jwtVerify } from "jose";
 
-export type VerificadorToken = (token: string) => Promise<{ sub: string; email?: string }>;
+export interface ClaimsVerificados {
+  sub: string;
+  email?: string;
+  /** Nível de garantia da sessão: aal2 = passou pelo segundo fator. Ausente = aal1. */
+  aal?: "aal1" | "aal2";
+}
+
+export type VerificadorToken = (token: string) => Promise<ClaimsVerificados>;
 
 /**
  * Verifica o JWT de sessão do Supabase Auth.
@@ -24,6 +31,7 @@ export function criarVerificadorSupabase(opcoes: {
       : await jwtVerify(token, jwks!, { issuer, audience, algorithms: ["ES256", "RS256", "EdDSA"] });
     if (typeof payload.sub !== "string" || payload.sub === "") throw new Error("Token sem sub");
     const email = typeof payload.email === "string" ? payload.email : undefined;
-    return email === undefined ? { sub: payload.sub } : { sub: payload.sub, email };
+    const aal = payload.aal === "aal2" ? "aal2" : "aal1";
+    return email === undefined ? { sub: payload.sub, aal } : { sub: payload.sub, email, aal };
   };
 }

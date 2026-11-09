@@ -4,9 +4,10 @@ import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import { idadeEm } from "../domain/index.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
+import { ContaJaExiste } from "../integracoes/supabase-admin.js";
+import { buscarTermoVigente } from "../repositories/termo.js";
 import { ArquivoRejeitado, importarCsv } from "../importacao/index.js";
 
-const VERSAO_TERMO = "Piloto 18+ · v1";
 const IDADE_MINIMA_PILOTO = 18;
 const CODIGO_VELAID = /^[A-Z]{2}-[A-Z0-9]{2,10}$/;
 
@@ -63,6 +64,7 @@ const esquemaCadastro = z.object({
   velaidCodigo: z.string().max(40),
   classeId: z.string().min(1).max(40),
   treinadorId: z.uuid(),
+  criarConta: z.boolean().default(true).describe("Cria a conta do atleta (papel atleta) e envia o convite, se houver e-mail no VelaID"),
 });
 
 const esquemaImportacao = z.object({
@@ -161,6 +163,11 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
             id: z.string(),
             nome: z.string(),
             termo: z.object({ status: z.literal("aguardando_aceite"), versao: z.string() }),
+            conta: z
+              .enum(["convite_enviado", "sem_email", "indisponivel"])
+              .describe(
+                "convite_enviado: conta criada e convite enviado. sem_email: nenhuma conta criada (VelaID sem e-mail, e-mail já em uso ou criarConta=false). indisponivel: conta criada, mas o convite não foi enviado (use POST /usuarios/:id/convite).",
+              ),
           }),
           400: esquemaErro,
           401: esquemaErro,
@@ -172,9 +179,10 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
     },
     async (req, reply) => {
       const codigo = normalizarCodigo(req.body.velaidCodigo);
-      const { classeId, treinadorId } = req.body;
+      const { classeId, treinadorId, criarConta } = req.body;
       const usuarioId = req.usuario.id;
       const referencia = app.agora();
+      const termo = await buscarTermoVigente(app.db);
 
       const criado = await app.db
         .transacao(async (tx) => {
@@ -198,13 +206,32 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
             [v.codigo, v.nome, v.genero, v.data_nascimento, classeId, v.clube, v.cidade, v.uf, v.ws_id, treinadorId, v.email, usuarioId],
           );
           const id = ins.rows[0]!.id;
-          const detalhes = JSON.stringify({ velaid: codigo, classeId, versaoTermo: VERSAO_TERMO });
+          const detalhes = JSON.stringify({ velaid: codigo, classeId, versaoTermo: termo.versao });
           await tx.query(
             `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
              values ($1, 'cadastrar_atleta', 'atletas', $2, $3::jsonb), ($1, 'enviar_termo', 'atletas', $2, $3::jsonb)`,
             [usuarioId, id, detalhes],
           );
-          return { id, nome: v.nome };
+
+          // Conta do atleta (papel atleta), amarrada ao e-mail do VelaID. E-mail já em uso: não cria.
+          let contaUsuarioId: string | null = null;
+          const email = v.email?.trim().toLowerCase() || null;
+          if (criarConta && email) {
+            const emUso = await tx.query("select 1 from usuarios where lower(email) = $1", [email]);
+            if (emUso.rows.length === 0) {
+              const u = await tx.query<{ id: string }>(
+                "insert into usuarios (email, nome, papel, atleta_id) values ($1, $2, 'atleta', $3) returning id",
+                [email, v.nome, id],
+              );
+              contaUsuarioId = u.rows[0]!.id;
+              await tx.query(
+                `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
+                 values ($1, 'criar_usuario', 'usuarios', $2, $3::jsonb)`,
+                [usuarioId, contaUsuarioId, JSON.stringify({ papel: "atleta", atletaId: id })],
+              );
+            }
+          }
+          return { id, nome: v.nome, email, contaUsuarioId };
         })
         .catch((e: unknown) => {
           // Cadastro simultâneo do mesmo código: a restrição única do banco decide.
@@ -212,9 +239,59 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
           throw e;
         });
 
-      // Provedor de e-mail ainda não definido: só log estruturado, sem e-mail nem dado pessoal.
-      req.log.info({ evento: "termo_enviado", atletaId: criado.id, versao: VERSAO_TERMO }, "termo do piloto enviado");
-      return reply.code(201).send({ ...criado, termo: { status: "aguardando_aceite" as const, versao: VERSAO_TERMO } });
+      const front = app.config.FRONT_URL.replace(/\/+$/, "");
+      let conta: "convite_enviado" | "sem_email" | "indisponivel" = "sem_email";
+      if (criado.contaUsuarioId && criado.email) {
+        conta = "indisponivel";
+        if (app.adminAuth) {
+          try {
+            const { authUserId } = await app.adminAuth.convidar(criado.email, `${front}/redefinir-senha`);
+            await app.db.transacao(async (tx) => {
+              await tx.query("update usuarios set auth_user_id = coalesce(auth_user_id, $2), convidado_em = $3 where id = $1", [
+                criado.contaUsuarioId,
+                authUserId,
+                app.agora(),
+              ]);
+              await tx.query(
+                `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
+                 values ($1, 'convidar_usuario', 'usuarios', $2, '{}'::jsonb)`,
+                [usuarioId, criado.contaUsuarioId],
+              );
+            });
+            conta = "convite_enviado";
+          } catch (e) {
+            if (!(e instanceof ContaJaExiste)) {
+              req.log.error({ evento: "convite_falhou", usuarioId: criado.contaUsuarioId, err: e instanceof Error ? e.message : "erro" }, "falha ao convidar");
+            }
+          }
+        }
+      }
+
+      // E-mail do termo: falha de envio não desfaz o cadastro (o gestor pode registrar o aceite depois).
+      if (criado.email) {
+        try {
+          await app.email.enviar({
+            para: criado.email,
+            assunto: "Scout Vela: leia e aceite o termo de consentimento",
+            texto: [
+              `Olá, ${criado.nome}.`,
+              "Você foi cadastrado no piloto do Scout Vela (CBVela). Para participar, leia e aceite o termo de consentimento " +
+                `(${termo.versao}) em ${front}`,
+              "O compartilhamento com o IBVAR é uma autorização separada, que você controla depois do aceite.",
+            ].join("\n\n"),
+          });
+        } catch (e) {
+          req.log.error({ evento: "email_termo_falhou", atletaId: criado.id, err: e instanceof Error ? e.message : "erro" }, "falha ao enviar o termo");
+        }
+      }
+
+      req.log.info({ evento: "termo_enviado", atletaId: criado.id, versao: termo.versao }, "termo do piloto enviado");
+      return reply.code(201).send({
+        id: criado.id,
+        nome: criado.nome,
+        termo: { status: "aguardando_aceite" as const, versao: termo.versao },
+        conta,
+      });
     },
   );
 
@@ -272,7 +349,7 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
           "Não concede o compartilhamento com o IBVAR: essa decisão é do atleta (consentimento explícito). Depois do aceite o atleta entra no ranking.",
         security: seguranca,
         params: z.object({ id: z.uuid() }),
-        body: z.object({ versao: z.literal(VERSAO_TERMO) }),
+        body: z.object({ versao: z.string().min(1).max(100) }),
         response: { 200: z.object({ ok: z.literal(true) }), 400: esquemaErro, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro, 409: esquemaErro },
       },
     },
@@ -280,6 +357,8 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       const { id } = req.params;
       const usuarioId = req.usuario.id;
       await app.db.transacao(async (tx) => {
+        const vigente = await buscarTermoVigente(tx);
+        if (req.body.versao !== vigente.versao) throw requisicaoInvalida("A versão do termo não é a vigente.");
         const a = await tx.query("select 1 from atletas where id = $1 and ativo for update", [id]);
         if (a.rows.length === 0) throw naoEncontrado("Atleta não encontrado.");
         const aceito = await tx.query(

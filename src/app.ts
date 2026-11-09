@@ -12,6 +12,7 @@ import type { Config } from "./config.js";
 import type { Db } from "./db/db.js";
 import { criarProvedorEmailLog, type ProvedorEmail } from "./email/index.js";
 import { registrarTratamentoDeErros } from "./erros.js";
+import type { AdminAuth } from "./integracoes/supabase-admin.js";
 import { rotasHealth } from "./routes/health.js";
 import { rotasAtletas } from "./routes/atletas.js";
 import { rotasAuditoria } from "./routes/auditoria.js";
@@ -28,6 +29,8 @@ import { rotasParametros } from "./routes/parametros.js";
 import { rotasRanking } from "./routes/ranking.js";
 import { rotasTitular } from "./routes/titular.js";
 import { criarArmazenamentoLocal, type ArmazenamentoEvidencias } from "./storage/index.js";
+import { rotasTermo } from "./routes/termo.js";
+import { rotasUsuarios } from "./routes/usuarios.js";
 
 export interface DepsApp {
   db: Db;
@@ -42,6 +45,8 @@ export interface DepsApp {
   email?: ProvedorEmail;
   /** Armazenamento das evidências. Padrão: disco local da config (só desenvolvimento). O server.ts escolhe pela config. */
   armazenamento?: ArmazenamentoEvidencias;
+  /** Cliente admin do Supabase Auth (convites). Ausente = convite indisponível. */
+  adminAuth?: AdminAuth | null;
 }
 
 declare module "fastify" {
@@ -49,6 +54,7 @@ declare module "fastify" {
     config: Config;
     email: ProvedorEmail;
     armazenamento: ArmazenamentoEvidencias;
+    adminAuth: AdminAuth | null;
   }
 }
 
@@ -77,6 +83,8 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasTitular,
   rotasPlano,
   rotasEvidencias,
+  rotasUsuarios,
+  rotasTermo,
 ];
 
 export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
@@ -102,6 +110,7 @@ export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
   app.decorate("config", config);
   app.decorate("email", deps.email ?? criarProvedorEmailLog(app.log));
   app.decorate("armazenamento", deps.armazenamento ?? criarArmazenamentoLocal(config.STORAGE_DIR_LOCAL));
+  app.decorate("adminAuth", deps.adminAuth ?? null);
   app.decorate("agora", deps.agora ?? (() => new Date()));
   registrarAutenticacao(app, deps.verificarToken);
 

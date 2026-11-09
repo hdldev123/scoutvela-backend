@@ -1,8 +1,8 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from "fastify";
 import type { Db } from "../db/db.js";
 import type { Papel } from "../domain/tipos.js";
-import { naoAutenticado, semAcesso } from "../erros.js";
-import { buscarUsuarioPorAuthId } from "../repositories/usuarios.js";
+import { mfaObrigatorio, naoAutenticado, semAcesso } from "../erros.js";
+import { buscarUsuarioPorAuthId, vincularContaPorEmail } from "../repositories/usuarios.js";
 import { acessoDoPapel } from "./acesso.js";
 import type { VerificadorToken } from "./jwt.js";
 
@@ -53,14 +53,21 @@ export function registrarAutenticacao(app: FastifyInstance, verificarToken: Veri
     }
 
     let sub: string;
+    let email: string | undefined;
+    let aal: "aal1" | "aal2" | undefined;
     try {
-      ({ sub } = await verificarToken(m[1]));
+      ({ sub, email, aal } = await verificarToken(m[1]));
     } catch {
       logarAcessoNegado(req, "token_invalido");
       throw naoAutenticado("Sessão inválida ou expirada.");
     }
 
-    const u = await buscarUsuarioPorAuthId(app.db, sub);
+    let u = await buscarUsuarioPorAuthId(app.db, sub);
+    if (!u && email) {
+      // Primeiro login de uma conta convidada: amarra o login ao cadastro pelo e-mail do token.
+      u = await vincularContaPorEmail(app.db, sub, email);
+      if (u) req.log.info({ evento: "conta_vinculada", usuarioId: u.id, papel: u.papel }, "conta vinculada no primeiro login");
+    }
     if (!u) {
       logarAcessoNegado(req, "sem_cadastro");
       throw semAcesso();
@@ -68,6 +75,11 @@ export function registrarAutenticacao(app: FastifyInstance, verificarToken: Veri
     if (!u.ativo || !acessoDoPapel(u.papel)) {
       logarAcessoNegado(req, u.ativo ? "papel_sem_acesso" : "usuario_inativo", u);
       throw semAcesso();
+    }
+
+    if (app.config.EXIGIR_MFA && (u.papel === "gestor" || u.papel === "ibvar") && aal !== "aal2") {
+      logarAcessoNegado(req, "mfa_obrigatorio", u);
+      throw mfaObrigatorio();
     }
 
     req.usuario = {

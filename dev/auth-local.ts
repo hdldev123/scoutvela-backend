@@ -25,6 +25,10 @@ export interface OpcoesAuthLocal {
   contas?: ContaDemo[];
   /** Padrão: process.env.APP_ENV, e "desenvolvimento" quando ausente (igual à config da API). */
   appEnv?: string;
+  /** Chave de servidor local aceita em /auth/v1/invite (a API a usa como SUPABASE_SERVICE_ROLE_KEY). Sem ela, convite é negado. */
+  serviceRoleKey?: string;
+  /** Onde imprimir os links de convite e de redefinição (não há e-mail no modo local). Padrão: console.log. */
+  log?: (mensagem: string) => void;
 }
 
 interface SenhaComHash {
@@ -36,6 +40,13 @@ interface UsuarioAuth {
   auth_user_id: string;
   email: string;
   criado_em: Date;
+}
+
+interface LinkEmail {
+  authUserId: string;
+  email: string;
+  tipo: "invite" | "recovery";
+  expiraEm: number;
 }
 
 interface SessaoRefresh {
@@ -79,6 +90,12 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
   // Hash scrypt calculado na inicialização: a senha em texto puro não fica guardada para comparação.
   const contas = new Map<string, SenhaComHash>();
   for (const c of opcoes.contas ?? CONTAS_DEMO) contas.set(c.email.toLowerCase(), await hashDaSenha(c.senha));
+  const imprimir = opcoes.log ?? ((m: string) => console.log(m));
+  const hashChaveServico = opcoes.serviceRoleKey ? hashDoToken(opcoes.serviceRoleKey) : null;
+  // Links de convite/redefinição (uso único, 1 h), indexados pelo SHA-256 do token.
+  const linksEmail = new Map<string, LinkEmail>();
+  // E-mails convidados nesta execução: id de login emitido (a conta ainda pode não ter senha).
+  const convidados = new Map<string, string>();
   const hashFalso = await hashDaSenha(randomBytes(12).toString("hex"));
 
   // Refresh tokens ficam só em memória, indexados pelo SHA-256 (uso único).
@@ -87,7 +104,7 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
   const app = Fastify({ logger: false, bodyLimit: 16 * 1024 });
   await app.register(cors, {
     origin: opcoes.origens,
-    methods: ["GET", "POST", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "OPTIONS"],
     allowedHeaders: ["authorization", "apikey", "content-type", "x-client-info", "x-supabase-api-version"],
   });
 
@@ -160,8 +177,8 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
     };
   }
 
-  /** Valida o Bearer (assinatura, emissor, audiência, validade) e devolve o auth_user_id. */
-  async function sujeitoDoBearer(cabecalho: string | undefined): Promise<string | null> {
+  /** Valida o Bearer (assinatura, emissor, audiência, validade) e devolve o auth_user_id e o e-mail do token. */
+  async function claimsDoBearer(cabecalho: string | undefined): Promise<{ sub: string; email: string | null } | null> {
     const m = /^Bearer (\S+)$/.exec(cabecalho ?? "");
     if (!m) return null;
     try {
@@ -171,11 +188,39 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
         algorithms: ["HS256"],
         currentDate: agora(),
       });
-      return typeof payload.sub === "string" && payload.sub !== "" ? payload.sub : null;
+      if (typeof payload.sub !== "string" || payload.sub === "") return null;
+      return { sub: payload.sub, email: typeof payload.email === "string" ? payload.email : null };
     } catch {
       return null;
     }
   }
+  async function sujeitoDoBearer(cabecalho: string | undefined): Promise<string | null> {
+    return (await claimsDoBearer(cabecalho))?.sub ?? null;
+  }
+
+  const ehChaveServico = (cabecalho: string | undefined): boolean => {
+    const m = /^Bearer (\S+)$/.exec(cabecalho ?? "");
+    return hashChaveServico !== null && m !== null && hashDoToken(m[1]!) === hashChaveServico;
+  };
+
+  /** Destino do link: precisa ser de uma origem liberada (evita redirecionamento aberto). */
+  function destinoPermitido(redirectTo: string | undefined): string | null {
+    if (!redirectTo) return opcoes.origens[0] ? `${opcoes.origens[0]}/` : null;
+    try {
+      const u = new URL(redirectTo);
+      return opcoes.origens.includes(u.origin) ? u.toString() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  function gerarLink(base: string, dados: Omit<LinkEmail, "expiraEm">, destino: string): string {
+    const token = randomBytes(24).toString("base64url");
+    linksEmail.set(hashDoToken(token), { ...dados, expiraEm: agora().getTime() + VALIDADE_SEGUNDOS * 1000 });
+    const q = new URLSearchParams({ token, type: dados.tipo, redirect_to: destino });
+    return `${base}/auth/v1/verify?${q.toString()}`;
+  }
+  const urlBase = (host: string | undefined): string => (host ? `http://${host}` : emissor.replace(/\/auth\/v1$/, ""));
 
   const credenciaisInvalidas = (resp: FastifyReply) =>
     erro(resp, 400, "invalid_credentials", "Invalid login credentials");
@@ -223,6 +268,99 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
     if (!sub) return erro(resp, 401, "bad_jwt", "invalid JWT");
     for (const [k, s] of refreshTokens) if (s.authUserId === sub) refreshTokens.delete(k);
     return resp.code(204).send();
+  });
+
+  // Convite de conta (API admin): exige a chave de servidor local. Cria a conta sem senha e imprime o link.
+  app.post("/auth/v1/invite", async (req, resp) => {
+    if (!ehChaveServico(req.headers.authorization)) return erro(resp, 401, "not_admin", "User not allowed");
+    const corpo = (req.body ?? {}) as Record<string, unknown>;
+    const email = typeof corpo.email === "string" ? corpo.email.trim().toLowerCase() : "";
+    const destino = destinoPermitido((req.query as { redirect_to?: string }).redirect_to);
+    if (!email || !destino) return erro(resp, 400, "validation_failed", "Invalid request");
+    if (contas.has(email)) {
+      return erro(resp, 422, "email_exists", "A user with this email address has already been registered");
+    }
+    const { rows } = await db.query<{ auth_user_id: string | null }>(
+      "select auth_user_id::text as auth_user_id from usuarios where email = $1 and ativo",
+      [email],
+    );
+    if (!rows[0]) return erro(resp, 400, "validation_failed", "Usuário não cadastrado na API (modo local)");
+    const authUserId = rows[0].auth_user_id ?? convidados.get(email) ?? randomUUID();
+    convidados.set(email, authUserId);
+    imprimir(`[auth-local] Convite para ${email}: ${gerarLink(urlBase(req.headers.host), { authUserId, email, tipo: "invite" }, destino)}`);
+    const criado = agora().toISOString();
+    return resp.code(200).send({
+      id: authUserId,
+      aud: "authenticated",
+      role: "authenticated",
+      email,
+      invited_at: criado,
+      created_at: criado,
+      updated_at: criado,
+    });
+  });
+
+  // Redefinição de senha: resposta igual exista ou não a conta (não revela e-mails).
+  app.post("/auth/v1/recover", async (req, resp) => {
+    const corpo = (req.body ?? {}) as Record<string, unknown>;
+    const email = typeof corpo.email === "string" ? corpo.email.trim().toLowerCase() : "";
+    const destino = destinoPermitido((req.query as { redirect_to?: string }).redirect_to);
+    if (!email || !destino) return erro(resp, 400, "validation_failed", "Invalid request");
+    const { rows } = await db.query<{ auth_user_id: string | null }>(
+      "select auth_user_id::text as auth_user_id from usuarios where email = $1 and ativo",
+      [email],
+    );
+    const authUserId = rows[0] ? (rows[0].auth_user_id ?? convidados.get(email) ?? null) : null;
+    if (authUserId) {
+      const link = gerarLink(urlBase(req.headers.host), { authUserId, email, tipo: "recovery" }, destino);
+      imprimir(`[auth-local] Redefinição de senha para ${email}: ${link}`);
+    }
+    return resp.code(200).send({});
+  });
+
+  // Abre o link do e-mail: valida o token (uso único) e volta ao front com a sessão no fragmento.
+  app.get("/auth/v1/verify", async (req, resp) => {
+    const q = req.query as { token?: string; type?: string; redirect_to?: string };
+    const destino = destinoPermitido(q.redirect_to);
+    if (!destino) return erro(resp, 400, "validation_failed", "redirect_to não permitido");
+    const chaveLink = hashDoToken(q.token ?? "");
+    const link = linksEmail.get(chaveLink);
+    linksEmail.delete(chaveLink);
+    const rows = link
+      ? (await db.query<{ criado_em: Date }>("select criado_em from usuarios where email = $1 and ativo", [link.email])).rows
+      : [];
+    if (!link || !rows[0] || link.tipo !== q.type || link.expiraEm < agora().getTime()) {
+      const falha = new URLSearchParams({
+        error: "access_denied",
+        error_code: "otp_expired",
+        error_description: "Email link is invalid or has expired",
+      });
+      return resp.redirect(`${destino}#${falha.toString()}`, 302);
+    }
+    // Como no Supabase, a conta passa a existir no Auth: amarra o login ao cadastro se ainda não estiver.
+    await db.query("update usuarios set auth_user_id = $1 where email = $2 and auth_user_id is null", [link.authUserId, link.email]);
+    const sessao = await criarSessao({ auth_user_id: link.authUserId, email: link.email, criado_em: rows[0].criado_em }, randomUUID());
+    const frag = new URLSearchParams({
+      access_token: sessao.access_token,
+      refresh_token: sessao.refresh_token,
+      expires_in: String(VALIDADE_SEGUNDOS),
+      token_type: "bearer",
+      type: link.tipo,
+    });
+    return resp.redirect(`${destino}#${frag.toString()}`, 302);
+  });
+
+  // Troca a senha da sessão (usada após convite ou redefinição).
+  app.put("/auth/v1/user", async (req, resp) => {
+    const sub = await sujeitoDoBearer(req.headers.authorization);
+    const usuario = sub ? await buscarUsuario("auth_user_id", sub) : null;
+    if (!usuario) return erro(resp, 401, "bad_jwt", "invalid JWT");
+    const senha = ((req.body ?? {}) as Record<string, unknown>).password;
+    if (typeof senha !== "string" || senha.length < 6) {
+      return erro(resp, 422, "weak_password", "Password should be at least 6 characters.");
+    }
+    contas.set(usuario.email.toLowerCase(), await hashDaSenha(senha));
+    return resp.code(200).send(objetoUser(usuario));
   });
 
   app.get("/auth/v1/health", async () => ({ status: "ok", name: "auth-local" }));
