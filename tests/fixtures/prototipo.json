@@ -1,0 +1,1935 @@
+{
+  "geradoDe": "vela-front/src/lib/scout/engine.js",
+  "referencia": "2026-11-06",
+  "atletas": [
+    {
+      "velaid": "SC-T01",
+      "nome": "Lívia Arruda",
+      "classe": "ilca6",
+      "peso": 72.4,
+      "perfilSuporte": "B",
+      "consentIbvar": true,
+      "score": 86.56666666666666,
+      "faixa": "f1",
+      "pontosCbvela": 310.02886002886,
+      "gates": [
+        {
+          "status": "apto",
+          "motivo": "Dentro da faixa da classe (+0,4 kg da média)"
+        },
+        {
+          "status": "apto",
+          "motivo": "12º de 60 no Mundial da classe"
+        },
+        {
+          "status": "condicional",
+          "motivo": "2 eventos internacionalis em 24 meses"
+        },
+        {
+          "status": "apto",
+          "motivo": "Plano e recursos para 24 meses"
+        }
+      ],
+      "statusFinal": "condicional",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 87.07187366417298
+        },
+        {
+          "ciclo": "Out",
+          "score": 86.3773170777286
+        }
+      ],
+      "notas": {
+        "perf_mundial": 5,
+        "perf_continental": 5,
+        "perf_nacional": 4,
+        "perf_consistencia": 4,
+        "perf_nivel_frota": 5,
+        "cf_peso_kg": 5,
+        "cf_altura_cm": 5,
+        "cf_composicao": 5,
+        "cf_potencia": 4,
+        "cf_forca": 5,
+        "cf_compatibilidade": 4,
+        "tec_boat_handling": 5,
+        "tec_velocidade": 4,
+        "tec_trim": 4,
+        "tec_manobras": 5,
+        "tec_largada": 4,
+        "tec_adaptacao": 4,
+        "tat_leitura_vento": 4,
+        "tat_estrategia": 4,
+        "tat_posicionamento": 4,
+        "tat_risco": 3,
+        "tat_adaptacao": 4,
+        "pot_aprendizagem": 5,
+        "pot_feedback": 4,
+        "pot_evolucao": 5,
+        "exp_alto_rendimento": 3,
+        "men_resiliencia": 5,
+        "men_disciplina": 4,
+        "men_autonomia": 4,
+        "men_competitividade": 4,
+        "men_controle_pressao": 4,
+        "amb_apoio_familiar": 4,
+        "amb_disponibilidade": 4,
+        "amb_estabilidade": 5,
+        "amb_autonomia": 4,
+        "amb_logistica": 4,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 4,
+        "car_compromisso": 4,
+        "car_disponibilidade": 4,
+        "car_equipe_tecnica": 5,
+        "car_horizonte": 5
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia totalmente",
+        "amb_disponibilidade": "Sem restrição",
+        "amb_estabilidade": "Sim, sem conflito",
+        "amb_logistica": "Resolvo sozinho(a)",
+        "amb_historico_familiar": "Sim",
+        "amb_acesso_estrutura": "Treinador e base fixos",
+        "car_disponibilidade": "Mais de 20 h",
+        "car_equipe_tecnica": "Treinador e preparador físico"
+      },
+      "resultados": [
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 2,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 44.44444444444444
+        },
+        {
+          "nivel": "Mundial",
+          "evento": "Mundial de ILCA 6",
+          "data": "2026-07-18",
+          "posicao": 12,
+          "tamanhoFrota": 60,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual SC",
+          "data": "2026-05-30",
+          "posicao": 2,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 92.85714285714286
+        },
+        {
+          "nivel": "Sul-Americano",
+          "evento": "Sul-Americano de ILCA 6",
+          "data": "2026-03-14",
+          "posicao": 2,
+          "tamanhoFrota": 18,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de ILCA 6",
+          "data": "2026-01-24",
+          "posicao": 4,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 172.72727272727272
+        }
+      ]
+    },
+    {
+      "velaid": "RS-T02",
+      "nome": "Caio Tavares",
+      "classe": "ilca7",
+      "peso": 84.1,
+      "perfilSuporte": "A",
+      "consentIbvar": true,
+      "score": 83.46666666666665,
+      "faixa": "f2",
+      "pontosCbvela": 279.14862914862914,
+      "gates": [
+        {
+          "status": "apto",
+          "motivo": "Dentro da faixa da classe (−0,4 kg da média)"
+        },
+        {
+          "status": "condicional",
+          "motivo": "4º no Sul-Americano"
+        },
+        {
+          "status": "apto",
+          "motivo": "3 eventos internacionais em 24 meses"
+        },
+        {
+          "status": "apto",
+          "motivo": "Plano e recursos para 36 meses"
+        }
+      ],
+      "statusFinal": "condicional",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 83.35573904948929
+        },
+        {
+          "ciclo": "Out",
+          "score": 82.65791389706233
+        }
+      ],
+      "notas": {
+        "perf_mundial": 5,
+        "perf_continental": 4,
+        "perf_nacional": 4,
+        "perf_consistencia": 4,
+        "perf_nivel_frota": 4,
+        "cf_peso_kg": 5,
+        "cf_altura_cm": 4,
+        "cf_composicao": 4,
+        "cf_potencia": 5,
+        "cf_forca": 4,
+        "cf_compatibilidade": 4,
+        "tec_boat_handling": 4,
+        "tec_velocidade": 4,
+        "tec_trim": 5,
+        "tec_manobras": 4,
+        "tec_largada": 4,
+        "tec_adaptacao": 4,
+        "tat_leitura_vento": 5,
+        "tat_estrategia": 4,
+        "tat_posicionamento": 4,
+        "tat_risco": 5,
+        "tat_adaptacao": 5,
+        "pot_aprendizagem": 4,
+        "pot_feedback": 4,
+        "pot_evolucao": 4,
+        "exp_alto_rendimento": 5,
+        "men_resiliencia": 3,
+        "men_disciplina": 4,
+        "men_autonomia": 3,
+        "men_competitividade": 3,
+        "men_controle_pressao": 4,
+        "amb_apoio_familiar": 3,
+        "amb_disponibilidade": 4,
+        "amb_estabilidade": 3,
+        "amb_autonomia": 4,
+        "amb_logistica": 4,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 4,
+        "car_compromisso": 5,
+        "car_disponibilidade": 4,
+        "car_equipe_tecnica": 5,
+        "car_horizonte": 4
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia em parte",
+        "amb_disponibilidade": "Sem restrição",
+        "amb_estabilidade": "Com ajustes",
+        "amb_logistica": "Resolvo sozinho(a)",
+        "amb_historico_familiar": "Não",
+        "amb_acesso_estrutura": "Treinador e base fixos",
+        "car_disponibilidade": "Mais de 20 h",
+        "car_equipe_tecnica": "Treinador e preparador físico"
+      },
+      "resultados": [
+        {
+          "nivel": "Europeu aberto",
+          "evento": "Europeu aberto de ILCA 7",
+          "data": "2026-09-12",
+          "posicao": 28,
+          "tamanhoFrota": 80,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 3,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 38.88888888888889
+        },
+        {
+          "nivel": "Mundial",
+          "evento": "Mundial de ILCA 7",
+          "data": "2026-07-18",
+          "posicao": 22,
+          "tamanhoFrota": 60,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual RS",
+          "data": "2026-05-30",
+          "posicao": 3,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 85.71428571428571
+        },
+        {
+          "nivel": "Sul-Americano",
+          "evento": "Sul-Americano de ILCA 7",
+          "data": "2026-03-14",
+          "posicao": 4,
+          "tamanhoFrota": 18,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de ILCA 7",
+          "data": "2026-01-24",
+          "posicao": 6,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 154.54545454545453
+        }
+      ]
+    },
+    {
+      "velaid": "RJ-T03",
+      "nome": "Bianca Lemos",
+      "classe": "fx-helm",
+      "peso": 68,
+      "perfilSuporte": "C",
+      "consentIbvar": true,
+      "score": 78.05,
+      "faixa": "f2",
+      "pontosCbvela": 264.86291486291486,
+      "gates": [
+        {
+          "status": "apto",
+          "motivo": "Dentro da faixa da classe (−1,3 kg da média)"
+        },
+        {
+          "status": "condicional",
+          "motivo": "6º no Sul-Americano"
+        },
+        {
+          "status": "condicional",
+          "motivo": "1 evento internacional em 24 meses"
+        },
+        {
+          "status": "condicional",
+          "motivo": "Depende de apoio da CBVela"
+        }
+      ],
+      "statusFinal": "condicional",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 77.30874514505267
+        },
+        {
+          "ciclo": "Out",
+          "score": 77.81985460240394
+        }
+      ],
+      "notas": {
+        "perf_mundial": 4,
+        "perf_continental": 3,
+        "perf_nacional": 4,
+        "perf_consistencia": 4,
+        "perf_nivel_frota": 4,
+        "cf_peso_kg": 4,
+        "cf_altura_cm": 4,
+        "cf_composicao": 3,
+        "cf_potencia": 5,
+        "cf_forca": 4,
+        "cf_compatibilidade": 4,
+        "tec_boat_handling": 5,
+        "tec_velocidade": 4,
+        "tec_trim": 4,
+        "tec_manobras": 4,
+        "tec_largada": 4,
+        "tec_adaptacao": 4,
+        "tat_leitura_vento": 4,
+        "tat_estrategia": 4,
+        "tat_posicionamento": 3,
+        "tat_risco": 4,
+        "tat_adaptacao": 4,
+        "pot_aprendizagem": 4,
+        "pot_feedback": 5,
+        "pot_evolucao": 5,
+        "exp_alto_rendimento": 3,
+        "men_resiliencia": 3,
+        "men_disciplina": 4,
+        "men_autonomia": 4,
+        "men_competitividade": 5,
+        "men_controle_pressao": 4,
+        "amb_apoio_familiar": 4,
+        "amb_disponibilidade": 3,
+        "amb_estabilidade": 3,
+        "amb_autonomia": 4,
+        "amb_logistica": 4,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 4,
+        "car_compromisso": 4,
+        "car_disponibilidade": 3,
+        "car_equipe_tecnica": 4,
+        "car_horizonte": 4
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia totalmente",
+        "amb_disponibilidade": "Algumas semanas por ano",
+        "amb_estabilidade": "Com ajustes",
+        "amb_logistica": "Resolvo sozinho(a)",
+        "amb_historico_familiar": "Não",
+        "amb_acesso_estrutura": "Treinador e base fixos",
+        "car_disponibilidade": "10 a 20 h",
+        "car_equipe_tecnica": "Treinador e preparador físico"
+      },
+      "resultados": [
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 3,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 38.88888888888889
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual RJ",
+          "data": "2026-05-30",
+          "posicao": 5,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 71.42857142857143
+        },
+        {
+          "nivel": "Sul-Americano",
+          "evento": "Sul-Americano de 49erFX",
+          "data": "2026-03-14",
+          "posicao": 6,
+          "tamanhoFrota": 18,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de 49erFX",
+          "data": "2026-01-24",
+          "posicao": 6,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 154.54545454545453
+        }
+      ]
+    },
+    {
+      "velaid": "RJ-T04",
+      "nome": "Marina Seixas",
+      "classe": "fx-crew",
+      "peso": 74.9,
+      "perfilSuporte": "C",
+      "consentIbvar": true,
+      "score": 66.9,
+      "faixa": "f3",
+      "pontosCbvela": 270.4184704184704,
+      "gates": [
+        {
+          "status": "condicional",
+          "motivo": "Leve desvio: +3,4 kg da média da classe"
+        },
+        {
+          "status": "alerta",
+          "motivo": "Sem evidência relevante fora do circuito nacional"
+        },
+        {
+          "status": "condicional",
+          "motivo": "1 evento internacional em 24 meses"
+        },
+        {
+          "status": "condicional",
+          "motivo": "Depende de apoio da CBVela"
+        }
+      ],
+      "statusFinal": "nao_prioritario",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 66.7391186464578
+        },
+        {
+          "ciclo": "Out",
+          "score": 66.94702460300178
+        }
+      ],
+      "notas": {
+        "perf_mundial": 3,
+        "perf_continental": 3,
+        "perf_nacional": 3,
+        "perf_consistencia": 4,
+        "perf_nivel_frota": 3,
+        "cf_peso_kg": 2,
+        "cf_altura_cm": 3,
+        "cf_composicao": 3,
+        "cf_potencia": 4,
+        "cf_forca": 3,
+        "cf_compatibilidade": 3,
+        "tec_boat_handling": 4,
+        "tec_velocidade": 5,
+        "tec_trim": 3,
+        "tec_manobras": 4,
+        "tec_largada": 4,
+        "tec_adaptacao": 4,
+        "tat_leitura_vento": 3,
+        "tat_estrategia": 3,
+        "tat_posicionamento": 3,
+        "tat_risco": 4,
+        "tat_adaptacao": 3,
+        "pot_aprendizagem": 5,
+        "pot_feedback": 4,
+        "pot_evolucao": 4,
+        "exp_alto_rendimento": 2,
+        "men_resiliencia": 3,
+        "men_disciplina": 4,
+        "men_autonomia": 4,
+        "men_competitividade": 4,
+        "men_controle_pressao": 3,
+        "amb_apoio_familiar": 3,
+        "amb_disponibilidade": 3,
+        "amb_estabilidade": 3,
+        "amb_autonomia": 4,
+        "amb_logistica": 4,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 3,
+        "car_compromisso": 3,
+        "car_disponibilidade": 4,
+        "car_equipe_tecnica": 4,
+        "car_horizonte": 3
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia em parte",
+        "amb_disponibilidade": "Algumas semanas por ano",
+        "amb_estabilidade": "Com ajustes",
+        "amb_logistica": "Resolvo sozinho(a)",
+        "amb_historico_familiar": "Não",
+        "amb_acesso_estrutura": "Treinador eventual",
+        "car_disponibilidade": "Mais de 20 h",
+        "car_equipe_tecnica": "Treinador e preparador físico"
+      },
+      "resultados": [
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 2,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 44.44444444444444
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual RJ",
+          "data": "2026-05-30",
+          "posicao": 5,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 71.42857142857143
+        },
+        {
+          "nivel": "Sul-Americano",
+          "evento": "Sul-Americano de 49erFX",
+          "data": "2026-03-14",
+          "posicao": 8,
+          "tamanhoFrota": 18,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de 49erFX",
+          "data": "2026-01-24",
+          "posicao": 6,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 154.54545454545453
+        }
+      ]
+    },
+    {
+      "velaid": "RJ-T05",
+      "nome": "Rafael Quintela",
+      "classe": "49er-helm",
+      "peso": 81,
+      "perfilSuporte": "B",
+      "consentIbvar": true,
+      "score": 83.4,
+      "faixa": "f2",
+      "pontosCbvela": 302.88600288600287,
+      "gates": [
+        {
+          "status": "apto",
+          "motivo": "Dentro da faixa da classe (−0,7 kg da média)"
+        },
+        {
+          "status": "apto",
+          "motivo": "17º de 60 no Mundial da classe"
+        },
+        {
+          "status": "apto",
+          "motivo": "3 eventos internacionais em 24 meses"
+        },
+        {
+          "status": "apto",
+          "motivo": "Plano e recursos para 24 meses"
+        }
+      ],
+      "statusFinal": "apto",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 81.59932253938169
+        },
+        {
+          "ciclo": "Out",
+          "score": 84.27962058838457
+        }
+      ],
+      "notas": {
+        "perf_mundial": 4,
+        "perf_continental": 4,
+        "perf_nacional": 4,
+        "perf_consistencia": 4,
+        "perf_nivel_frota": 3,
+        "cf_peso_kg": 5,
+        "cf_altura_cm": 4,
+        "cf_composicao": 5,
+        "cf_potencia": 4,
+        "cf_forca": 5,
+        "cf_compatibilidade": 5,
+        "tec_boat_handling": 4,
+        "tec_velocidade": 4,
+        "tec_trim": 5,
+        "tec_manobras": 5,
+        "tec_largada": 4,
+        "tec_adaptacao": 5,
+        "tat_leitura_vento": 4,
+        "tat_estrategia": 4,
+        "tat_posicionamento": 5,
+        "tat_risco": 4,
+        "tat_adaptacao": 4,
+        "pot_aprendizagem": 3,
+        "pot_feedback": 3,
+        "pot_evolucao": 4,
+        "exp_alto_rendimento": 4,
+        "men_resiliencia": 4,
+        "men_disciplina": 4,
+        "men_autonomia": 4,
+        "men_competitividade": 5,
+        "men_controle_pressao": 5,
+        "amb_apoio_familiar": 3,
+        "amb_disponibilidade": 4,
+        "amb_estabilidade": 4,
+        "amb_autonomia": 3,
+        "amb_logistica": 4,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 3,
+        "car_compromisso": 4,
+        "car_disponibilidade": 5,
+        "car_equipe_tecnica": 5,
+        "car_horizonte": 4
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia em parte",
+        "amb_disponibilidade": "Sem restrição",
+        "amb_estabilidade": "Sim, sem conflito",
+        "amb_logistica": "Resolvo sozinho(a)",
+        "amb_historico_familiar": "Sim",
+        "amb_acesso_estrutura": "Treinador eventual",
+        "car_disponibilidade": "Mais de 20 h",
+        "car_equipe_tecnica": "Treinador e preparador físico"
+      },
+      "resultados": [
+        {
+          "nivel": "Europeu aberto",
+          "evento": "Europeu aberto de 49er",
+          "data": "2026-09-12",
+          "posicao": 22,
+          "tamanhoFrota": 80,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 2,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 44.44444444444444
+        },
+        {
+          "nivel": "Mundial",
+          "evento": "Mundial de 49er",
+          "data": "2026-07-18",
+          "posicao": 17,
+          "tamanhoFrota": 60,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual RJ",
+          "data": "2026-05-30",
+          "posicao": 3,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 85.71428571428571
+        },
+        {
+          "nivel": "Sul-Americano",
+          "evento": "Sul-Americano de 49er",
+          "data": "2026-03-14",
+          "posicao": 3,
+          "tamanhoFrota": 18,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de 49er",
+          "data": "2026-01-24",
+          "posicao": 4,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 172.72727272727272
+        }
+      ]
+    },
+    {
+      "velaid": "RJ-T06",
+      "nome": "Otávio Brandão",
+      "classe": "49er-crew",
+      "peso": 86.8,
+      "perfilSuporte": "B",
+      "consentIbvar": true,
+      "score": 77.09999999999998,
+      "faixa": "f2",
+      "pontosCbvela": 304.47330447330444,
+      "gates": [
+        {
+          "status": "condicional",
+          "motivo": "Leve desvio: +3,0 kg da média da classe"
+        },
+        {
+          "status": "condicional",
+          "motivo": "4º no Sul-Americano"
+        },
+        {
+          "status": "apto",
+          "motivo": "3 eventos internacionais em 24 meses"
+        },
+        {
+          "status": "apto",
+          "motivo": "Plano e recursos para 24 meses"
+        }
+      ],
+      "statusFinal": "condicional",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 72.4227081634104
+        },
+        {
+          "ciclo": "Out",
+          "score": 74.34534314405171
+        }
+      ],
+      "notas": {
+        "perf_mundial": 4,
+        "perf_continental": 4,
+        "perf_nacional": 5,
+        "perf_consistencia": 4,
+        "perf_nivel_frota": 4,
+        "cf_peso_kg": 2,
+        "cf_altura_cm": 4,
+        "cf_composicao": 4,
+        "cf_potencia": 4,
+        "cf_forca": 3,
+        "cf_compatibilidade": 4,
+        "tec_boat_handling": 4,
+        "tec_velocidade": 4,
+        "tec_trim": 5,
+        "tec_manobras": 5,
+        "tec_largada": 5,
+        "tec_adaptacao": 4,
+        "tat_leitura_vento": 3,
+        "tat_estrategia": 3,
+        "tat_posicionamento": 3,
+        "tat_risco": 4,
+        "tat_adaptacao": 4,
+        "pot_aprendizagem": 4,
+        "pot_feedback": 3,
+        "pot_evolucao": 4,
+        "exp_alto_rendimento": 3,
+        "men_resiliencia": 4,
+        "men_disciplina": 4,
+        "men_autonomia": 4,
+        "men_competitividade": 4,
+        "men_controle_pressao": 4,
+        "amb_apoio_familiar": 4,
+        "amb_disponibilidade": 3,
+        "amb_estabilidade": 4,
+        "amb_autonomia": 3,
+        "amb_logistica": 4,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 4,
+        "car_compromisso": 4,
+        "car_disponibilidade": 4,
+        "car_equipe_tecnica": 4,
+        "car_horizonte": 4
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia totalmente",
+        "amb_disponibilidade": "Algumas semanas por ano",
+        "amb_estabilidade": "Sim, sem conflito",
+        "amb_logistica": "Resolvo sozinho(a)",
+        "amb_historico_familiar": "Sim",
+        "amb_acesso_estrutura": "Treinador e base fixos",
+        "car_disponibilidade": "Mais de 20 h",
+        "car_equipe_tecnica": "Treinador e preparador físico"
+      },
+      "resultados": [
+        {
+          "nivel": "Europeu aberto",
+          "evento": "Europeu aberto de 49er",
+          "data": "2026-09-12",
+          "posicao": 27,
+          "tamanhoFrota": 80,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 3,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 38.88888888888889
+        },
+        {
+          "nivel": "Mundial",
+          "evento": "Mundial de 49er",
+          "data": "2026-07-18",
+          "posicao": 20,
+          "tamanhoFrota": 60,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual RJ",
+          "data": "2026-05-30",
+          "posicao": 2,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 92.85714285714286
+        },
+        {
+          "nivel": "Sul-Americano",
+          "evento": "Sul-Americano de 49er",
+          "data": "2026-03-14",
+          "posicao": 4,
+          "tamanhoFrota": 18,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de 49er",
+          "data": "2026-01-24",
+          "posicao": 4,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 172.72727272727272
+        }
+      ]
+    },
+    {
+      "velaid": "SP-T07",
+      "nome": "Helena Vasques",
+      "classe": "iqf-w",
+      "peso": 66.2,
+      "perfilSuporte": "C",
+      "consentIbvar": false,
+      "score": 72.5,
+      "faixa": "f3",
+      "pontosCbvela": 241.1255411255411,
+      "gates": [
+        {
+          "status": "condicional",
+          "motivo": "Leve desvio: −3,9 kg da média da classe"
+        },
+        {
+          "status": "alerta",
+          "motivo": "Sem evidência relevante fora do circuito nacional"
+        },
+        {
+          "status": "alerta",
+          "motivo": "Nenhum evento internacional em 24 meses"
+        },
+        {
+          "status": "condicional",
+          "motivo": "Depende de apoio da CBVela"
+        }
+      ],
+      "statusFinal": "nao_prioritario",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 71.4043472148478
+        },
+        {
+          "ciclo": "Out",
+          "score": 71.08763390686363
+        }
+      ],
+      "notas": {
+        "perf_mundial": 3,
+        "perf_continental": 3,
+        "perf_nacional": 2,
+        "perf_consistencia": 3,
+        "perf_nivel_frota": 4,
+        "cf_peso_kg": 3,
+        "cf_altura_cm": 5,
+        "cf_composicao": 4,
+        "cf_potencia": 4,
+        "cf_forca": 5,
+        "cf_compatibilidade": 4,
+        "tec_boat_handling": 3,
+        "tec_velocidade": 4,
+        "tec_trim": 5,
+        "tec_manobras": 4,
+        "tec_largada": 4,
+        "tec_adaptacao": 3,
+        "tat_leitura_vento": 3,
+        "tat_estrategia": 3,
+        "tat_posicionamento": 3,
+        "tat_risco": 4,
+        "tat_adaptacao": 3,
+        "pot_aprendizagem": 4,
+        "pot_feedback": 4,
+        "pot_evolucao": 5,
+        "exp_alto_rendimento": 2,
+        "men_resiliencia": 5,
+        "men_disciplina": 5,
+        "men_autonomia": 5,
+        "men_competitividade": 5,
+        "men_controle_pressao": 4,
+        "amb_apoio_familiar": null,
+        "amb_disponibilidade": null,
+        "amb_estabilidade": null,
+        "amb_autonomia": 3,
+        "amb_logistica": null,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": null,
+        "car_compromisso": 4,
+        "car_disponibilidade": null,
+        "car_equipe_tecnica": null,
+        "car_horizonte": 4
+      },
+      "respostas": {},
+      "resultados": [
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 4,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 33.33333333333333
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual SP",
+          "data": "2026-05-30",
+          "posicao": 5,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 71.42857142857143
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de iQFOiL",
+          "data": "2026-01-24",
+          "posicao": 8,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 136.36363636363635
+        }
+      ]
+    },
+    {
+      "velaid": "SP-T08",
+      "nome": "Davi Moretto",
+      "classe": "iqf-m",
+      "peso": 89.5,
+      "perfilSuporte": "A",
+      "consentIbvar": true,
+      "score": 89.78333333333333,
+      "faixa": "f1",
+      "pontosCbvela": 311.976911976912,
+      "gates": [
+        {
+          "status": "apto",
+          "motivo": "Dentro da faixa da classe (−0,9 kg da média)"
+        },
+        {
+          "status": "apto",
+          "motivo": "12º de 60 no Mundial da classe"
+        },
+        {
+          "status": "apto",
+          "motivo": "3 eventos internacionais em 24 meses"
+        },
+        {
+          "status": "apto",
+          "motivo": "Plano e recursos para 36 meses"
+        }
+      ],
+      "statusFinal": "apto",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 87.2576177764063
+        },
+        {
+          "ciclo": "Out",
+          "score": 87.84039950755735
+        }
+      ],
+      "notas": {
+        "perf_mundial": 4,
+        "perf_continental": 5,
+        "perf_nacional": 5,
+        "perf_consistencia": 5,
+        "perf_nivel_frota": 5,
+        "cf_peso_kg": 4,
+        "cf_altura_cm": 4,
+        "cf_composicao": 5,
+        "cf_potencia": 5,
+        "cf_forca": 5,
+        "cf_compatibilidade": 5,
+        "tec_boat_handling": 4,
+        "tec_velocidade": 5,
+        "tec_trim": 4,
+        "tec_manobras": 4,
+        "tec_largada": 4,
+        "tec_adaptacao": 4,
+        "tat_leitura_vento": 5,
+        "tat_estrategia": 4,
+        "tat_posicionamento": 5,
+        "tat_risco": 4,
+        "tat_adaptacao": 4,
+        "pot_aprendizagem": 3,
+        "pot_feedback": 3,
+        "pot_evolucao": 4,
+        "exp_alto_rendimento": 5,
+        "men_resiliencia": 4,
+        "men_disciplina": 5,
+        "men_autonomia": 4,
+        "men_competitividade": 5,
+        "men_controle_pressao": 5,
+        "amb_apoio_familiar": 4,
+        "amb_disponibilidade": 4,
+        "amb_estabilidade": 5,
+        "amb_autonomia": 4,
+        "amb_logistica": 4,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 4,
+        "car_compromisso": 5,
+        "car_disponibilidade": 4,
+        "car_equipe_tecnica": 5,
+        "car_horizonte": 5
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia totalmente",
+        "amb_disponibilidade": "Sem restrição",
+        "amb_estabilidade": "Sim, sem conflito",
+        "amb_logistica": "Resolvo sozinho(a)",
+        "amb_historico_familiar": "Sim",
+        "amb_acesso_estrutura": "Treinador e base fixos",
+        "car_disponibilidade": "Mais de 20 h",
+        "car_equipe_tecnica": "Treinador e preparador físico"
+      },
+      "resultados": [
+        {
+          "nivel": "Europeu aberto",
+          "evento": "Europeu aberto de iQFOiL",
+          "data": "2026-09-12",
+          "posicao": 17,
+          "tamanhoFrota": 80,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 2,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 44.44444444444444
+        },
+        {
+          "nivel": "Mundial",
+          "evento": "Mundial de iQFOiL",
+          "data": "2026-07-18",
+          "posicao": 12,
+          "tamanhoFrota": 60,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual SP",
+          "data": "2026-05-30",
+          "posicao": 3,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 85.71428571428571
+        },
+        {
+          "nivel": "Sul-Americano",
+          "evento": "Sul-Americano de iQFOiL",
+          "data": "2026-03-14",
+          "posicao": 2,
+          "tamanhoFrota": 18,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de iQFOiL",
+          "data": "2026-01-24",
+          "posicao": 3,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 181.8181818181818
+        }
+      ]
+    },
+    {
+      "velaid": "CE-T09",
+      "nome": "Isadora Prates",
+      "classe": "fk-w",
+      "peso": 69.4,
+      "perfilSuporte": "D",
+      "consentIbvar": true,
+      "score": 65.93333333333334,
+      "faixa": "f3",
+      "pontosCbvela": 257.35930735930737,
+      "gates": [
+        {
+          "status": "condicional",
+          "motivo": "Leve desvio: −5,7 kg da média da classe"
+        },
+        {
+          "status": "alerta",
+          "motivo": "Sem evidência relevante fora do circuito nacional"
+        },
+        {
+          "status": "condicional",
+          "motivo": "1 evento internacional em 24 meses"
+        },
+        {
+          "status": "alerta",
+          "motivo": "Sem estrutura para campanha internacional"
+        }
+      ],
+      "statusFinal": "nao_prioritario",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 64.41521808107694
+        },
+        {
+          "ciclo": "Out",
+          "score": 63.761809897360706
+        }
+      ],
+      "notas": {
+        "perf_mundial": 4,
+        "perf_continental": 3,
+        "perf_nacional": 4,
+        "perf_consistencia": 4,
+        "perf_nivel_frota": 4,
+        "cf_peso_kg": 2,
+        "cf_altura_cm": 3,
+        "cf_composicao": 3,
+        "cf_potencia": 3,
+        "cf_forca": 2,
+        "cf_compatibilidade": 3,
+        "tec_boat_handling": 3,
+        "tec_velocidade": 4,
+        "tec_trim": null,
+        "tec_manobras": 4,
+        "tec_largada": null,
+        "tec_adaptacao": 3,
+        "tat_leitura_vento": 2,
+        "tat_estrategia": 4,
+        "tat_posicionamento": 3,
+        "tat_risco": 3,
+        "tat_adaptacao": 4,
+        "pot_aprendizagem": 4,
+        "pot_feedback": 4,
+        "pot_evolucao": 4,
+        "exp_alto_rendimento": 2,
+        "men_resiliencia": 5,
+        "men_disciplina": 4,
+        "men_autonomia": 4,
+        "men_competitividade": 3,
+        "men_controle_pressao": 4,
+        "amb_apoio_familiar": 3,
+        "amb_disponibilidade": 3,
+        "amb_estabilidade": 3,
+        "amb_autonomia": 3,
+        "amb_logistica": 2,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 3,
+        "car_compromisso": 4,
+        "car_disponibilidade": 3,
+        "car_equipe_tecnica": 3,
+        "car_horizonte": 4
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia em parte",
+        "amb_disponibilidade": "Algumas semanas por ano",
+        "amb_estabilidade": "Com ajustes",
+        "amb_logistica": "Preciso de ajuda às vezes",
+        "amb_historico_familiar": "Não",
+        "amb_acesso_estrutura": "Treinador eventual",
+        "car_disponibilidade": "10 a 20 h",
+        "car_equipe_tecnica": "Só treinador"
+      },
+      "resultados": [
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 4,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 33.33333333333333
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual CE",
+          "data": "2026-05-30",
+          "posicao": 4,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 78.57142857142857
+        },
+        {
+          "nivel": "Sul-Americano",
+          "evento": "Sul-Americano de Formula Kite",
+          "data": "2026-03-14",
+          "posicao": 7,
+          "tamanhoFrota": 18,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de Formula Kite",
+          "data": "2026-01-24",
+          "posicao": 7,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 145.45454545454547
+        }
+      ]
+    },
+    {
+      "velaid": "CE-T10",
+      "nome": "Tomás Albuquerque",
+      "classe": "fk-m",
+      "peso": 96,
+      "perfilSuporte": "B",
+      "consentIbvar": true,
+      "score": 75.68333333333334,
+      "faixa": "f2",
+      "pontosCbvela": 275.54112554112555,
+      "gates": [
+        {
+          "status": "apto",
+          "motivo": "Dentro da faixa da classe (−1,1 kg da média)"
+        },
+        {
+          "status": "condicional",
+          "motivo": "4º no Sul-Americano"
+        },
+        {
+          "status": "condicional",
+          "motivo": "2 eventos internacionalis em 24 meses"
+        },
+        {
+          "status": "apto",
+          "motivo": "Plano e recursos para 24 meses"
+        }
+      ],
+      "statusFinal": "condicional",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 74.0510028793787
+        },
+        {
+          "ciclo": "Out",
+          "score": 75.98511657373359
+        }
+      ],
+      "notas": {
+        "perf_mundial": 4,
+        "perf_continental": 4,
+        "perf_nacional": 4,
+        "perf_consistencia": 4,
+        "perf_nivel_frota": 4,
+        "cf_peso_kg": 5,
+        "cf_altura_cm": 4,
+        "cf_composicao": 4,
+        "cf_potencia": 5,
+        "cf_forca": 5,
+        "cf_compatibilidade": 4,
+        "tec_boat_handling": 5,
+        "tec_velocidade": 4,
+        "tec_trim": 3,
+        "tec_manobras": 4,
+        "tec_largada": 3,
+        "tec_adaptacao": 3,
+        "tat_leitura_vento": 3,
+        "tat_estrategia": 4,
+        "tat_posicionamento": 4,
+        "tat_risco": 4,
+        "tat_adaptacao": 4,
+        "pot_aprendizagem": 3,
+        "pot_feedback": 4,
+        "pot_evolucao": 4,
+        "exp_alto_rendimento": 3,
+        "men_resiliencia": 3,
+        "men_disciplina": 3,
+        "men_autonomia": 3,
+        "men_competitividade": 3,
+        "men_controle_pressao": 3,
+        "amb_apoio_familiar": 4,
+        "amb_disponibilidade": 3,
+        "amb_estabilidade": 3,
+        "amb_autonomia": 3,
+        "amb_logistica": 4,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 3,
+        "car_compromisso": 3,
+        "car_disponibilidade": 4,
+        "car_equipe_tecnica": 4,
+        "car_horizonte": 4
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia totalmente",
+        "amb_disponibilidade": "Algumas semanas por ano",
+        "amb_estabilidade": "Com ajustes",
+        "amb_logistica": "Resolvo sozinho(a)",
+        "amb_historico_familiar": "Não",
+        "amb_acesso_estrutura": "Treinador eventual",
+        "car_disponibilidade": "Mais de 20 h",
+        "car_equipe_tecnica": "Treinador e preparador físico"
+      },
+      "resultados": [
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 4,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 33.33333333333333
+        },
+        {
+          "nivel": "Mundial",
+          "evento": "Mundial de Formula Kite",
+          "data": "2026-07-18",
+          "posicao": 23,
+          "tamanhoFrota": 60,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual CE",
+          "data": "2026-05-30",
+          "posicao": 4,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 78.57142857142857
+        },
+        {
+          "nivel": "Sul-Americano",
+          "evento": "Sul-Americano de Formula Kite",
+          "data": "2026-03-14",
+          "posicao": 4,
+          "tamanhoFrota": 18,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de Formula Kite",
+          "data": "2026-01-24",
+          "posicao": 5,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 163.63636363636365
+        }
+      ]
+    },
+    {
+      "velaid": "DF-T11",
+      "nome": "Nina Cardoso",
+      "classe": "470-helm",
+      "peso": 61.8,
+      "perfilSuporte": "C",
+      "consentIbvar": true,
+      "score": 81.91666666666667,
+      "faixa": "f2",
+      "pontosCbvela": 281.0966810966811,
+      "gates": [
+        {
+          "status": "apto",
+          "motivo": "Dentro da faixa da classe (−0,7 kg da média)"
+        },
+        {
+          "status": "condicional",
+          "motivo": "23º de 60 no Mundial"
+        },
+        {
+          "status": "condicional",
+          "motivo": "2 eventos internacionalis em 24 meses"
+        },
+        {
+          "status": "condicional",
+          "motivo": "Depende de apoio da CBVela"
+        }
+      ],
+      "statusFinal": "condicional",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 81.2738372689734
+        },
+        {
+          "ciclo": "Out",
+          "score": 81.36930405596893
+        }
+      ],
+      "notas": {
+        "perf_mundial": 4,
+        "perf_continental": 4,
+        "perf_nacional": 3,
+        "perf_consistencia": 4,
+        "perf_nivel_frota": 4,
+        "cf_peso_kg": 5,
+        "cf_altura_cm": 4,
+        "cf_composicao": 4,
+        "cf_potencia": 4,
+        "cf_forca": 5,
+        "cf_compatibilidade": 5,
+        "tec_boat_handling": 4,
+        "tec_velocidade": 4,
+        "tec_trim": 3,
+        "tec_manobras": 4,
+        "tec_largada": 4,
+        "tec_adaptacao": 4,
+        "tat_leitura_vento": 4,
+        "tat_estrategia": 4,
+        "tat_posicionamento": 4,
+        "tat_risco": 5,
+        "tat_adaptacao": 3,
+        "pot_aprendizagem": 3,
+        "pot_feedback": 5,
+        "pot_evolucao": 4,
+        "exp_alto_rendimento": 4,
+        "men_resiliencia": 5,
+        "men_disciplina": 4,
+        "men_autonomia": 4,
+        "men_competitividade": 4,
+        "men_controle_pressao": 5,
+        "amb_apoio_familiar": 4,
+        "amb_disponibilidade": 3,
+        "amb_estabilidade": 4,
+        "amb_autonomia": 5,
+        "amb_logistica": 3,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 4,
+        "car_compromisso": 5,
+        "car_disponibilidade": 4,
+        "car_equipe_tecnica": 5,
+        "car_horizonte": 5
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia totalmente",
+        "amb_disponibilidade": "Algumas semanas por ano",
+        "amb_estabilidade": "Sim, sem conflito",
+        "amb_logistica": "Preciso de ajuda às vezes",
+        "amb_historico_familiar": "Não",
+        "amb_acesso_estrutura": "Treinador e base fixos",
+        "car_disponibilidade": "Mais de 20 h",
+        "car_equipe_tecnica": "Treinador e preparador físico"
+      },
+      "resultados": [
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 3,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 38.88888888888889
+        },
+        {
+          "nivel": "Mundial",
+          "evento": "Mundial de 470",
+          "data": "2026-07-18",
+          "posicao": 23,
+          "tamanhoFrota": 60,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual DF",
+          "data": "2026-05-30",
+          "posicao": 4,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 78.57142857142857
+        },
+        {
+          "nivel": "Sul-Americano",
+          "evento": "Sul-Americano de 470",
+          "data": "2026-03-14",
+          "posicao": 7,
+          "tamanhoFrota": 18,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de 470",
+          "data": "2026-01-24",
+          "posicao": 5,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 163.63636363636365
+        }
+      ]
+    },
+    {
+      "velaid": "DF-T12",
+      "nome": "Pedro Viana",
+      "classe": "470-crew",
+      "peso": 75.5,
+      "perfilSuporte": "B",
+      "consentIbvar": true,
+      "score": 81.63333333333334,
+      "faixa": "f2",
+      "pontosCbvela": 288.23953823953826,
+      "gates": [
+        {
+          "status": "apto",
+          "motivo": "Dentro da faixa da classe (+1,9 kg da média)"
+        },
+        {
+          "status": "condicional",
+          "motivo": "6º no Sul-Americano"
+        },
+        {
+          "status": "condicional",
+          "motivo": "2 eventos internacionalis em 24 meses"
+        },
+        {
+          "status": "apto",
+          "motivo": "Plano e recursos para 24 meses"
+        }
+      ],
+      "statusFinal": "condicional",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 79.6259621852388
+        },
+        {
+          "ciclo": "Out",
+          "score": 79.8826334770148
+        }
+      ],
+      "notas": {
+        "perf_mundial": 4,
+        "perf_continental": 4,
+        "perf_nacional": 4,
+        "perf_consistencia": 4,
+        "perf_nivel_frota": 4,
+        "cf_peso_kg": 4,
+        "cf_altura_cm": 4,
+        "cf_composicao": 5,
+        "cf_potencia": 5,
+        "cf_forca": 4,
+        "cf_compatibilidade": 5,
+        "tec_boat_handling": 5,
+        "tec_velocidade": 3,
+        "tec_trim": 4,
+        "tec_manobras": 4,
+        "tec_largada": 5,
+        "tec_adaptacao": 4,
+        "tat_leitura_vento": 4,
+        "tat_estrategia": 3,
+        "tat_posicionamento": 5,
+        "tat_risco": 5,
+        "tat_adaptacao": 4,
+        "pot_aprendizagem": 4,
+        "pot_feedback": 4,
+        "pot_evolucao": 3,
+        "exp_alto_rendimento": 3,
+        "men_resiliencia": 3,
+        "men_disciplina": 5,
+        "men_autonomia": 3,
+        "men_competitividade": 5,
+        "men_controle_pressao": 5,
+        "amb_apoio_familiar": 4,
+        "amb_disponibilidade": 4,
+        "amb_estabilidade": 4,
+        "amb_autonomia": 4,
+        "amb_logistica": 3,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 4,
+        "car_compromisso": 4,
+        "car_disponibilidade": 5,
+        "car_equipe_tecnica": 3,
+        "car_horizonte": 4
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia totalmente",
+        "amb_disponibilidade": "Sem restrição",
+        "amb_estabilidade": "Sim, sem conflito",
+        "amb_logistica": "Preciso de ajuda às vezes",
+        "amb_historico_familiar": "Não",
+        "amb_acesso_estrutura": "Treinador e base fixos",
+        "car_disponibilidade": "Mais de 20 h",
+        "car_equipe_tecnica": "Só treinador"
+      },
+      "resultados": [
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 3,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 38.88888888888889
+        },
+        {
+          "nivel": "Mundial",
+          "evento": "Mundial de 470",
+          "data": "2026-07-18",
+          "posicao": 23,
+          "tamanhoFrota": 60,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual DF",
+          "data": "2026-05-30",
+          "posicao": 3,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 85.71428571428571
+        },
+        {
+          "nivel": "Sul-Americano",
+          "evento": "Sul-Americano de 470",
+          "data": "2026-03-14",
+          "posicao": 6,
+          "tamanhoFrota": 18,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de 470",
+          "data": "2026-01-24",
+          "posicao": 5,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 163.63636363636365
+        }
+      ]
+    },
+    {
+      "velaid": "RS-T13",
+      "nome": "Larissa Fontes",
+      "classe": "n17-helm",
+      "peso": 70.9,
+      "perfilSuporte": "C",
+      "consentIbvar": true,
+      "score": 62.016666666666666,
+      "faixa": "f4",
+      "pontosCbvela": 233.98268398268397,
+      "gates": [
+        {
+          "status": "apto",
+          "motivo": "Dentro da faixa da classe (−0,8 kg da média)"
+        },
+        {
+          "status": "alerta",
+          "motivo": "Sem evidência relevante fora do circuito nacional"
+        },
+        {
+          "status": "condicional",
+          "motivo": "1 evento internacional em 24 meses"
+        },
+        {
+          "status": "condicional",
+          "motivo": "Depende de apoio da CBVela"
+        }
+      ],
+      "statusFinal": "nao_prioritario",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 60.07627358386914
+        },
+        {
+          "ciclo": "Out",
+          "score": 59.745453826213875
+        }
+      ],
+      "notas": {
+        "perf_mundial": 3,
+        "perf_continental": 3,
+        "perf_nacional": 3,
+        "perf_consistencia": 3,
+        "perf_nivel_frota": 4,
+        "cf_peso_kg": 5,
+        "cf_altura_cm": 4,
+        "cf_composicao": 4,
+        "cf_potencia": 5,
+        "cf_forca": 4,
+        "cf_compatibilidade": 3,
+        "tec_boat_handling": 3,
+        "tec_velocidade": 4,
+        "tec_trim": 4,
+        "tec_manobras": 3,
+        "tec_largada": 3,
+        "tec_adaptacao": 3,
+        "tat_leitura_vento": null,
+        "tat_estrategia": null,
+        "tat_posicionamento": null,
+        "tat_risco": null,
+        "tat_adaptacao": null,
+        "pot_aprendizagem": 5,
+        "pot_feedback": 4,
+        "pot_evolucao": 5,
+        "exp_alto_rendimento": 2,
+        "men_resiliencia": 4,
+        "men_disciplina": 3,
+        "men_autonomia": 3,
+        "men_competitividade": 3,
+        "men_controle_pressao": 4,
+        "amb_apoio_familiar": 3,
+        "amb_disponibilidade": 3,
+        "amb_estabilidade": 2,
+        "amb_autonomia": 3,
+        "amb_logistica": 3,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 2,
+        "car_compromisso": 4,
+        "car_disponibilidade": 4,
+        "car_equipe_tecnica": 4,
+        "car_horizonte": 3
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia em parte",
+        "amb_disponibilidade": "Algumas semanas por ano",
+        "amb_estabilidade": "Com ajustes",
+        "amb_logistica": "Preciso de ajuda às vezes",
+        "amb_historico_familiar": "Não",
+        "amb_acesso_estrutura": "Treinador eventual",
+        "car_disponibilidade": "Mais de 20 h",
+        "car_equipe_tecnica": "Treinador e preparador físico"
+      },
+      "resultados": [
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 4,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 33.33333333333333
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual RS",
+          "data": "2026-05-30",
+          "posicao": 6,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 64.28571428571429
+        },
+        {
+          "nivel": "Sul-Americano",
+          "evento": "Sul-Americano de Nacra 17",
+          "data": "2026-03-14",
+          "posicao": 8,
+          "tamanhoFrota": 18,
+          "internacional": true,
+          "pontos": null
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de Nacra 17",
+          "data": "2026-01-24",
+          "posicao": 8,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 136.36363636363635
+        }
+      ]
+    },
+    {
+      "velaid": "RS-T14",
+      "nome": "Gabriel Teles",
+      "classe": "n17-crew",
+      "peso": 79.8,
+      "perfilSuporte": "D",
+      "consentIbvar": true,
+      "score": 53.550000000000004,
+      "faixa": "f4",
+      "pontosCbvela": 233.98268398268397,
+      "gates": [
+        {
+          "status": "alerta",
+          "motivo": "Fora da faixa: +8,4 kg da média da classe"
+        },
+        {
+          "status": "alerta",
+          "motivo": "Sem evidência relevante fora do circuito nacional"
+        },
+        {
+          "status": "alerta",
+          "motivo": "Nenhum evento internacional em 24 meses"
+        },
+        {
+          "status": "alerta",
+          "motivo": "Sem estrutura para campanha internacional"
+        }
+      ],
+      "statusFinal": "nao_prioritario",
+      "historico": [
+        {
+          "ciclo": "Set",
+          "score": 48.02213103901595
+        },
+        {
+          "ciclo": "Out",
+          "score": 51.008196760155265
+        }
+      ],
+      "notas": {
+        "perf_mundial": 3,
+        "perf_continental": 2,
+        "perf_nacional": 3,
+        "perf_consistencia": 3,
+        "perf_nivel_frota": 2,
+        "cf_peso_kg": 0,
+        "cf_altura_cm": 2,
+        "cf_composicao": 2,
+        "cf_potencia": 2,
+        "cf_forca": 2,
+        "cf_compatibilidade": 2,
+        "tec_boat_handling": 3,
+        "tec_velocidade": 3,
+        "tec_trim": 3,
+        "tec_manobras": 3,
+        "tec_largada": 3,
+        "tec_adaptacao": 3,
+        "tat_leitura_vento": 3,
+        "tat_estrategia": 3,
+        "tat_posicionamento": 2,
+        "tat_risco": 4,
+        "tat_adaptacao": 4,
+        "pot_aprendizagem": 4,
+        "pot_feedback": 3,
+        "pot_evolucao": 3,
+        "exp_alto_rendimento": 2,
+        "men_resiliencia": 3,
+        "men_disciplina": 3,
+        "men_autonomia": 3,
+        "men_competitividade": 3,
+        "men_controle_pressao": 3,
+        "amb_apoio_familiar": 3,
+        "amb_disponibilidade": 2,
+        "amb_estabilidade": 4,
+        "amb_autonomia": 2,
+        "amb_logistica": 4,
+        "amb_historico_familiar": null,
+        "amb_acesso_estrutura": 3,
+        "car_compromisso": 4,
+        "car_disponibilidade": 4,
+        "car_equipe_tecnica": 3,
+        "car_horizonte": 4
+      },
+      "respostas": {
+        "amb_apoio_familiar": "Apoia em parte",
+        "amb_disponibilidade": "Algumas semanas por ano",
+        "amb_estabilidade": "Sim, sem conflito",
+        "amb_logistica": "Resolvo sozinho(a)",
+        "amb_historico_familiar": "Não",
+        "amb_acesso_estrutura": "Treinador eventual",
+        "car_disponibilidade": "Mais de 20 h",
+        "car_equipe_tecnica": "Só treinador"
+      },
+      "resultados": [
+        {
+          "nivel": "Regional",
+          "evento": "Regata regional · etapa 2",
+          "data": "2026-08-22",
+          "posicao": 4,
+          "tamanhoFrota": 9,
+          "internacional": false,
+          "pontos": 33.33333333333333
+        },
+        {
+          "nivel": "Estadual",
+          "evento": "Copa estadual RS",
+          "data": "2026-05-30",
+          "posicao": 6,
+          "tamanhoFrota": 14,
+          "internacional": false,
+          "pontos": 64.28571428571429
+        },
+        {
+          "nivel": "Brasileiro",
+          "evento": "Brasileiro de Nacra 17",
+          "data": "2026-01-24",
+          "posicao": 8,
+          "tamanhoFrota": 22,
+          "internacional": false,
+          "pontos": 136.36363636363635
+        }
+      ]
+    }
+  ]
+}
