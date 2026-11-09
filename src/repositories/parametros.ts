@@ -1,4 +1,5 @@
 import type { Db } from "../db/db.js";
+import { CODIGOS_REGRAS, ESQUEMAS_REGRAS, type CodigoRegra } from "./regras-esquemas.js";
 import type { Classe, FaixaScore, Parametros, Pilar, Regras, StatusGate, TipoIndicador } from "../domain/tipos.js";
 
 type ValorRegra = Record<string, unknown>;
@@ -77,7 +78,7 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
       peso_min_kg: string;
       peso_medio_kg: string;
       peso_max_kg: string;
-    }>("select id, nome, evento, posicao, peso_min_kg, peso_medio_kg, peso_max_kg from classes where ativa order by ordem")
+    }>("select id, nome, evento, posicao, peso_min_kg, peso_medio_kg, peso_max_kg from classes order by ordem")
   ).rows;
   const regrasRows = (await db.query<{ codigo: string; valor: ValorRegra }>("select codigo, valor from regras")).rows;
 
@@ -114,43 +115,63 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
 export interface ParametrosCompletos {
   pilares: Pilar[];
   faixas: FaixaScore[];
-  classes: Classe[];
+  classes: (Classe & { ativa: boolean })[];
   rubricas: { pilarId: string | null; nota: number; descricao: string }[];
-  regras: { codigo: string; descricao: string; valor: unknown }[];
+  regras: { codigo: string; descricao: string; valor: unknown; atualizadoEm: string }[];
   componentesCusto: { id: string; nome: string }[];
 }
 
 /** Leitura completa para a tela de parâmetros e para a escala de avaliação (inclui rubricas, regras brutas e componentes). */
 export async function carregarParametrosCompletos(db: Db): Promise<ParametrosCompletos> {
   const base = await carregarParametros(db);
-  const [rubricas, regras, componentes] = await Promise.all([
+  const [rubricas, regras, componentes, ativas] = await Promise.all([
     db.query<{ pilar_id: string | null; nota: number; descricao: string }>(
       "select pilar_id, nota, descricao from rubricas order by pilar_id nulls first, nota",
     ),
-    db.query<{ codigo: string; descricao: string; valor: unknown }>("select codigo, descricao, valor from regras order by codigo"),
+    db.query<{ codigo: string; descricao: string; valor: unknown; atualizado_em: Date }>(
+      "select codigo, descricao, valor, atualizado_em from regras order by codigo",
+    ),
     db.query<{ id: string; nome: string }>("select id, nome from componentes_custo order by ordem"),
+    db.query<{ id: string; ativa: boolean }>("select id, ativa from classes"),
   ]);
+  const ativaPorId = new Map(ativas.rows.map((c) => [c.id, c.ativa]));
   return {
     pilares: base.pilares,
     faixas: base.faixas,
-    classes: base.classes,
+    classes: base.classes.map((c) => ({ ...c, ativa: ativaPorId.get(c.id) ?? true })),
     rubricas: rubricas.rows.map((r) => ({ pilarId: r.pilar_id, nota: r.nota, descricao: r.descricao })),
-    regras: regras.rows,
+    regras: regras.rows.map((r) => ({
+      codigo: r.codigo,
+      descricao: r.descricao,
+      valor: r.valor,
+      atualizadoEm: new Date(r.atualizado_em).toISOString(),
+    })),
     componentesCusto: componentes.rows,
   };
 }
 
 export interface AtualizacaoParametros {
   pesos?: Record<string, number> | undefined;
-  classes?: { id: string; pesoMinKg: number; pesoMedioKg: number; pesoMaxKg: number }[] | undefined;
+  faixas?: { id: string; scoreMin: number }[] | undefined;
+  rubricas?: { pilarId: string | null; nota: number; descricao: string }[] | undefined;
+  regras?: Record<string, unknown> | undefined;
+  classes?:
+    | {
+        id: string;
+        pesoMinKg?: number | undefined;
+        pesoMedioKg?: number | undefined;
+        pesoMaxKg?: number | undefined;
+        ativa?: boolean | undefined;
+      }[]
+    | undefined;
 }
 
 /** Erro de validação de negócio ao atualizar parâmetros (a rota converte em 400). */
 export class ErroParametros extends Error {}
 
 /**
- * Atualiza pesos dos pilares e faixas de peso das classes numa transação e grava a auditoria
- * com antes e depois (valores de parametrização, não dado pessoal).
+ * Atualiza pesos, faixas de score, rubricas, regras e classes numa transação e grava uma
+ * linha de auditoria com antes e depois de cada bloco (valores de parametrização, não dado pessoal).
  */
 export async function atualizarParametros(db: Db, usuarioId: string, dados: AtualizacaoParametros): Promise<void> {
   await db.transacao(async (tx) => {
@@ -174,30 +195,120 @@ export async function atualizarParametros(db: Db, usuarioId: string, dados: Atua
       detalhes.pesos = { antes, depois: dados.pesos };
     }
 
+    if (dados.faixas) {
+      const atuais = (await tx.query<{ id: string; score_min: string }>("select id, score_min from faixas_score order by ordem")).rows;
+      const enviadas = new Map(dados.faixas.map((f) => [f.id, f.scoreMin]));
+      if (enviadas.size !== dados.faixas.length || enviadas.size !== atuais.length || atuais.some((f) => !enviadas.has(f.id))) {
+        throw new ErroParametros("Informe o score mínimo de todas as faixas, e só delas.");
+      }
+      const valores = atuais.map((f) => enviadas.get(f.id) as number);
+      if (valores.some((v, i) => i > 0 && v >= (valores[i - 1] as number))) {
+        throw new ErroParametros("Os scores mínimos das faixas precisam ser estritamente decrescentes.");
+      }
+      if (valores[valores.length - 1] !== 0) throw new ErroParametros("A última faixa precisa começar em 0.");
+      const antes: Record<string, number> = {};
+      for (const f of atuais) {
+        antes[f.id] = Number(f.score_min);
+        await tx.query("update faixas_score set score_min = $1 where id = $2", [enviadas.get(f.id), f.id]);
+      }
+      detalhes.faixas = { antes, depois: Object.fromEntries(enviadas) };
+    }
+
+    if (dados.rubricas) {
+      const chaves = new Set<string>();
+      const antes: { pilarId: string | null; nota: number; descricao: string | null }[] = [];
+      for (const r of dados.rubricas) {
+        const chave = `${r.pilarId ?? ""}|${r.nota}`;
+        if (chaves.has(chave)) throw new ErroParametros("Rubrica repetida para o mesmo pilar e nota.");
+        chaves.add(chave);
+        if (r.pilarId !== null && (await tx.query("select 1 from pilares where id = $1", [r.pilarId])).rows.length === 0) {
+          throw new ErroParametros(`Pilar desconhecido: ${r.pilarId}.`);
+        }
+        const atual = (
+          await tx.query<{ descricao: string }>("select descricao from rubricas where pilar_id is not distinct from $1 and nota = $2", [
+            r.pilarId,
+            r.nota,
+          ])
+        ).rows[0];
+        antes.push({ pilarId: r.pilarId, nota: r.nota, descricao: atual?.descricao ?? null });
+        if (atual) {
+          await tx.query("update rubricas set descricao = $3 where pilar_id is not distinct from $1 and nota = $2", [
+            r.pilarId,
+            r.nota,
+            r.descricao,
+          ]);
+        } else {
+          await tx.query("insert into rubricas (pilar_id, nota, descricao) values ($1, $2, $3)", [r.pilarId, r.nota, r.descricao]);
+        }
+      }
+      detalhes.rubricas = { antes, depois: dados.rubricas };
+    }
+
+    if (dados.regras) {
+      const antes: Record<string, unknown> = {};
+      const depois: Record<string, unknown> = {};
+      for (const [codigo, valor] of Object.entries(dados.regras)) {
+        if (!(CODIGOS_REGRAS as string[]).includes(codigo)) throw new ErroParametros(`Regra desconhecida: ${codigo}.`);
+        const parsed = ESQUEMAS_REGRAS[codigo as CodigoRegra].safeParse(valor);
+        if (!parsed.success) {
+          const problema = parsed.error.issues[0];
+          const onde = problema?.path.length ? ` (${problema.path.join(".")})` : "";
+          throw new ErroParametros(`Regra ${codigo} inválida${onde}: ${problema?.message ?? "valor incorreto"}.`);
+        }
+        const atual = (await tx.query<{ valor: unknown }>("select valor from regras where codigo = $1", [codigo])).rows[0];
+        if (!atual) throw new ErroParametros(`Regra desconhecida: ${codigo}.`);
+        antes[codigo] = atual.valor;
+        depois[codigo] = parsed.data;
+        await tx.query("update regras set valor = $2::jsonb, atualizado_em = now(), atualizado_por = $3 where codigo = $1", [
+          codigo,
+          JSON.stringify(parsed.data),
+          usuarioId,
+        ]);
+      }
+      detalhes.regras = { antes, depois };
+    }
+
     if (dados.classes) {
-      const antes: Record<string, number[]> = {};
-      const depois: Record<string, number[]> = {};
+      const antes: Record<string, unknown> = {};
+      const depois: Record<string, unknown> = {};
       for (const c of dados.classes) {
-        if (!(c.pesoMinKg <= c.pesoMedioKg && c.pesoMedioKg <= c.pesoMaxKg)) {
+        const { pesoMinKg: min, pesoMedioKg: medio, pesoMaxKg: max } = c;
+        const faixaInformada = [min, medio, max];
+        const comFaixa = min !== undefined && medio !== undefined && max !== undefined;
+        if (!comFaixa && faixaInformada.some((v) => v !== undefined)) {
+          throw new ErroParametros(`Classe ${c.id}: informe peso mínimo, médio e máximo juntos.`);
+        }
+        if (!comFaixa && c.ativa === undefined) throw new ErroParametros(`Classe ${c.id}: nada para alterar.`);
+        if (comFaixa && !(min <= medio && medio <= max)) {
           throw new ErroParametros("Em cada classe, o peso mínimo não pode passar da média, nem a média do máximo.");
         }
         const atual = (
-          await tx.query<{ peso_min_kg: string; peso_medio_kg: string; peso_max_kg: string }>(
-            "select peso_min_kg, peso_medio_kg, peso_max_kg from classes where id = $1 and ativa",
+          await tx.query<{ peso_min_kg: string; peso_medio_kg: string; peso_max_kg: string; ativa: boolean }>(
+            "select peso_min_kg, peso_medio_kg, peso_max_kg, ativa from classes where id = $1",
             [c.id],
           )
         ).rows[0];
         if (!atual) throw new ErroParametros(`Classe desconhecida: ${c.id}.`);
-        antes[c.id] = [Number(atual.peso_min_kg), Number(atual.peso_medio_kg), Number(atual.peso_max_kg)];
-        depois[c.id] = [c.pesoMinKg, c.pesoMedioKg, c.pesoMaxKg];
-        await tx.query("update classes set peso_min_kg = $1, peso_medio_kg = $2, peso_max_kg = $3 where id = $4", [
-          c.pesoMinKg,
-          c.pesoMedioKg,
-          c.pesoMaxKg,
-          c.id,
-        ]);
+        if (c.ativa === false && atual.ativa) {
+          const emUso = await tx.query("select 1 from atletas where classe_id = $1 and ativo limit 1", [c.id]);
+          if (emUso.rows.length > 0) {
+            throw new ErroParametros(`Não dá para desativar a classe ${c.id}: há atleta ativo nela. Mude o atleta de classe antes.`);
+          }
+        }
+        const pesoAtual = [Number(atual.peso_min_kg), Number(atual.peso_medio_kg), Number(atual.peso_max_kg)];
+        antes[c.id] = { pesoKg: pesoAtual, ativa: atual.ativa };
+        depois[c.id] = { pesoKg: comFaixa ? [min, medio, max] : pesoAtual, ativa: c.ativa ?? atual.ativa };
+        if (comFaixa) {
+          await tx.query("update classes set peso_min_kg = $1, peso_medio_kg = $2, peso_max_kg = $3 where id = $4", [
+            min,
+            medio,
+            max,
+            c.id,
+          ]);
+        }
+        if (c.ativa !== undefined) await tx.query("update classes set ativa = $1 where id = $2", [c.ativa, c.id]);
       }
-      detalhes.classes = { campos: ["peso_min_kg", "peso_medio_kg", "peso_max_kg"], antes, depois };
+      detalhes.classes = { antes, depois };
     }
 
     await tx.query(
