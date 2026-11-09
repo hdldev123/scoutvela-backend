@@ -1,5 +1,6 @@
 import { criarApp } from "./app.js";
 import { criarVerificadorSupabase } from "./auth/jwt.js";
+import { criarAdminAuth } from "./integracoes/supabase-admin.js";
 import { carregarEnvLocal, lerConfig } from "./config.js";
 import { criarDbPg, type Db } from "./db/db.js";
 import { criarProvedorEmail, loggerConsole } from "./email/index.js";
@@ -24,6 +25,9 @@ const app = await criarApp({
   config,
   email: criarProvedorEmail(config, loggerConsole),
   armazenamento: criarArmazenamentoDaConfig(config),
+  adminAuth: config.SUPABASE_SERVICE_ROLE_KEY
+    ? criarAdminAuth({ supabaseUrl: config.SUPABASE_URL, serviceRoleKey: config.SUPABASE_SERVICE_ROLE_KEY })
+    : null,
   verificarToken: criarVerificadorSupabase({
     supabaseUrl: config.SUPABASE_URL,
     jwtSecret: config.SUPABASE_JWT_SECRET,

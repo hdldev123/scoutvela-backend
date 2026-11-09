@@ -4,6 +4,7 @@ import { join, resolve } from "node:path";
 import { criarApp } from "../src/app.js";
 import { criarVerificadorSupabase } from "../src/auth/jwt.js";
 import { lerConfig } from "../src/config.js";
+import { criarAdminAuth } from "../src/integracoes/supabase-admin.js";
 import { migrar } from "../src/db/migrar.js";
 import { criarDbPglite } from "../src/db/pglite.js";
 import { CONTAS_DEMO } from "../seed/contas-demo.js";
@@ -57,6 +58,9 @@ if (Number(rows[0]!.n) === 0) {
 }
 await vincularContasLocais(db);
 
+// Chave de servidor só deste processo (nova a cada execução): o emulador a exige em /auth/v1/invite.
+const serviceRoleKey = randomBytes(24).toString("hex");
+
 const config = lerConfig({
   APP_ENV: "desenvolvimento",
   HOST: "127.0.0.1",
@@ -65,12 +69,15 @@ const config = lerConfig({
   SUPABASE_URL: URL_AUTH,
   SUPABASE_JWT_SECRET: jwtSecret,
   CORS_ORIGINS: ORIGENS.join(","),
+  SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+  FRONT_URL: ORIGENS[0]!,
 });
 
-const auth = await criarAuthLocal({ db, supabaseUrl: URL_AUTH, jwtSecret, origens: ORIGENS });
+const auth = await criarAuthLocal({ db, supabaseUrl: URL_AUTH, jwtSecret, origens: ORIGENS, serviceRoleKey });
 const app = await criarApp({
   db,
   config,
+  adminAuth: criarAdminAuth({ supabaseUrl: URL_AUTH, serviceRoleKey }),
   verificarToken: criarVerificadorSupabase({ supabaseUrl: URL_AUTH, jwtSecret }),
 });
 
@@ -102,6 +109,9 @@ Variáveis do front (vela-front/.env.local):
   VITE_API_URL=http://127.0.0.1:${PORTA_API}
   VITE_SUPABASE_URL=${URL_AUTH}
   VITE_SUPABASE_ANON_KEY=chave-local-dev
+
+Convites e redefinição de senha: o "e-mail" não é enviado; o link aparece neste terminal
+(linhas [auth-local]). Abra o link no navegador para definir a senha.
 
 Contas de teste:
 ${CONTAS_DEMO.map((c) => `  ${c.email}  /  ${c.senha}`).join("\n")}
