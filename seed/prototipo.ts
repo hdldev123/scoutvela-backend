@@ -263,6 +263,13 @@ export const ATLETAS_PROTOTIPO: AtletaProto[] = gerar();
 export const MESES_ASSEGURADOS: Record<PerfilProto, number> = { A: 36, B: 24, C: 12, D: 0 };
 export const PATROCINIO: Record<PerfilProto, "sim" | "em_negociacao" | "nao"> = { A: "sim", B: "em_negociacao", C: "nao", D: "nao" };
 
+/** VELAID_MOCK do protótipo: cadastros do VelaID que ainda não estão no piloto (Sofia Lins tem 17 anos). */
+export const VELAID_EXTRAS: { codigo: string; nome: string; genero: "F" | "M"; nascimento: string; clube: string; cidade: string; uf: string; wsId: string | null; email: string }[] = [
+  { codigo: "MG-T15", nome: "Renata Bastos", genero: "F", nascimento: "2005-08-19", clube: "Clube Náutico Lagoa Azul", cidade: "Lagoa Santa", uf: "MG", wsId: "BRARB51", email: "renata@exemplo.com" },
+  { codigo: "BA-T16", nome: "Felipe Guedes", genero: "M", nascimento: "2004-03-02", clube: "Iate Clube Baía Clara", cidade: "Salvador", uf: "BA", wsId: "BRAFG77", email: "felipe@exemplo.com" },
+  { codigo: "PE-T17", nome: "Sofia Lins", genero: "F", nascimento: "2009-06-10", clube: "Clube de Vela Recife Antigo", cidade: "Recife", uf: "PE", wsId: null, email: "sofia@exemplo.com" },
+];
+
 /** autonomia(a, i) do protótipo para o componente de custo i (0 a 7), já em minúsculas e sem acento. */
 export function autonomiaComponente(
   perfil: PerfilProto,

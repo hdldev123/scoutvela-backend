@@ -45,6 +45,9 @@ describe("semear", () => {
     expect(await contagem("ciclos_avaliacao")).toBe(3);
     expect(await contagem("scores_ciclo")).toBe(28);
     expect(await contagem("medidas_corporais")).toBe(14);
+    expect(await contagem("velaid_registros")).toBe(17);
+    expect(await contagem("velaid_registros where fonte = 'simulado' and email like '%@exemplo.com'")).toBe(17);
+    expect(await contagem("velaid_registros where codigo in ('MG-T15','BA-T16','PE-T17')")).toBe(3);
     const { rows } = await db.query<{ nome: string }>("select nome from ciclos_avaliacao where status = 'aberto'");
     expect(rows).toEqual([{ nome: "Novembro de 2026" }]);
   });

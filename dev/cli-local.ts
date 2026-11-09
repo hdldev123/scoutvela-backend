@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { join, resolve } from "node:path";
 import { criarApp } from "../src/app.js";
 import { criarVerificadorSupabase } from "../src/auth/jwt.js";
 import { lerConfig } from "../src/config.js";
@@ -20,7 +20,10 @@ const PORTA_AUTH = 54321;
 const URL_AUTH = `http://127.0.0.1:${PORTA_AUTH}`;
 const ORIGENS = ["http://localhost:8080", "http://127.0.0.1:8080", "http://localhost:5173"];
 
-const pasta = join(process.cwd(), ".dados-locais");
+// DADOS_LOCAIS_DIR permite um banco separado (o E2E do front usa um próprio e recria a cada execução).
+const pasta = process.env.DADOS_LOCAIS_DIR
+  ? resolve(process.env.DADOS_LOCAIS_DIR)
+  : join(process.cwd(), ".dados-locais");
 const pastaBanco = join(pasta, "banco");
 const arquivoSegredo = join(pasta, "segredo-jwt");
 

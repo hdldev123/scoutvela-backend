@@ -1,5 +1,5 @@
 import type { Db } from "../src/db/db.js";
-import { ATLETAS_PROTOTIPO, MESES_ASSEGURADOS, PATROCINIO, autonomiaComponente } from "./prototipo.js";
+import { ATLETAS_PROTOTIPO, MESES_ASSEGURADOS, PATROCINIO, VELAID_EXTRAS, autonomiaComponente } from "./prototipo.js";
 
 const NIVEIS: Record<string, string> = {
   Mundial: "mundial",
@@ -80,6 +80,14 @@ export async function semear(db: Db): Promise<void> {
       ciclos[c.nome] = rows[0]!.id;
     }
 
+    for (const v of VELAID_EXTRAS) {
+      await tx.query(
+        `insert into velaid_registros (codigo, nome, genero, data_nascimento, clube, cidade, uf, ws_id, email, fonte)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'simulado')`,
+        [v.codigo, v.nome, v.genero, v.nascimento, v.clube, v.cidade, v.uf, v.wsId, v.email],
+      );
+    }
+
     const componentes = (await tx.query<{ id: string }>("select id from componentes_custo order by ordem")).rows;
 
     for (const a of ATLETAS_PROTOTIPO) {
@@ -93,6 +101,12 @@ export async function semear(db: Db): Promise<void> {
         [a.velaId, a.nome, a.genero, a.nascimento, a.classeId, a.clube, a.cidade, a.uf, a.numeroVela, treinadorId, a.emailContato, gestorId],
       );
       const atletaId = rows[0]!.id;
+
+      await tx.query(
+        `insert into velaid_registros (codigo, nome, genero, data_nascimento, clube, cidade, uf, email, fonte)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, 'simulado')`,
+        [a.velaId, a.nome, a.genero, a.nascimento, a.clube, a.cidade, a.uf, a.emailContato],
+      );
 
       if (a.velaId === "SP-T07") {
         await inserirUsuario(tx, { email: "atleta@scoutvela.dev", nome: a.nome, papel: "atleta", atletaId });
