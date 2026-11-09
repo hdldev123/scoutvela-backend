@@ -10,6 +10,7 @@ import type { VerificadorToken } from "./auth/jwt.js";
 import { registrarAutenticacao } from "./auth/plugin.js";
 import type { Config } from "./config.js";
 import type { Db } from "./db/db.js";
+import { criarProvedorEmailLog, type ProvedorEmail } from "./email/index.js";
 import { registrarTratamentoDeErros } from "./erros.js";
 import { rotasHealth } from "./routes/health.js";
 import { rotasAtletas } from "./routes/atletas.js";
@@ -30,6 +31,15 @@ export interface DepsApp {
   logger?: boolean;
   /** Limite global por IP. Padrão: 300 requisições por minuto. */
   limiteRequisicoes?: { max: number; janelaMs: number };
+  /** Provedor de e-mail. Padrão: provedor `log` (não envia). O server.ts escolhe pela config. */
+  email?: ProvedorEmail;
+}
+
+declare module "fastify" {
+  interface FastifyInstance {
+    config: Config;
+    email: ProvedorEmail;
+  }
 }
 
 type PluginDeRotas = (app: FastifyInstance) => Promise<void>;
@@ -39,7 +49,7 @@ type PluginDeRotas = (app: FastifyInstance) => Promise<void>;
  * `export async function rotasXxx(app: FastifyInstance)` em src/routes/xxx.ts
  * e acrescente aqui .
  * Rota protegida: `preHandler: [app.autenticar, exigirPapel(...)]` e `schema` zod
- * (o schema vira OpenAPI). Use `app.db` e `app.agora`.
+ * (o schema vira OpenAPI). Use `app.db`, `app.agora`, `app.config` e `app.email`.
  */
 const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasHealth,
@@ -73,6 +83,8 @@ export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
   registrarTratamentoDeErros(app);
 
   app.decorate("db", deps.db);
+  app.decorate("config", config);
+  app.decorate("email", deps.email ?? criarProvedorEmailLog(app.log));
   app.decorate("agora", deps.agora ?? (() => new Date()));
   registrarAutenticacao(app, deps.verificarToken);
 

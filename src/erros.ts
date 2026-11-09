@@ -9,6 +9,10 @@ export const codigosDeErro = [
   "requisicao_invalida",
   "erro_interno",
   "limite_excedido",
+  /** 403: o papel exige segundo fator (aal2) e a sessão ainda não tem. O front leva à tela de MFA. */
+  "mfa_obrigatorio",
+  /** 503: recurso depende de integração não configurada (ex.: convite sem chave de servidor). */
+  "servico_indisponivel",
 ] as const;
 export type CodigoDeErro = (typeof codigosDeErro)[number];
 
@@ -32,6 +36,12 @@ export class ErroApi extends Error {
 export const naoAutenticado = (m = "Faça login para continuar.") => new ErroApi(401, "nao_autenticado", m);
 export const semAcesso = (m = "Você não tem acesso a este recurso.") => new ErroApi(403, "sem_acesso", m);
 export const naoEncontrado = (m = "Recurso não encontrado.") => new ErroApi(404, "nao_encontrado", m);
+export const requisicaoInvalida = (m = "Requisição inválida.") => new ErroApi(400, "requisicao_invalida", m);
+/** Conflito de estado (já existe, já respondido). Status 409 com o código `requisicao_invalida`. */
+export const conflito = (m: string) => new ErroApi(409, "requisicao_invalida", m);
+export const mfaObrigatorio = (m = "Ative a verificação em duas etapas para continuar.") =>
+  new ErroApi(403, "mfa_obrigatorio", m);
+export const servicoIndisponivel = (m = "Serviço indisponível no momento.") => new ErroApi(503, "servico_indisponivel", m);
 
 export function registrarTratamentoDeErros(app: FastifyInstance): void {
   app.setNotFoundHandler((_req, reply) => {

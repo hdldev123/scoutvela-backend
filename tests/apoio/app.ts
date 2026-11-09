@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import { SignJWT } from "jose";
 import { criarApp } from "../../src/app.js";
 import { criarVerificadorSupabase } from "../../src/auth/jwt.js";
-import type { Config } from "../../src/config.js";
+import { lerConfig, type Config } from "../../src/config.js";
 import type { Db } from "../../src/db/db.js";
 import type { Papel } from "../../src/domain/tipos.js";
 
@@ -10,15 +10,19 @@ export const SUPABASE_URL_TESTE = "http://supabase.teste";
 export const SEGREDO_JWT_TESTE = "segredo-de-teste-com-pelo-menos-32-caracteres!!";
 export const ORIGEM_PERMITIDA_TESTE = "http://localhost:5173";
 
+/** Config de teste: os padrões vêm do próprio esquema (lerConfig), então variáveis novas não quebram os testes. */
 export function configDeTeste(parcial: Partial<Config> = {}): Config {
   return {
-    APP_ENV: "desenvolvimento",
-    HOST: "127.0.0.1",
+    ...lerConfig({
+      APP_ENV: "desenvolvimento",
+      HOST: "127.0.0.1",
+      PORT: "3333",
+      DATABASE_URL: "nao-usado",
+      SUPABASE_URL: SUPABASE_URL_TESTE,
+      SUPABASE_JWT_SECRET: SEGREDO_JWT_TESTE,
+      CORS_ORIGINS: ORIGEM_PERMITIDA_TESTE,
+    }),
     PORT: 0,
-    DATABASE_URL: "nao-usado",
-    SUPABASE_URL: SUPABASE_URL_TESTE,
-    SUPABASE_JWT_SECRET: SEGREDO_JWT_TESTE,
-    CORS_ORIGINS: [ORIGEM_PERMITIDA_TESTE],
     ...parcial,
   };
 }
