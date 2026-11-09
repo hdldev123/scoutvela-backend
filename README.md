@@ -41,7 +41,13 @@ Contas e dados são fictícios. As senhas existem só no seed de desenvolvimento
 4. `SUPABASE_SERVICE_ROLE_KEY=... npm run seed:auth` cria as 4 contas de teste no Supabase Auth e vincula ao papel.
 5. `npm run dev`.
 
-No painel do Supabase, desligue o cadastro público (Authentication > Sign In / Providers > "Allow new users to sign up"). Contas são criadas pela CBVela.
+No painel do Supabase:
+- desligue o cadastro público (Authentication > Sign In / Providers > "Allow new users to sign up"); contas são criadas pela CBVela em `POST /usuarios`;
+- mantenha a confirmação de e-mail ligada (o vínculo da conta no primeiro login usa o e-mail do token);
+- ative o MFA por TOTP (Authentication > Multi-Factor) e use `EXIGIR_MFA=true`;
+- em URL Configuration, cadastre `FRONT_URL/redefinir-senha` como redirect permitido (convite e redefinição de senha).
+
+No modo local, os links de convite e de redefinição de senha aparecem no terminal, em linhas `[auth-local]`. As senhas de contas convidadas ficam só em memória e somem quando o `dev:local` reinicia.
 
 ## Scripts
 
@@ -54,6 +60,7 @@ No painel do Supabase, desligue o cadastro público (Authentication > Sign In / 
 | `db:migrate` / `db:migrate:prod` | aplica migrations (dev com tsx; produção a partir do `dist/`) |
 | `db:seed` / `seed:auth` | dados fictícios e contas de teste (nunca em produção) |
 | `openapi` | gera o `openapi.yaml`, o contrato com o front (o CI falha se estiver desatualizado) |
+| `job:lembretes` / `job:lembretes:prod` | lembretes do ciclo por e-mail (Cron Job do Render) |
 
 ## Organização
 
@@ -65,6 +72,10 @@ src/
   servicos/      carrega dados e aplica o domínio por atleta
   repositories/  SQL (filtros de acesso no WHERE)
   importacao/    CSV do VelaID e do Ranking CBVela
+  integracoes/   API admin do Supabase Auth (convites)
+  storage/       evidências: disco local (dev) ou Supabase Storage
+  email/         provedores de e-mail (log ou SMTP)
+  jobs/          lembretes do ciclo
   db/            conexão (pg ou PGlite), migrations
 migrations/      esquema em SQL versionado
 seed/            dados fictícios do protótipo e contas de teste
@@ -78,6 +89,16 @@ tests/           domínio, paridade com o protótipo, permissões, rotas, banco
 - **Série histórica:** notas, medidas, gates, consentimentos e financeiro só aceitam `INSERT`, com trigger no banco. O valor atual é o último lançamento.
 - **Matriz de acesso no SQL:** treinador só vê os próprios atletas; atleta só a si; IBVAR só quem consentiu, sem detalhe sensível, sem contato e só com o perfil de suporte. Quem não consentiu entra só nos agregados.
 - **Nota sugerida pela resposta do atleta** não conta no score até o treinador confirmar.
+- **Ciclos:** só um aberto por vez. Ao fechar, a API calcula e congela em `scores_ciclo` o score e a faixa de todos os atletas ativos com termo aceito, numa transação. Ciclo fechado não muda.
+- **Financeiro (P8):** o gestor informa o perfil de suporte A–D e os componentes; cada atualização é uma nova linha. Alimenta o G4 e o painel de investimento, não o score.
+- **Resultado internacional:** lançado à mão por gestor ou treinador do atleta, com link https do resultado oficial; G2 e G3 são recalculados na leitura.
+- **Parâmetros:** pesos, faixas de peso, faixas de score, rubricas, regras (P3, G1–G4, janela do Ranking CBVela) e classes ativas são editáveis só pelo gestor, com validação por código e auditoria de antes e depois. Classe com atleta ativo não pode ser desativada.
+- **Plano individual:** a API calcula uma sugestão (`sugestaoPlano`); o plano que vale é o registrado por uma pessoa em `PUT /atletas/:id/plano`, com histórico. O IBVAR não vê.
+- **Evidências:** PDF, PNG ou JPEG até 5 MB, com assinatura do arquivo conferida, em bucket privado; abertas por link assinado de 5 minutos, com auditoria do acesso. A nota pode levar `anexoId`.
+- **Contas e termo:** o gestor cria contas e o Supabase envia o convite. O termo é versionado em `termos_consentimento` (o vigente é o mais recente) e o atleta aceita no app; o gestor ainda pode registrar aceite recebido fora dele. Com `EXIGIR_MFA=true`, gestor e IBVAR só entram com sessão `aal2`.
+- **Titular (LGPD):** o atleta baixa os próprios dados em `GET /meus-dados` e registra pedidos de acesso, correção, exclusão ou revogação; o gestor responde. A exclusão é procedimento manual, porque a série histórica só aceita inserção.
+- **Lembretes:** o job avisa treinadores e atletas com pendência 7, 3, 1 e 0 dias antes do prazo e todo dia depois dele, no máximo um e-mail por pessoa por dia, sem nota, peso nem nome de atleta no texto.
+- **Auditoria:** toda escrita grava quem, quando, ação e ids, sem valores sensíveis. O gestor consulta em `GET /auditoria`.
 - **RLS ativo em todas as tabelas, sem política:** a chave pública do Supabase não lê nada. A API conecta com a credencial de servidor, que fica só no Render. Há teste que confere RLS em toda tabela nova.
 
 ## Segurança
@@ -90,6 +111,9 @@ tests/           domínio, paridade com o protótipo, permissões, rotas, banco
 
 ## Deploy (Render)
 
+O `render.yaml` (Blueprint) descreve o web service e o Cron Job dos lembretes.
+
 - **Web service:** build `npm ci && npm run build`, start `npm start`, pre-deploy `npm run db:migrate:prod`, health check `/health`.
-- **Variáveis:** `APP_ENV`, `DATABASE_URL`, `DATABASE_CA_CERT`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET` (só se for chave legada) e `CORS_ORIGINS`.
+- **Cron Job:** `npm run job:lembretes:prod`, todo dia às 11:00 UTC (08:00 de Brasília).
+- **Variáveis:** `APP_ENV`, `DATABASE_URL`, `DATABASE_CA_CERT`, `SUPABASE_URL`, `SUPABASE_JWT_SECRET` (só se for chave legada), `SUPABASE_SERVICE_ROLE_KEY`, `CORS_ORIGINS`, `FRONT_URL`, `EXIGIR_MFA=true`, `EMAIL_PROVEDOR=smtp`, `EMAIL_REMETENTE`, `SMTP_*` e `STORAGE_PROVEDOR=supabase`. Fora do desenvolvimento a API recusa subir com Storage local ou SMTP sem host.
 - **Ambientes:** homologação e produção são serviços separados, cada um com seu projeto Supabase. Produção usa instância paga, porque o plano gratuito hiberna.
