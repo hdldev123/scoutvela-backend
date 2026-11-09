@@ -21,6 +21,7 @@ import { rotasMe } from "./routes/me.js";
 import { rotasPainel } from "./routes/painel.js";
 import { rotasParametros } from "./routes/parametros.js";
 import { rotasRanking } from "./routes/ranking.js";
+import { rotasTitular } from "./routes/titular.js";
 
 export interface DepsApp {
   db: Db;
@@ -61,6 +62,7 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasPainel,
   rotasInvestimento,
   rotasParametros,
+  rotasTitular,
 ];
 
 export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
