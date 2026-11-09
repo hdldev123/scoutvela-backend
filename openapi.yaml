@@ -664,6 +664,18 @@ paths:
                                   - valor
                                   - lancadoEm
                                 additionalProperties: false
+                              anexo:
+                                nullable: true
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                  nomeArquivo:
+                                    type: string
+                                required:
+                                  - id
+                                  - nomeArquivo
+                                additionalProperties: false
                             required:
                               - id
                               - nome
@@ -676,6 +688,7 @@ paths:
                               - lancadoEm
                               - resposta
                               - sugestaoPendente
+                              - anexo
                             additionalProperties: false
                       required:
                         - id
@@ -869,6 +882,66 @@ paths:
                         required:
                           - perfilSuporte
                         additionalProperties: false
+                  plano:
+                    nullable: true
+                    description: Plano registrado por uma pessoa. Nulo para o IBVAR ou sem plano.
+                    type: object
+                    properties:
+                      forcas:
+                        type: string
+                      lacunas:
+                        type: string
+                      meta12m:
+                        type: string
+                      meta24m:
+                        type: string
+                      recomendacao:
+                        type: string
+                      registradoPor:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                        additionalProperties: false
+                      registradoEm:
+                        type: string
+                        description: Instante ISO
+                    required:
+                      - forcas
+                      - lacunas
+                      - meta12m
+                      - meta24m
+                      - recomendacao
+                      - registradoPor
+                      - registradoEm
+                    additionalProperties: false
+                  sugestaoPlano:
+                    nullable: true
+                    description: Sugestão calculada pelo sistema. Nula para o IBVAR.
+                    type: object
+                    properties:
+                      forcas:
+                        type: string
+                      lacunas:
+                        type: string
+                      meta12m:
+                        type: string
+                      meta24m:
+                        type: string
+                      recomendacao:
+                        type: string
+                    required:
+                      - forcas
+                      - lacunas
+                      - meta12m
+                      - meta24m
+                      - recomendacao
+                    additionalProperties: false
                 required:
                   - atleta
                   - contato
@@ -885,6 +958,8 @@ paths:
                   - classFit
                   - resultados
                   - financeiro
+                  - plano
+                  - sugestaoPlano
                 additionalProperties: false
         "400":
           description: Default Response
@@ -1013,6 +1088,10 @@ paths:
                         type: string
                         minLength: 3
                         maxLength: 500
+                      anexoId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
                     required:
                       - indicadorId
                       - valor
@@ -1270,6 +1349,10 @@ paths:
                         type: string
                         minLength: 3
                         maxLength: 500
+                      anexoId:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
                     required:
                       - indicadorId
                       - valor
@@ -4241,6 +4324,698 @@ paths:
                   - mensagem
                 additionalProperties: false
         "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/plano:
+    put:
+      summary: "Registra uma nova versão do plano individual (série histórica: só
+        insere)"
+      tags:
+        - atletas
+      description: Gestor, ou treinador dos próprios atletas. A ficha traz a sugestão
+        calculada; quem registra é uma pessoa. 201 no primeiro plano do atleta,
+        200 nas versões seguintes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                forcas:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+                lacunas:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+                meta12m:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+                meta24m:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+                recomendacao:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+              required:
+                - forcas
+                - lacunas
+                - meta12m
+                - meta24m
+                - recomendacao
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  forcas:
+                    type: string
+                  lacunas:
+                    type: string
+                  meta12m:
+                    type: string
+                  meta24m:
+                    type: string
+                  recomendacao:
+                    type: string
+                  registradoPor:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  registradoEm:
+                    type: string
+                    description: Instante ISO
+                required:
+                  - forcas
+                  - lacunas
+                  - meta12m
+                  - meta24m
+                  - recomendacao
+                  - registradoPor
+                  - registradoEm
+                additionalProperties: false
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  forcas:
+                    type: string
+                  lacunas:
+                    type: string
+                  meta12m:
+                    type: string
+                  meta24m:
+                    type: string
+                  recomendacao:
+                    type: string
+                  registradoPor:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  registradoEm:
+                    type: string
+                    description: Instante ISO
+                required:
+                  - forcas
+                  - lacunas
+                  - meta12m
+                  - meta24m
+                  - recomendacao
+                  - registradoPor
+                  - registradoEm
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/evidencias:
+    post:
+      summary: Anexa uma evidência (PDF, JPEG ou PNG de até 5 MB) ao atleta
+      tags:
+        - evidencias
+      description: Gestor, ou treinador dos próprios atletas. O arquivo vai em base64,
+        é conferido pelo tamanho e pela assinatura e fica no Storage privado.
+        Use o `id` retornado como `anexoId` ao lançar a nota.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nomeArquivo:
+                  type: string
+                  minLength: 1
+                  maxLength: 200
+                tipoMime:
+                  type: string
+                  enum:
+                    - application/pdf
+                    - image/jpeg
+                    - image/png
+                conteudoBase64:
+                  type: string
+                  minLength: 4
+                  maxLength: 7000000
+                indicadorId:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+              required:
+                - nomeArquivo
+                - tipoMime
+                - conteudoBase64
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  nomeArquivo:
+                    type: string
+                  tipoMime:
+                    type: string
+                  tamanhoBytes:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  indicadorId:
+                    nullable: true
+                    type: string
+                  enviadoEm:
+                    type: string
+                    description: Instante ISO
+                required:
+                  - id
+                  - nomeArquivo
+                  - tipoMime
+                  - tamanhoBytes
+                  - indicadorId
+                  - enviadoEm
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "503":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    get:
+      summary: Lista as evidências anexadas ao atleta (mais recentes primeiro)
+      tags:
+        - evidencias
+      description: Gestor, treinador dos próprios atletas e o próprio atleta. IBVAR
+        não tem acesso.
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  anexos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        nomeArquivo:
+                          type: string
+                        tipoMime:
+                          type: string
+                        tamanhoBytes:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        indicadorId:
+                          nullable: true
+                          type: string
+                        enviadoEm:
+                          type: string
+                          description: Instante ISO
+                      required:
+                        - id
+                        - nomeArquivo
+                        - tipoMime
+                        - tamanhoBytes
+                        - indicadorId
+                        - enviadoEm
+                      additionalProperties: false
+                required:
+                  - anexos
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /evidencias/{id}/link:
+    get:
+      summary: Link temporário (5 minutos) para abrir a evidência
+      tags:
+        - evidencias
+      description: Mesmo acesso da listagem, pelo atleta do anexo. Cada geração de
+        link fica na auditoria.
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  url:
+                    type: string
+                  expiraEm:
+                    type: string
+                    description: Instante ISO
+                required:
+                  - url
+                  - expiraEm
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "503":
           description: Default Response
           content:
             application/json:
