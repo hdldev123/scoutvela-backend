@@ -1,0 +1,99 @@
+import cors from "@fastify/cors";
+import helmet from "@fastify/helmet";
+import rateLimit from "@fastify/rate-limit";
+import swagger from "@fastify/swagger";
+import swaggerUi from "@fastify/swagger-ui";
+import Fastify, { type FastifyInstance } from "fastify";
+import { jsonSchemaTransform, serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
+import pacote from "../package.json" with { type: "json" };
+import type { VerificadorToken } from "./auth/jwt.js";
+import { registrarAutenticacao } from "./auth/plugin.js";
+import type { Config } from "./config.js";
+import type { Db } from "./db/db.js";
+import { registrarTratamentoDeErros } from "./erros.js";
+import { rotasHealth } from "./routes/health.js";
+import { rotasMe } from "./routes/me.js";
+
+export interface DepsApp {
+  db: Db;
+  config: Config;
+  verificarToken: VerificadorToken;
+  agora?: () => Date;
+  /** Passe false nos testes para não poluir a saída. */
+  logger?: boolean;
+  /** Limite global por IP. Padrão: 300 requisições por minuto. */
+  limiteRequisicoes?: { max: number; janelaMs: number };
+}
+
+type PluginDeRotas = (app: FastifyInstance) => Promise<void>;
+
+/**
+ * Rotas da API. PONTO DE EXTENSÃO: para criar uma rota nova, escreva
+ * `export async function rotasXxx(app: FastifyInstance)` em src/routes/xxx.ts
+ * e acrescente aqui (a T4 adiciona `rotasRanking` e `rotasAtletas`).
+ * Rota protegida: `preHandler: [app.autenticar, exigirPapel(...)]` e `schema` zod
+ * (o schema vira OpenAPI). Use `app.db` e `app.agora`.
+ */
+const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
+  rotasHealth,
+  rotasMe,
+  // T4: rotasRanking, rotasAtletas
+];
+
+export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
+  const { config } = deps;
+  const app = Fastify({
+    trustProxy: true, // atrás do proxy do Render: IP real do cliente
+    bodyLimit: 1024 * 1024,
+    logger:
+      deps.logger === false
+        ? false
+        : {
+            level: "info",
+            // Nunca registrar credenciais. O corpo da requisição não é logado.
+            redact: ["req.headers.authorization", "req.headers.cookie"],
+          },
+  });
+
+  app.setValidatorCompiler(validatorCompiler);
+  app.setSerializerCompiler(serializerCompiler);
+  registrarTratamentoDeErros(app);
+
+  app.decorate("db", deps.db);
+  app.decorate("agora", deps.agora ?? (() => new Date()));
+  registrarAutenticacao(app, deps.verificarToken);
+
+  // API só JSON: CSP restritiva. O /docs (só fora de produção) ganha CSP própria do swagger-ui.
+  await app.register(helmet, {
+    contentSecurityPolicy: { directives: { defaultSrc: ["'none'"], frameAncestors: ["'none'"] } },
+    strictTransportSecurity: { maxAge: 31_536_000, includeSubDomains: true },
+  });
+  await app.register(rateLimit, {
+    global: true,
+    max: deps.limiteRequisicoes?.max ?? 300,
+    timeWindow: deps.limiteRequisicoes?.janelaMs ?? 60_000,
+  });
+
+  await app.register(cors, {
+    origin: config.CORS_ORIGINS,
+    methods: ["GET", "POST", "PUT"],
+    allowedHeaders: ["Authorization", "Content-Type"],
+  });
+
+  await app.register(swagger, {
+    openapi: {
+      info: { title: "Scout Vela API", version: pacote.version },
+      components: {
+        securitySchemes: { bearerAuth: { type: "http", scheme: "bearer", bearerFormat: "JWT" } },
+      },
+    },
+    transform: jsonSchemaTransform,
+  });
+  if (config.APP_ENV !== "producao") {
+    await app.register(swaggerUi, { routePrefix: "/docs", staticCSP: true });
+  }
+
+  for (const plugin of PLUGINS_DE_ROTAS) await app.register(plugin);
+
+  return app;
+}
