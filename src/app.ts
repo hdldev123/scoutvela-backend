@@ -14,6 +14,7 @@ import { criarProvedorEmailLog, type ProvedorEmail } from "./email/index.js";
 import { registrarTratamentoDeErros } from "./erros.js";
 import { rotasHealth } from "./routes/health.js";
 import { rotasAtletas } from "./routes/atletas.js";
+import { rotasAuditoria } from "./routes/auditoria.js";
 import { rotasAvaliacoes } from "./routes/avaliacoes.js";
 import { rotasCadastro } from "./routes/cadastro.js";
 import { rotasCampanha } from "./routes/campanha.js";
@@ -65,6 +66,7 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasParametros,
   rotasCiclos,
   rotasCampanha,
+  rotasAuditoria,
 ];
 
 export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {

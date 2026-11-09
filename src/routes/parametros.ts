@@ -23,6 +23,7 @@ const esquemaParametros = z.object({
   classes: z.array(
     z.object({
       id: z.string(),
+      ativa: z.boolean(),
       nome: z.string(),
       evento: z.string(),
       posicao: z.enum(["helm", "crew", "ind"]),
@@ -38,7 +39,9 @@ const esquemaParametros = z.object({
       descricao: z.string(),
     }),
   ),
-  regras: z.array(z.object({ codigo: z.string(), descricao: z.string(), valor: z.unknown() })),
+  regras: z.array(
+    z.object({ codigo: z.string(), descricao: z.string(), valor: z.unknown(), atualizadoEm: z.string().describe("Instante ISO") }),
+  ),
   componentesCusto: z.array(z.object({ id: z.string(), nome: z.string() })),
 });
 
@@ -49,14 +52,48 @@ const esquemaAtualizacao = z
       .record(z.string().min(1).max(40), z.number().int().min(0).max(100))
       .optional()
       .describe("Peso de cada um dos 9 pilares; a soma precisa ser 100"),
+    faixas: z
+      .array(z.object({ id: z.string().min(1).max(40), scoreMin: z.number().min(0).max(100) }))
+      .max(10)
+      .optional()
+      .describe("As 4 faixas; scoreMin estritamente decrescente na ordem das faixas e a última com 0"),
+    rubricas: z
+      .array(
+        z.object({
+          pilarId: z.string().min(1).max(40).nullable().describe("Nulo = escala geral de 0 a 5"),
+          nota: z.number().int().min(0).max(5),
+          descricao: z.string().trim().min(3).max(300),
+        }),
+      )
+      .max(100)
+      .optional()
+      .describe("Upsert por (pilarId, nota)"),
+    regras: z
+      .record(z.string().min(1).max(40), z.unknown())
+      .optional()
+      .describe("{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4, RANKING_CBVELA. O valor segue o formato lido em GET /parametros"),
     classes: z
-      .array(z.object({ id: z.string().min(1).max(40), pesoMinKg: pesoKg, pesoMedioKg: pesoKg, pesoMaxKg: pesoKg }))
+      .array(
+        z.object({
+          id: z.string().min(1).max(40),
+          pesoMinKg: pesoKg.optional(),
+          pesoMedioKg: pesoKg.optional(),
+          pesoMaxKg: pesoKg.optional(),
+          ativa: z.boolean().optional().describe("Não dá para desativar classe com atleta ativo"),
+        }),
+      )
       .max(50)
       .optional(),
   })
-  .refine((d) => d.pesos !== undefined || (d.classes !== undefined && d.classes.length > 0), {
-    message: "Informe pesos ou classes.",
-  });
+  .refine(
+    (d) =>
+      d.pesos !== undefined ||
+      (d.faixas?.length ?? 0) > 0 ||
+      (d.rubricas?.length ?? 0) > 0 ||
+      (d.regras !== undefined && Object.keys(d.regras).length > 0) ||
+      (d.classes?.length ?? 0) > 0,
+    { message: "Informe ao menos um de: pesos, faixas, rubricas, regras ou classes." },
+  );
 
 export async function rotasParametros(app: FastifyInstance): Promise<void> {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -82,7 +119,7 @@ export async function rotasParametros(app: FastifyInstance): Promise<void> {
       preHandler: [app.autenticar, exigirPapel("gestor")],
       schema: {
         tags: ["parametros"],
-        summary: "Atualiza pesos dos pilares e faixas de peso das classes",
+        summary: "Atualiza pesos, faixas de score, rubricas, regras e classes",
         description: "O ranking recalcula sozinho (o cálculo é feito na leitura). Grava auditoria com antes e depois.",
         security: [{ bearerAuth: [] }],
         body: esquemaAtualizacao,
