@@ -34,6 +34,7 @@
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.15",
+    "@supabase/supabase-js": "^2.119.0",
     "@types/node": "^22.20.5",
     "@types/pg": "^8.23.1",
     "openapi-types": "^12.1.3",

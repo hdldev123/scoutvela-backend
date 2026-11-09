@@ -12,7 +12,14 @@ import type { Config } from "./config.js";
 import type { Db } from "./db/db.js";
 import { registrarTratamentoDeErros } from "./erros.js";
 import { rotasHealth } from "./routes/health.js";
+import { rotasAtletas } from "./routes/atletas.js";
+import { rotasAvaliacoes } from "./routes/avaliacoes.js";
+import { rotasCadastro } from "./routes/cadastro.js";
+import { rotasInvestimento } from "./routes/investimento.js";
 import { rotasMe } from "./routes/me.js";
+import { rotasPainel } from "./routes/painel.js";
+import { rotasParametros } from "./routes/parametros.js";
+import { rotasRanking } from "./routes/ranking.js";
 
 export interface DepsApp {
   db: Db;
@@ -30,14 +37,20 @@ type PluginDeRotas = (app: FastifyInstance) => Promise<void>;
 /**
  * Rotas da API. PONTO DE EXTENSÃO: para criar uma rota nova, escreva
  * `export async function rotasXxx(app: FastifyInstance)` em src/routes/xxx.ts
- * e acrescente aqui (a T4 adiciona `rotasRanking` e `rotasAtletas`).
+ * e acrescente aqui .
  * Rota protegida: `preHandler: [app.autenticar, exigirPapel(...)]` e `schema` zod
  * (o schema vira OpenAPI). Use `app.db` e `app.agora`.
  */
 const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasHealth,
   rotasMe,
-  // T4: rotasRanking, rotasAtletas
+  rotasRanking,
+  rotasAtletas,
+  rotasAvaliacoes,
+  rotasCadastro,
+  rotasPainel,
+  rotasInvestimento,
+  rotasParametros,
 ];
 
 export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
