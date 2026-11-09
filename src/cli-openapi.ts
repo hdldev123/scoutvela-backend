@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
 import { stringify } from "yaml";
 import { criarApp } from "./app.js";
+import { lerConfig } from "./config.js";
 import type { Db } from "./db/db.js";
 
 // Só gera a especificação: nenhuma rota é executada, então o banco nunca é tocado.
@@ -12,11 +13,9 @@ const semBanco: Db = { query: falha, exec: falha, transacao: falha, fechar: falh
 const app = await criarApp({
   db: semBanco,
   config: {
-    APP_ENV: "desenvolvimento",
+    ...lerConfig({ APP_ENV: "desenvolvimento", DATABASE_URL: "nao-usado", SUPABASE_URL: "http://supabase.invalid" }),
     HOST: "127.0.0.1",
     PORT: 0,
-    DATABASE_URL: "nao-usado",
-    SUPABASE_URL: "http://supabase.invalid",
     CORS_ORIGINS: [],
   },
   verificarToken: async () => {
