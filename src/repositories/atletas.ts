@@ -29,6 +29,7 @@ export interface NotaAtual {
   origem: "avaliacao" | "resposta_confirmada";
   avaliador: { id: string; nome: string } | null;
   lancadoEm: string;
+  anexo: { id: string; nomeArquivo: string } | null;
 }
 
 export interface MedidaAtual {
@@ -266,10 +267,14 @@ export async function carregarDadosAtletas(
       avaliador_id: string | null;
       avaliador_nome: string | null;
       lancado_em: Date;
+      anexo_id: string | null;
+      anexo_nome: string | null;
     }>(
       `select n.atleta_id, n.indicador_id, n.valor, n.evidencia, n.origem, n.avaliador_id,
-              u.nome as avaliador_nome, n.lancado_em
-         from avaliacao_atual n left join usuarios u on u.id = n.avaliador_id
+              u.nome as avaliador_nome, n.lancado_em, n.anexo_id, ea.nome_arquivo as anexo_nome
+         from avaliacao_atual n
+         left join usuarios u on u.id = n.avaliador_id
+         left join evidencias_anexos ea on ea.id = n.anexo_id
         where n.atleta_id = any($1::uuid[])`,
       p,
     ),
@@ -341,6 +346,7 @@ export async function carregarDadosAtletas(
       origem: l.origem,
       avaliador: l.avaliador_id ? { id: l.avaliador_id, nome: l.avaliador_nome ?? "" } : null,
       lancadoEm: iso(l.lancado_em),
+      anexo: l.anexo_id ? { id: l.anexo_id, nomeArquivo: l.anexo_nome ?? "" } : null,
     });
   }
   for (const l of respostas.rows) dado(l.atleta_id).respostas[l.indicador_id] = l.resposta;

@@ -2,6 +2,7 @@ import { criarApp } from "./app.js";
 import { criarVerificadorSupabase } from "./auth/jwt.js";
 import { carregarEnvLocal, lerConfig } from "./config.js";
 import { criarDbPg, type Db } from "./db/db.js";
+import { criarArmazenamentoDaConfig } from "./storage/index.js";
 
 carregarEnvLocal();
 const config = lerConfig();
@@ -20,6 +21,7 @@ async function criarDbDaConfig(): Promise<Db> {
 const app = await criarApp({
   db,
   config,
+  armazenamento: criarArmazenamentoDaConfig(config),
   verificarToken: criarVerificadorSupabase({
     supabaseUrl: config.SUPABASE_URL,
     jwtSecret: config.SUPABASE_JWT_SECRET,
