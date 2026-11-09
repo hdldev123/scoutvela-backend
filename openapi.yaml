@@ -136,3 +136,831 @@ paths:
                   - erro
                   - mensagem
                 additionalProperties: false
+  /ranking:
+    get:
+      summary: Ranking de atletas do piloto, conforme a matriz de acesso do papel
+      tags:
+        - ranking
+      description: Gestor vê todos; treinador, os próprios; IBVAR, só atletas com
+        consentimento (os demais entram apenas na contagem).
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 60
+          in: query
+          name: classe
+          required: false
+          description: "Evento da classe, ex.: ILCA 7"
+        - schema:
+            type: string
+            enum:
+              - F
+              - M
+          in: query
+          name: categoria
+          required: false
+        - schema:
+            type: string
+            enum:
+              - f1
+              - f2
+              - f3
+              - f4
+          in: query
+          name: faixa
+          required: false
+        - schema:
+            default: score
+            type: string
+            enum:
+              - score
+              - pontos_cbvela
+          in: query
+          name: ordem
+          required: false
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ciclo:
+                    nullable: true
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                      prazo:
+                        type: string
+                        description: AAAA-MM-DD
+                    required:
+                      - nome
+                      - prazo
+                    additionalProperties: false
+                  itens:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        posicao:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        atleta:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                            velaid:
+                              type: string
+                            numeroVela:
+                              nullable: true
+                              type: string
+                            uf:
+                              nullable: true
+                              type: string
+                            idade:
+                              type: integer
+                              minimum: -9007199254740991
+                              maximum: 9007199254740991
+                            genero:
+                              type: string
+                              enum:
+                                - F
+                                - M
+                            classe:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                nome:
+                                  type: string
+                                evento:
+                                  type: string
+                              required:
+                                - id
+                                - nome
+                                - evento
+                              additionalProperties: false
+                          required:
+                            - id
+                            - nome
+                            - velaid
+                            - numeroVela
+                            - uf
+                            - idade
+                            - genero
+                            - classe
+                          additionalProperties: false
+                        score:
+                          type: number
+                        faixa:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                            nomeCurto:
+                              type: string
+                          required:
+                            - id
+                            - nome
+                            - nomeCurto
+                          additionalProperties: false
+                        completo:
+                          type: boolean
+                        pilares:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              nomeCurto:
+                                type: string
+                              nota:
+                                nullable: true
+                                type: number
+                            required:
+                              - id
+                              - nomeCurto
+                              - nota
+                            additionalProperties: false
+                        statusGates:
+                          type: string
+                          enum:
+                            - apto
+                            - condicional
+                            - nao_prioritario
+                          description: Status final pelos 4 gates (P7)
+                        pontosCbvela:
+                          type: number
+                      required:
+                        - posicao
+                        - atleta
+                        - score
+                        - faixa
+                        - completo
+                        - pilares
+                        - statusGates
+                        - pontosCbvela
+                      additionalProperties: false
+                  ocultosSemConsentimento:
+                    nullable: true
+                    description: Só para o IBVAR; nulo para os demais
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - ciclo
+                  - itens
+                  - ocultosSemConsentimento
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}:
+    get:
+      summary: Ficha do atleta, conforme a matriz de acesso do papel
+      tags:
+        - atletas
+      description: "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo
+        404. IBVAR: sem indicadores sensíveis, Class Fit, contato e financeiro
+        detalhado."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  atleta:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                      velaid:
+                        type: string
+                      numeroVela:
+                        nullable: true
+                        type: string
+                      genero:
+                        type: string
+                        enum:
+                          - F
+                          - M
+                      idade:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                      funcao:
+                        type: string
+                      clube:
+                        nullable: true
+                        type: string
+                      cidade:
+                        nullable: true
+                        type: string
+                      uf:
+                        nullable: true
+                        type: string
+                      termoAceito:
+                        type: boolean
+                      classe:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                          evento:
+                            type: string
+                          posicao:
+                            type: string
+                            enum:
+                              - helm
+                              - crew
+                              - ind
+                        required:
+                          - id
+                          - nome
+                          - evento
+                          - posicao
+                        additionalProperties: false
+                    required:
+                      - id
+                      - nome
+                      - velaid
+                      - numeroVela
+                      - genero
+                      - idade
+                      - funcao
+                      - clube
+                      - cidade
+                      - uf
+                      - termoAceito
+                      - classe
+                    additionalProperties: false
+                  contato:
+                    nullable: true
+                    type: object
+                    properties:
+                      email:
+                        nullable: true
+                        type: string
+                      treinador:
+                        nullable: true
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                        additionalProperties: false
+                    required:
+                      - email
+                      - treinador
+                    additionalProperties: false
+                  ciclo:
+                    nullable: true
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                      prazo:
+                        type: string
+                    required:
+                      - nome
+                      - prazo
+                    additionalProperties: false
+                  score:
+                    type: number
+                  faixa:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                      nomeCurto:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                      - nomeCurto
+                    additionalProperties: false
+                  completo:
+                    type: boolean
+                  preenchidos:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  total:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  pontosCbvela:
+                    type: number
+                  historicoScore:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ciclo:
+                          type: string
+                        score:
+                          type: number
+                      required:
+                        - ciclo
+                        - score
+                      additionalProperties: false
+                  pilares:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                        nomeCurto:
+                          type: string
+                        peso:
+                          type: number
+                        nota:
+                          nullable: true
+                          type: number
+                        contribuicao:
+                          type: number
+                        preenchidos:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        total:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        restrito:
+                          type: boolean
+                          description: Detalhe oculto para este papel (só a nota do pilar)
+                        indicadores:
+                          nullable: true
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              nome:
+                                type: string
+                              tipo:
+                                type: string
+                                enum:
+                                  - T
+                                  - A
+                                  - R
+                              calculado:
+                                type: boolean
+                              nota:
+                                nullable: true
+                                type: number
+                              evidencia:
+                                nullable: true
+                                type: string
+                              origem:
+                                nullable: true
+                                type: string
+                                enum:
+                                  - avaliacao
+                                  - resposta_confirmada
+                                  - calculado
+                              avaliador:
+                                nullable: true
+                                type: object
+                                properties:
+                                  id:
+                                    type: string
+                                  nome:
+                                    type: string
+                                required:
+                                  - id
+                                  - nome
+                                additionalProperties: false
+                              lancadoEm:
+                                nullable: true
+                                description: Instante ISO
+                                type: string
+                              resposta:
+                                nullable: true
+                                type: string
+                              sugestaoPendente:
+                                nullable: true
+                                type: object
+                                properties:
+                                  valor:
+                                    type: integer
+                                    minimum: -9007199254740991
+                                    maximum: 9007199254740991
+                                  lancadoEm:
+                                    type: string
+                                required:
+                                  - valor
+                                  - lancadoEm
+                                additionalProperties: false
+                            required:
+                              - id
+                              - nome
+                              - tipo
+                              - calculado
+                              - nota
+                              - evidencia
+                              - origem
+                              - avaliador
+                              - lancadoEm
+                              - resposta
+                              - sugestaoPendente
+                            additionalProperties: false
+                      required:
+                        - id
+                        - nome
+                        - nomeCurto
+                        - peso
+                        - nota
+                        - contribuicao
+                        - preenchidos
+                        - total
+                        - restrito
+                        - indicadores
+                      additionalProperties: false
+                  gates:
+                    type: object
+                    properties:
+                      statusFinal:
+                        type: string
+                        enum:
+                          - apto
+                          - condicional
+                          - nao_prioritario
+                      itens:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            gate:
+                              type: integer
+                              minimum: -9007199254740991
+                              maximum: 9007199254740991
+                            nome:
+                              type: string
+                            status:
+                              type: string
+                              enum:
+                                - apto
+                                - condicional
+                                - alerta
+                            motivo:
+                              type: string
+                            sugestaoAutomatica:
+                              type: string
+                              enum:
+                                - apto
+                                - condicional
+                                - alerta
+                            ajustadoPeloGestor:
+                              type: boolean
+                          required:
+                            - gate
+                            - nome
+                            - status
+                            - motivo
+                            - sugestaoAutomatica
+                            - ajustadoPeloGestor
+                          additionalProperties: false
+                    required:
+                      - statusFinal
+                      - itens
+                    additionalProperties: false
+                  classFit:
+                    nullable: true
+                    type: object
+                    properties:
+                      pesoKg:
+                        type: number
+                      alturaCm:
+                        nullable: true
+                        type: number
+                      pesoMinKg:
+                        type: number
+                      pesoMedioKg:
+                        type: number
+                      pesoMaxKg:
+                        type: number
+                      deltaKg:
+                        type: number
+                      distanciaRelativa:
+                        type: number
+                    required:
+                      - pesoKg
+                      - alturaCm
+                      - pesoMinKg
+                      - pesoMedioKg
+                      - pesoMaxKg
+                      - deltaKg
+                      - distanciaRelativa
+                    additionalProperties: false
+                  resultados:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        data:
+                          type: string
+                        nivel:
+                          type: string
+                        evento:
+                          type: string
+                        posicao:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        tamanhoFrota:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        internacional:
+                          type: boolean
+                        pontosCbvela:
+                          nullable: true
+                          type: number
+                        fonte:
+                          type: string
+                          enum:
+                            - ranking_cbvela
+                            - manual
+                        linkOficial:
+                          nullable: true
+                          type: string
+                      required:
+                        - data
+                        - nivel
+                        - evento
+                        - posicao
+                        - tamanhoFrota
+                        - internacional
+                        - pontosCbvela
+                        - fonte
+                        - linkOficial
+                      additionalProperties: false
+                  financeiro:
+                    nullable: true
+                    anyOf:
+                      - type: object
+                        properties:
+                          perfilSuporte:
+                            type: string
+                            enum:
+                              - A
+                              - B
+                              - C
+                              - D
+                          mesesAssegurados:
+                            nullable: true
+                            type: integer
+                            minimum: -9007199254740991
+                            maximum: 9007199254740991
+                          patrocinioPrivado:
+                            nullable: true
+                            type: string
+                            enum:
+                              - sim
+                              - em_negociacao
+                              - nao
+                          componentes:
+                            type: array
+                            items:
+                              type: object
+                              properties:
+                                id:
+                                  type: string
+                                nome:
+                                  type: string
+                                autonomia:
+                                  type: string
+                                apoioCbvela:
+                                  type: string
+                              required:
+                                - id
+                                - nome
+                                - autonomia
+                                - apoioCbvela
+                              additionalProperties: false
+                        required:
+                          - perfilSuporte
+                          - mesesAssegurados
+                          - patrocinioPrivado
+                          - componentes
+                        additionalProperties: false
+                      - type: object
+                        properties:
+                          perfilSuporte:
+                            type: string
+                            enum:
+                              - A
+                              - B
+                              - C
+                              - D
+                        required:
+                          - perfilSuporte
+                        additionalProperties: false
+                required:
+                  - atleta
+                  - contato
+                  - ciclo
+                  - score
+                  - faixa
+                  - completo
+                  - preenchidos
+                  - total
+                  - pontosCbvela
+                  - historicoScore
+                  - pilares
+                  - gates
+                  - classFit
+                  - resultados
+                  - financeiro
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
