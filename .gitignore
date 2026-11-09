@@ -6,3 +6,5 @@ coverage/
 !.env.example
 *.log
 .DS_Store
+.dados-locais/
+.dados-e2e/
