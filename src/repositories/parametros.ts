@@ -110,3 +110,99 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
 
   return { pilares, faixas, classes, regras: regrasDoBanco(regrasRows) };
 }
+
+export interface ParametrosCompletos {
+  pilares: Pilar[];
+  faixas: FaixaScore[];
+  classes: Classe[];
+  rubricas: { pilarId: string | null; nota: number; descricao: string }[];
+  regras: { codigo: string; descricao: string; valor: unknown }[];
+  componentesCusto: { id: string; nome: string }[];
+}
+
+/** Leitura completa para a tela de parâmetros e para a escala de avaliação (inclui rubricas, regras brutas e componentes). */
+export async function carregarParametrosCompletos(db: Db): Promise<ParametrosCompletos> {
+  const base = await carregarParametros(db);
+  const [rubricas, regras, componentes] = await Promise.all([
+    db.query<{ pilar_id: string | null; nota: number; descricao: string }>(
+      "select pilar_id, nota, descricao from rubricas order by pilar_id nulls first, nota",
+    ),
+    db.query<{ codigo: string; descricao: string; valor: unknown }>("select codigo, descricao, valor from regras order by codigo"),
+    db.query<{ id: string; nome: string }>("select id, nome from componentes_custo order by ordem"),
+  ]);
+  return {
+    pilares: base.pilares,
+    faixas: base.faixas,
+    classes: base.classes,
+    rubricas: rubricas.rows.map((r) => ({ pilarId: r.pilar_id, nota: r.nota, descricao: r.descricao })),
+    regras: regras.rows,
+    componentesCusto: componentes.rows,
+  };
+}
+
+export interface AtualizacaoParametros {
+  pesos?: Record<string, number> | undefined;
+  classes?: { id: string; pesoMinKg: number; pesoMedioKg: number; pesoMaxKg: number }[] | undefined;
+}
+
+/** Erro de validação de negócio ao atualizar parâmetros (a rota converte em 400). */
+export class ErroParametros extends Error {}
+
+/**
+ * Atualiza pesos dos pilares e faixas de peso das classes numa transação e grava a auditoria
+ * com antes e depois (valores de parametrização, não dado pessoal).
+ */
+export async function atualizarParametros(db: Db, usuarioId: string, dados: AtualizacaoParametros): Promise<void> {
+  await db.transacao(async (tx) => {
+    const detalhes: Record<string, unknown> = {};
+
+    if (dados.pesos) {
+      const atuais = (await tx.query<{ id: string; peso: string }>("select id, peso from pilares")).rows;
+      const antes: Record<string, number> = {};
+      for (const p of atuais) antes[p.id] = Number(p.peso);
+      const ids = Object.keys(antes).sort();
+      const enviados = Object.keys(dados.pesos).sort();
+      if (ids.length !== enviados.length || ids.some((id, i) => id !== enviados[i])) {
+        throw new ErroParametros("Informe o peso de todos os pilares, e só deles.");
+      }
+      if (Object.values(dados.pesos).reduce((t, v) => t + v, 0) !== 100) {
+        throw new ErroParametros("A soma dos pesos precisa ser 100.");
+      }
+      for (const [id, peso] of Object.entries(dados.pesos)) {
+        await tx.query("update pilares set peso = $1 where id = $2", [peso, id]);
+      }
+      detalhes.pesos = { antes, depois: dados.pesos };
+    }
+
+    if (dados.classes) {
+      const antes: Record<string, number[]> = {};
+      const depois: Record<string, number[]> = {};
+      for (const c of dados.classes) {
+        if (!(c.pesoMinKg <= c.pesoMedioKg && c.pesoMedioKg <= c.pesoMaxKg)) {
+          throw new ErroParametros("Em cada classe, o peso mínimo não pode passar da média, nem a média do máximo.");
+        }
+        const atual = (
+          await tx.query<{ peso_min_kg: string; peso_medio_kg: string; peso_max_kg: string }>(
+            "select peso_min_kg, peso_medio_kg, peso_max_kg from classes where id = $1 and ativa",
+            [c.id],
+          )
+        ).rows[0];
+        if (!atual) throw new ErroParametros(`Classe desconhecida: ${c.id}.`);
+        antes[c.id] = [Number(atual.peso_min_kg), Number(atual.peso_medio_kg), Number(atual.peso_max_kg)];
+        depois[c.id] = [c.pesoMinKg, c.pesoMedioKg, c.pesoMaxKg];
+        await tx.query("update classes set peso_min_kg = $1, peso_medio_kg = $2, peso_max_kg = $3 where id = $4", [
+          c.pesoMinKg,
+          c.pesoMedioKg,
+          c.pesoMaxKg,
+          c.id,
+        ]);
+      }
+      detalhes.classes = { campos: ["peso_min_kg", "peso_medio_kg", "peso_max_kg"], antes, depois };
+    }
+
+    await tx.query(
+      "insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes) values ($1, 'atualizar_parametros', 'parametros', null, $2::jsonb)",
+      [usuarioId, JSON.stringify(detalhes)],
+    );
+  });
+}
