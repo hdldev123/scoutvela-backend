@@ -123,43 +123,62 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
       }
       const sha256 = createHash("sha256").update(bytes).digest("hex");
 
-      const anexo = await app.db.transacao(async (tx) => {
-        const r = await tx.query<LinhaAnexo>(
-          `insert into evidencias_anexos
+      let anexo: LinhaAnexo;
+      try {
+        anexo = await app.db.transacao(async (tx) => {
+          const r = await tx.query<LinhaAnexo>(
+            `insert into evidencias_anexos
              (atleta_id, indicador_id, nome_arquivo, tipo_mime, tamanho_bytes, caminho, sha256, enviado_por, enviado_em)
            values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            returning ${COLUNAS}`,
-          [
-            base.id,
-            body.indicadorId ?? null,
-            body.nomeArquivo,
-            body.tipoMime,
-            bytes.length,
-            caminho,
-            sha256,
-            usuario.id,
-            referencia,
-          ],
-        );
-        const linha = r.rows[0]!;
-        // Auditoria sem o nome do arquivo: só id, tipo e tamanho.
-        await tx.query(
-          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+            [
+              base.id,
+              body.indicadorId ?? null,
+              body.nomeArquivo,
+              body.tipoMime,
+              bytes.length,
+              caminho,
+              sha256,
+              usuario.id,
+              referencia,
+            ],
+          );
+          const linha = r.rows[0]!;
+          // Auditoria sem o nome do arquivo: só id, tipo e tamanho.
+          await tx.query(
+            `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
            values ($1, 'anexar_evidencia', 'atleta', $2, $3::jsonb, $4)`,
-          [
-            usuario.id,
-            base.id,
-            JSON.stringify({
-              anexoId: linha.id,
-              tipoMime: body.tipoMime,
-              tamanhoBytes: bytes.length,
-              indicadorId: body.indicadorId ?? null,
-            }),
-            referencia,
-          ],
-        );
-        return linha;
-      });
+            [
+              usuario.id,
+              base.id,
+              JSON.stringify({
+                anexoId: linha.id,
+                tipoMime: body.tipoMime,
+                tamanhoBytes: bytes.length,
+                indicadorId: body.indicadorId ?? null,
+              }),
+              referencia,
+            ],
+          );
+          return linha;
+        });
+      } catch (e) {
+        // O arquivo já está no Storage e o registro não saiu: não deixa arquivo órfão.
+        try {
+          await app.armazenamento.remover(caminho);
+        } catch (e2) {
+          // Sem caminho, nome de arquivo nem dados do atleta no log.
+          const falha = e2 as { code?: unknown; name?: string };
+          req.log.error(
+            {
+              evento: "evidencia_orfa",
+              erro: typeof falha.code === "string" ? falha.code : (falha.name ?? "Error"),
+            },
+            "falha ao remover arquivo órfão",
+          );
+        }
+        throw e;
+      }
       return reply.code(201).send(paraAnexo(anexo));
     },
   );
