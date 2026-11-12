@@ -7,6 +7,9 @@ import { esquemaErro, naoEncontrado, requisicaoInvalida, servicoIndisponivel } f
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
 
 const TAMANHO_MAXIMO_BYTES = 5 * 1024 * 1024;
+/** Envios por minuto, por usuário autenticado (não por IP). Conta também as tentativas recusadas. */
+const LIMITE_ENVIOS = 20;
+
 /** Base64 de 5 MB tem ~6,7 milhões de caracteres. */
 const BASE64_MAXIMO = 7_000_000;
 
@@ -64,11 +67,20 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
     {
       preHandler: [app.autenticar, exigirPapel("gestor", "treinador")],
       bodyLimit: 8 * 1024 * 1024,
+      // preHandler: roda depois de autenticar, então req.usuario já existe e 401 não gasta a cota.
+      config: {
+        rateLimit: {
+          max: LIMITE_ENVIOS,
+          timeWindow: 60_000,
+          hook: "preHandler",
+          keyGenerator: (req) => `evidencias:${req.usuario.id}`,
+        },
+      },
       schema: {
         tags: ["evidencias"],
         summary: "Anexa uma evidência (PDF, JPEG ou PNG de até 5 MB) ao atleta",
         description:
-          "Gestor, ou treinador dos próprios atletas. O arquivo vai em base64, é conferido pelo tamanho e pela assinatura e fica no Storage privado. Use o `id` retornado como `anexoId` ao lançar a nota.",
+          "Gestor, ou treinador dos próprios atletas. O arquivo vai em base64, é conferido pelo tamanho e pela assinatura e fica no Storage privado. Use o `id` retornado como `anexoId` ao lançar a nota. Limite de 20 envios por minuto por usuário (429 `limite_excedido`).",
         security: [{ bearerAuth: [] }],
         params,
         body: z
@@ -83,7 +95,13 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
             indicadorId: z.string().min(1).max(64).optional(),
           })
           .strict(),
-        response: { 201: esquemaAnexo, 400: esquemaErro, ...respostasComuns, 503: esquemaErro },
+        response: {
+          201: esquemaAnexo,
+          400: esquemaErro,
+          ...respostasComuns,
+          429: esquemaErro,
+          503: esquemaErro,
+        },
       },
     },
     async (req, reply) => {

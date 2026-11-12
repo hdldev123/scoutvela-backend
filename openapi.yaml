@@ -6799,7 +6799,8 @@ paths:
         - evidencias
       description: Gestor, ou treinador dos próprios atletas. O arquivo vai em base64,
         é conferido pelo tamanho e pela assinatura e fica no Storage privado.
-        Use o `id` retornado como `anexoId` ao lançar a nota.
+        Use o `id` retornado como `anexoId` ao lançar a nota. Limite de 20
+        envios por minuto por usuário (429 `limite_excedido`).
       requestBody:
         required: true
         content:
@@ -6947,6 +6948,30 @@ paths:
                   - mensagem
                 additionalProperties: false
         "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "429":
           description: Default Response
           content:
             application/json:

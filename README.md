@@ -110,7 +110,7 @@ tests/           domínio, paridade com o protótipo, permissões, rotas, banco
 
 ## Segurança
 
-- **Requisições:** JWT validado em toda requisição (issuer, audience, expiração), CORS só para os domínios do front, Helmet (CSP `default-src 'none'`, HSTS), limite de 300 requisições por minuto por IP e corpo de até 1 MB.
+- **Requisições:** JWT validado em toda requisição (issuer, audience, expiração), CORS só para os domínios do front, Helmet (CSP `default-src 'none'`, HSTS), limite de 300 requisições por minuto por IP e corpo de até 1 MB. O envio de evidências (`POST /atletas/:id/evidencias`) tem limite próprio de 20 por minuto por usuário autenticado, e não por IP (429 `limite_excedido`).
 - **Logs e erros:** logs estruturados (pino) sem token, cookie nem corpo, e todo 401/403 vira log `acesso_negado`. Os erros seguem o formato `{ erro, mensagem }`, e o 500 não expõe detalhe interno.
 - **CSRF:** não se aplica. O token vai no header `Authorization`, não em cookie.
 - **Dependências:** CI com typecheck, lint, formatação, testes, build, contrato OpenAPI e `npm audit --omit=dev`. Dependabot semanal.
