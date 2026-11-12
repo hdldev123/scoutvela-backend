@@ -75,4 +75,49 @@ describe("cliente admin do Supabase Auth", () => {
     });
     await expect(admin.convidar("a@b.dev", "https://app.dev/r")).rejects.toThrow(/sem id/);
   });
+
+  it("removerConta: DELETE /auth/v1/admin/users/{id} com a chave de servidor", async () => {
+    const { f, chamadas } = comResposta(200, {});
+    const admin = criarAdminAuth({
+      supabaseUrl: "https://x.supabase.co/",
+      serviceRoleKey: "chave-servico",
+      fetch: f,
+    });
+    await admin.removerConta("11111111-1111-4111-8111-111111111111");
+    const c = chamadas[0]!;
+    expect(c.url).toBe(
+      "https://x.supabase.co/auth/v1/admin/users/11111111-1111-4111-8111-111111111111",
+    );
+    expect(c.init.method).toBe("DELETE");
+    const h = c.init.headers as Record<string, string>;
+    expect(h.apikey).toBe("chave-servico");
+    expect(h.Authorization).toBe("Bearer chave-servico");
+  });
+
+  it("removerConta: 404 conta como sucesso (idempotente)", async () => {
+    const { f } = comResposta(404, { msg: "User not found" });
+    const admin = criarAdminAuth({
+      supabaseUrl: "https://x.supabase.co",
+      serviceRoleKey: "k",
+      fetch: f,
+    });
+    await expect(
+      admin.removerConta("11111111-1111-4111-8111-111111111111"),
+    ).resolves.toBeUndefined();
+  });
+
+  it("removerConta: outro erro lança sem id, e-mail nem chave na mensagem", async () => {
+    const { f } = comResposta(500, { msg: "boom a@b.dev" });
+    const admin = criarAdminAuth({
+      supabaseUrl: "https://x.supabase.co",
+      serviceRoleKey: "chave-secreta",
+      fetch: f,
+    });
+    const erro = await admin
+      .removerConta("11111111-1111-4111-8111-111111111111")
+      .catch((e: Error) => e);
+    expect(erro).toBeInstanceOf(Error);
+    expect((erro as Error).message).toBe("Supabase Auth: falha ao remover conta (HTTP 500)");
+    expect((erro as Error).message).not.toContain("chave-secreta");
+  });
 });

@@ -410,6 +410,24 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
     });
   });
 
+  // Remoção de conta (API admin): apaga a conta, os fatores MFA e as sessões. Idempotente (a API
+  // chama depois de anonimizar o usuário no banco, então o e-mail pode já não estar mais lá).
+  app.delete("/auth/v1/admin/users/:id", async (req, resp) => {
+    if (!ehChaveServico(req.headers.authorization))
+      return erro(resp, 401, "not_admin", "User not allowed");
+    const id = (req.params as { id: string }).id;
+    const { rows } = await db.query<{ email: string }>(
+      "select email from usuarios where auth_user_id::text = $1",
+      [id],
+    );
+    if (rows[0]) contas.delete(rows[0].email.toLowerCase());
+    for (const [e, v] of convidados) if (v === id) convidados.delete(e);
+    fatores.delete(id);
+    for (const [k, d] of desafios) if (d.authUserId === id) desafios.delete(k);
+    for (const [k, s] of refreshTokens) if (s.authUserId === id) refreshTokens.delete(k);
+    return resp.code(200).send({});
+  });
+
   // Redefinição de senha: resposta igual exista ou não a conta (não revela e-mails).
   app.post("/auth/v1/recover", async (req, resp) => {
     const corpo = (req.body ?? {}) as Record<string, unknown>;
