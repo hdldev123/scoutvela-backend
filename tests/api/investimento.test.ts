@@ -26,11 +26,19 @@ describe("GET /investimento", () => {
   afterAll(() => p.encerrar());
 
   const buscar = async (email: string) => {
-    const r = await p.app.inject({ method: "GET", url: "/investimento", headers: await p.como(email) });
+    const r = await p.app.inject({
+      method: "GET",
+      url: "/investimento",
+      headers: await p.como(email),
+    });
     return { status: r.statusCode, corpo: r.json(), texto: r.body };
   };
   const ranking = async () => {
-    const r = await p.app.inject({ method: "GET", url: "/ranking", headers: await p.como(EMAILS_DEMO.gestor) });
+    const r = await p.app.inject({
+      method: "GET",
+      url: "/ranking",
+      headers: await p.como(EMAILS_DEMO.gestor),
+    });
     return r.json().itens as ItemRanking[];
   };
 
@@ -51,8 +59,14 @@ describe("GET /investimento", () => {
     expect(corpo.kpis.aptos).toBe(itens.filter((i) => i.statusGates === "apto").length);
     expect(corpo.ocultosSemConsentimento).toBeNull();
 
-    expect(corpo.funil.map((f: { faixa: { id: string } }) => f.faixa.id)).toEqual(["f1", "f2", "f3", "f4"]);
-    for (const f of corpo.funil) expect(f.n).toBe(itens.filter((i) => i.faixa.id === f.faixa.id).length);
+    expect(corpo.funil.map((f: { faixa: { id: string } }) => f.faixa.id)).toEqual([
+      "f1",
+      "f2",
+      "f3",
+      "f4",
+    ]);
+    for (const f of corpo.funil)
+      expect(f.n).toBe(itens.filter((i) => i.faixa.id === f.faixa.id).length);
     expect(corpo.funil.reduce((t: number, f: { n: number }) => t + f.n, 0)).toBe(14);
 
     expect(corpo.gates.map((g: { nome: string }) => g.nome)).toEqual([
@@ -64,8 +78,12 @@ describe("GET /investimento", () => {
     for (const g of corpo.gates) expect(g.apto + g.condicional + g.alerta).toBe(14);
 
     expect(corpo.mediaPilares).toHaveLength(9);
-    const perf = itens.map((i) => i.pilares.find((x) => x.id === "perf")?.nota).filter((v): v is number => v != null);
-    const mediaPerf = corpo.mediaPilares.find((m: { pilarId: string }) => m.pilarId === "perf").media;
+    const perf = itens
+      .map((i) => i.pilares.find((x) => x.id === "perf")?.nota)
+      .filter((v): v is number => v != null);
+    const mediaPerf = corpo.mediaPilares.find(
+      (m: { pilarId: string }) => m.pilarId === "perf",
+    ).media;
     expect(mediaPerf).toBeCloseTo(perf.reduce((t, v) => t + v, 0) / perf.length, 9);
   });
 
@@ -93,7 +111,7 @@ describe("GET /investimento", () => {
     expect(i.corpo.mediaPilares).toEqual(g.mediaPilares);
 
     expect(i.texto).not.toContain("Helena");
-    expect(i.texto).not.toContain("mesesAssegurados\":1");
+    expect(i.texto).not.toContain('mesesAssegurados":1');
     for (const x of i.corpo.ondeInvestir as Alvo[]) expect(x.mesesAssegurados).toBeNull();
 
     const idHelena = await p.idDe("SP-T07");
@@ -117,8 +135,12 @@ describe("GET /investimento", () => {
        select $1::uuid, g, 'apto', u.id from usuarios u, generate_series(1,4) g where u.email = $2`,
       [idHelena, EMAILS_DEMO.gestor],
     );
-    const pilares = await p.db.query<{ id: string }>("select id from indicadores where tipo <> 'R' and not calculado");
-    const gestor = await p.db.query<{ id: string }>("select id from usuarios where email = $1", [EMAILS_DEMO.gestor]);
+    const pilares = await p.db.query<{ id: string }>(
+      "select id from indicadores where tipo <> 'R' and not calculado",
+    );
+    const gestor = await p.db.query<{ id: string }>("select id from usuarios where email = $1", [
+      EMAILS_DEMO.gestor,
+    ]);
     for (const ind of pilares.rows) {
       await p.db.query(
         `insert into avaliacoes (atleta_id, indicador_id, valor, evidencia, origem, avaliador_id)

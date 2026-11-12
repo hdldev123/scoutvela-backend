@@ -18,7 +18,9 @@ export function lerData(texto: string): string | null {
   if (!a || !m || !d) return null;
   const data = new Date(Date.UTC(Number(a), Number(m) - 1, Number(d)));
   const confere =
-    data.getUTCFullYear() === Number(a) && data.getUTCMonth() === Number(m) - 1 && data.getUTCDate() === Number(d);
+    data.getUTCFullYear() === Number(a) &&
+    data.getUTCMonth() === Number(m) - 1 &&
+    data.getUTCDate() === Number(d);
   return confere ? `${a}-${m}-${d}` : null;
 }
 

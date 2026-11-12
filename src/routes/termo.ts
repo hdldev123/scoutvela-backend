@@ -16,10 +16,16 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ["termo"],
         summary: "Termo de consentimento vigente",
-        description: "Texto da versão vigente (a de maior vigente_desde). Qualquer usuário autenticado lê.",
+        description:
+          "Texto da versão vigente (a de maior vigente_desde). Qualquer usuário autenticado lê.",
         security: seguranca,
         response: {
-          200: z.object({ versao: z.string(), titulo: z.string(), texto: z.string(), vigenteDesde: z.string().describe("Instante ISO") }),
+          200: z.object({
+            versao: z.string(),
+            titulo: z.string(),
+            texto: z.string(),
+            vigenteDesde: z.string().describe("Instante ISO"),
+          }),
           401: esquemaErro,
           403: esquemaErro,
         },
@@ -39,7 +45,13 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
           "A versão enviada precisa ser a vigente. Não concede o compartilhamento com o IBVAR (consentimento separado, em PUT /consentimento).",
         security: seguranca,
         body: z.object({ versao: z.string().min(1).max(100) }),
-        response: { 200: z.object({ ok: z.literal(true) }), 400: esquemaErro, 401: esquemaErro, 403: esquemaErro, 409: esquemaErro },
+        response: {
+          200: z.object({ ok: z.literal(true) }),
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          409: esquemaErro,
+        },
       },
     },
     async (req) => {
@@ -50,7 +62,9 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
       await app.db.transacao(async (tx) => {
         const vigente = await buscarTermoVigente(tx);
         if (req.body.versao !== vigente.versao) {
-          throw requisicaoInvalida("A versão do termo não é a vigente. Recarregue a página e leia o termo atual.");
+          throw requisicaoInvalida(
+            "A versão do termo não é a vigente. Recarregue a página e leia o termo atual.",
+          );
         }
         await tx.query("select 1 from atletas where id = $1 for update", [atletaId]);
         const aceito = await tx.query(

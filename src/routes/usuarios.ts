@@ -3,7 +3,13 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
-import { conflito, esquemaErro, naoEncontrado, requisicaoInvalida, servicoIndisponivel } from "../erros.js";
+import {
+  conflito,
+  esquemaErro,
+  naoEncontrado,
+  requisicaoInvalida,
+  servicoIndisponivel,
+} from "../erros.js";
 import { ContaJaExiste } from "../integracoes/supabase-admin.js";
 
 const PAPEIS_CONVIDAVEIS = ["gestor", "treinador", "ibvar", "atleta"] as const;
@@ -17,7 +23,10 @@ const esquemaUsuario = z.object({
   ativo: z.boolean(),
   atleta: z.object({ id: z.string(), nome: z.string() }).nullable(),
   contaVinculada: z.boolean().describe("Já existe login amarrado a este cadastro (auth_user_id)"),
-  convidadoEm: z.string().nullable().describe("Instante ISO do último convite; nulo se nunca enviado"),
+  convidadoEm: z
+    .string()
+    .nullable()
+    .describe("Instante ISO do último convite; nulo se nunca enviado"),
 });
 
 interface LinhaUsuario {
@@ -60,13 +69,16 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
   const seguranca = [{ bearerAuth: [] }];
   const redirectConvite = () => `${app.config.FRONT_URL.replace(/\/+$/, "")}/redefinir-senha`;
 
-  async function registrarConvite(usuarioId: string, authUserId: string, porId: string): Promise<void> {
+  async function registrarConvite(
+    usuarioId: string,
+    authUserId: string,
+    porId: string,
+  ): Promise<void> {
     await app.db.transacao(async (tx) => {
-      await tx.query("update usuarios set auth_user_id = coalesce(auth_user_id, $2), convidado_em = $3 where id = $1", [
-        usuarioId,
-        authUserId,
-        app.agora(),
-      ]);
+      await tx.query(
+        "update usuarios set auth_user_id = coalesce(auth_user_id, $2), convidado_em = $3 where id = $1",
+        [usuarioId, authUserId, app.agora()],
+      );
       await tx.query(
         `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
          values ($1, 'convidar_usuario', 'usuarios', $2, '{}'::jsonb)`,
@@ -76,7 +88,12 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
   }
 
   /** Convida no Supabase Auth e grava o vínculo. Devolve 'enviado' ou 'indisponivel'; não lança por falha do Auth. */
-  async function convidarConta(usuarioId: string, email: string, porId: string, log: FastifyInstance["log"]): Promise<"enviado" | "indisponivel"> {
+  async function convidarConta(
+    usuarioId: string,
+    email: string,
+    porId: string,
+    log: FastifyInstance["log"],
+  ): Promise<"enviado" | "indisponivel"> {
     if (!app.adminAuth) return "indisponivel";
     try {
       const { authUserId } = await app.adminAuth.convidar(email, redirectConvite());
@@ -84,7 +101,10 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
       return "enviado";
     } catch (e) {
       if (!(e instanceof ContaJaExiste)) {
-        log.error({ evento: "convite_falhou", usuarioId, err: e instanceof Error ? e.message : "erro" }, "falha ao convidar");
+        log.error(
+          { evento: "convite_falhou", usuarioId, err: e instanceof Error ? e.message : "erro" },
+          "falha ao convidar",
+        );
       }
       return "indisponivel";
     }
@@ -102,7 +122,9 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
       },
     },
     async () => {
-      const { rows } = await app.db.query<LinhaUsuario>(`${SELECT_USUARIO} order by u.nome, u.email`);
+      const { rows } = await app.db.query<LinhaUsuario>(
+        `${SELECT_USUARIO} order by u.nome, u.email`,
+      );
       return rows.map(paraResposta);
     },
   );
@@ -138,21 +160,30 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const { nome, email, papel, atletaId } = req.body;
       if (papel === "responsavel") {
-        throw requisicaoInvalida("O papel de responsável está desligado no piloto 18+ (fluxo de menores em desenho).");
+        throw requisicaoInvalida(
+          "O papel de responsável está desligado no piloto 18+ (fluxo de menores em desenho).",
+        );
       }
-      if (papel === "atleta" && !atletaId) throw requisicaoInvalida("Informe o atleta que esta conta representa.");
-      if (papel !== "atleta" && atletaId) throw requisicaoInvalida("Só a conta de atleta é vinculada a um atleta.");
+      if (papel === "atleta" && !atletaId)
+        throw requisicaoInvalida("Informe o atleta que esta conta representa.");
+      if (papel !== "atleta" && atletaId)
+        throw requisicaoInvalida("Só a conta de atleta é vinculada a um atleta.");
       const porId = req.usuario.id;
 
       const id = await app.db
         .transacao(async (tx) => {
           if (atletaId) {
-            const a = await tx.query("select 1 from atletas where id = $1 and ativo for update", [atletaId]);
+            const a = await tx.query("select 1 from atletas where id = $1 and ativo for update", [
+              atletaId,
+            ]);
             if (a.rows.length === 0) throw naoEncontrado("Atleta não encontrado.");
             const jaTem = await tx.query("select 1 from usuarios where atleta_id = $1", [atletaId]);
             if (jaTem.rows.length > 0) throw conflito("Este atleta já tem uma conta.");
           }
-          if ((await tx.query("select 1 from usuarios where lower(email) = $1", [email])).rows.length > 0) {
+          if (
+            (await tx.query("select 1 from usuarios where lower(email) = $1", [email])).rows
+              .length > 0
+          ) {
             throw conflito(MSG_EMAIL_EM_USO);
           }
           const ins = await tx.query<{ id: string }>(
@@ -185,20 +216,36 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ["usuarios"],
         summary: "Edita nome ou ativa/desativa uma conta",
-        description: "O gestor não desativa a própria conta. Conta inativa perde o acesso na próxima requisição.",
+        description:
+          "O gestor não desativa a própria conta. Conta inativa perde o acesso na próxima requisição.",
         security: seguranca,
         params: z.object({ id: z.uuid() }),
         body: z
-          .object({ nome: z.string().trim().min(1).max(120).optional(), ativo: z.boolean().optional() })
-          .refine((b) => b.nome !== undefined || b.ativo !== undefined, { message: "Informe nome ou ativo." }),
-        response: { 200: esquemaUsuario, 400: esquemaErro, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
+          .object({
+            nome: z.string().trim().min(1).max(120).optional(),
+            ativo: z.boolean().optional(),
+          })
+          .refine((b) => b.nome !== undefined || b.ativo !== undefined, {
+            message: "Informe nome ou ativo.",
+          }),
+        response: {
+          200: esquemaUsuario,
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+        },
       },
     },
     async (req) => {
       const { id } = req.params;
       const { nome, ativo } = req.body;
-      if (id === req.usuario.id && ativo === false) throw requisicaoInvalida("Você não pode desativar a própria conta.");
-      const campos = [...(nome !== undefined ? ["nome"] : []), ...(ativo !== undefined ? ["ativo"] : [])];
+      if (id === req.usuario.id && ativo === false)
+        throw requisicaoInvalida("Você não pode desativar a própria conta.");
+      const campos = [
+        ...(nome !== undefined ? ["nome"] : []),
+        ...(ativo !== undefined ? ["ativo"] : []),
+      ];
       await app.db.transacao(async (tx) => {
         const u = await tx.query(
           "update usuarios set nome = coalesce($2, nome), ativo = coalesce($3, ativo) where id = $1 returning id",
@@ -242,17 +289,30 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
       const u = await buscarUsuario(app.db, req.params.id);
       if (!u) throw naoEncontrado("Usuário não encontrado.");
       if (!u.ativo) throw requisicaoInvalida("A conta está inativa. Reative-a antes de convidar.");
-      if (u.papel === "responsavel") throw requisicaoInvalida("O papel de responsável está desligado no piloto 18+.");
-      if (!app.adminAuth) throw servicoIndisponivel("O envio de convites não está configurado neste ambiente.");
+      if (u.papel === "responsavel")
+        throw requisicaoInvalida("O papel de responsável está desligado no piloto 18+.");
+      if (!app.adminAuth)
+        throw servicoIndisponivel("O envio de convites não está configurado neste ambiente.");
       try {
         const { authUserId } = await app.adminAuth.convidar(u.email, redirectConvite());
         await registrarConvite(u.id, authUserId, req.usuario.id);
       } catch (e) {
         if (e instanceof ContaJaExiste) {
-          throw conflito('Este e-mail já tem conta. Peça à pessoa para usar "Esqueci a senha" na tela de entrada.');
+          throw conflito(
+            'Este e-mail já tem conta. Peça à pessoa para usar "Esqueci a senha" na tela de entrada.',
+          );
         }
-        req.log.error({ evento: "convite_falhou", usuarioId: u.id, err: e instanceof Error ? e.message : "erro" }, "falha ao convidar");
-        throw servicoIndisponivel("Não foi possível enviar o convite agora. Tente novamente em instantes.");
+        req.log.error(
+          {
+            evento: "convite_falhou",
+            usuarioId: u.id,
+            err: e instanceof Error ? e.message : "erro",
+          },
+          "falha ao convidar",
+        );
+        throw servicoIndisponivel(
+          "Não foi possível enviar o convite agora. Tente novamente em instantes.",
+        );
       }
       return { convite: "enviado" as const };
     },
@@ -275,7 +335,9 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
             numeroVela: z.string().trim().max(20).optional(),
             ativo: z.boolean().optional(),
           })
-          .refine((b) => Object.values(b).some((v) => v !== undefined), { message: "Informe ao menos um campo." }),
+          .refine((b) => Object.values(b).some((v) => v !== undefined), {
+            message: "Informe ao menos um campo.",
+          }),
         response: {
           200: z.object({
             id: z.string(),
@@ -305,19 +367,36 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
         .filter(([, v]) => v !== undefined)
         .map(([k]) => k);
       return app.db.transacao(async (tx) => {
-        if ((await tx.query("select 1 from atletas where id = $1 for update", [id])).rows.length === 0) {
+        if (
+          (await tx.query("select 1 from atletas where id = $1 for update", [id])).rows.length === 0
+        ) {
           throw naoEncontrado("Atleta não encontrado.");
         }
-        if (classeId !== undefined && (await tx.query("select 1 from classes where id = $1 and ativa", [classeId])).rows.length === 0) {
+        if (
+          classeId !== undefined &&
+          (await tx.query("select 1 from classes where id = $1 and ativa", [classeId])).rows
+            .length === 0
+        ) {
           throw requisicaoInvalida("Classe inválida ou inativa.");
         }
         if (
           treinadorId !== undefined &&
-          (await tx.query("select 1 from usuarios where id = $1 and papel = 'treinador' and ativo", [treinadorId])).rows.length === 0
+          (
+            await tx.query(
+              "select 1 from usuarios where id = $1 and papel = 'treinador' and ativo",
+              [treinadorId],
+            )
+          ).rows.length === 0
         ) {
           throw requisicaoInvalida("Treinador inválido ou inativo.");
         }
-        const res = await tx.query<{ id: string; classe_id: string; treinador_id: string | null; numero_vela: string | null; ativo: boolean }>(
+        const res = await tx.query<{
+          id: string;
+          classe_id: string;
+          treinador_id: string | null;
+          numero_vela: string | null;
+          ativo: boolean;
+        }>(
           `update atletas set
              classe_id = coalesce($2, classe_id),
              treinador_id = coalesce($3, treinador_id),
@@ -333,7 +412,13 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
           [req.usuario.id, id, JSON.stringify({ campos })],
         );
         const l = res.rows[0]!;
-        return { id: l.id, classeId: l.classe_id, treinadorId: l.treinador_id, numeroVela: l.numero_vela, ativo: l.ativo };
+        return {
+          id: l.id,
+          classeId: l.classe_id,
+          treinadorId: l.treinador_id,
+          numeroVela: l.numero_vela,
+          ativo: l.ativo,
+        };
       });
     },
   );

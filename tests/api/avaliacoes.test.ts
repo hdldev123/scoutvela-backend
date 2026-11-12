@@ -28,7 +28,9 @@ describe("avaliações, prévia e gates", () => {
       [idT],
     );
     indA = a.rows[0]!.indicador_id;
-    const r = await p.db.query<{ id: string }>(`select id from indicadores where tipo = 'R' limit 1`);
+    const r = await p.db.query<{ id: string }>(
+      `select id from indicadores where tipo = 'R' limit 1`,
+    );
     indR = r.rows[0]!.id;
   });
   afterAll(() => p.encerrar());
@@ -43,15 +45,29 @@ describe("avaliações, prévia e gates", () => {
     return { status: r.statusCode, corpo: r.json() };
   };
   const contar = async (tabela: string) =>
-    Number((await p.db.query<{ n: string }>(`select count(*)::text as n from ${tabela}`)).rows[0]!.n);
-  const nota = (valor: number, indicadorId = indT) => ({ indicadorId, valor, evidencia: "Observação em treino" });
+    Number(
+      (await p.db.query<{ n: string }>(`select count(*)::text as n from ${tabela}`)).rows[0]!.n,
+    );
+  const nota = (valor: number, indicadorId = indT) => ({
+    indicadorId,
+    valor,
+    evidencia: "Observação em treino",
+  });
 
   async function scoreCalculado(id: string): Promise<number> {
     const parametros = await carregarParametros(p.db);
-    const base = (await buscarAtletaVisivel(p.db, { id: "x", papel: "gestor", atletaId: null }, id))!;
+    const base = (await buscarAtletaVisivel(
+      p.db,
+      { id: "x", papel: "gestor", atletaId: null },
+      id,
+    ))!;
     const [av] = await carregarEAvaliarAtletas(p.db, parametros, [base], AGORA());
     return calcularAtleta(parametros, {
-      ...(await import("../../src/servicos/avaliacao-atletas.js")).montarEntradaCalculo(base, av!.dados, AGORA()),
+      ...(await import("../../src/servicos/avaliacao-atletas.js")).montarEntradaCalculo(
+        base,
+        av!.dados,
+        AGORA(),
+      ),
     }).score;
   }
 
@@ -75,7 +91,12 @@ describe("avaliações, prévia e gates", () => {
 
   it("série histórica: dois lançamentos viram duas linhas e vale o último; score bate com calcularAtleta", async () => {
     const antes = Number(
-      (await p.db.query<{ n: string }>(`select count(*)::text as n from avaliacoes where atleta_id=$1 and indicador_id=$2`, [idT, indT])).rows[0]!.n,
+      (
+        await p.db.query<{ n: string }>(
+          `select count(*)::text as n from avaliacoes where atleta_id=$1 and indicador_id=$2`,
+          [idT, indT],
+        )
+      ).rows[0]!.n,
     );
     const a = await enviar(EMAILS_DEMO.treinadora, idT, { notas: [nota(1)] });
     const b = await enviar(EMAILS_DEMO.treinadora, idT, { notas: [nota(5)] });
@@ -113,14 +134,22 @@ describe("avaliações, prévia e gates", () => {
   it("medida só com peso mantém a altura anterior; evidência padrão em pt-BR", async () => {
     const id = await p.idDe("CE-T09");
     const ficha = async () =>
-      (await p.app.inject({ method: "GET", url: `/atletas/${id}`, headers: await p.como(EMAILS_DEMO.gestor) })).json();
+      (
+        await p.app.inject({
+          method: "GET",
+          url: `/atletas/${id}`,
+          headers: await p.como(EMAILS_DEMO.gestor),
+        })
+      ).json();
     const antes = (await ficha()).classFit;
     const r = await enviar(EMAILS_DEMO.gestor, id, { medida: { pesoKg: 70.5 } });
     expect(r.status).toBe(201);
     const depois = await ficha();
     expect(depois.classFit.pesoKg).toBe(70.5);
     expect(depois.classFit.alturaCm).toBe(antes.alturaCm);
-    const peso = depois.pilares.flatMap((x: { indicadores: { id: string; evidencia: string }[] }) => x.indicadores).find((i: { id: string }) => i.id === "cf_peso_kg");
+    const peso = depois.pilares
+      .flatMap((x: { indicadores: { id: string; evidencia: string }[] }) => x.indicadores)
+      .find((i: { id: string }) => i.id === "cf_peso_kg");
     expect(peso.evidencia).toBe("Pesagem: 70,5 kg");
 
     await enviar(EMAILS_DEMO.gestor, id, { medida: { alturaCm: 181.5 } });
@@ -153,9 +182,15 @@ describe("avaliações, prévia e gates", () => {
     expect((await enviar(EMAILS_DEMO.treinadora, idMarcos, corpo, "/previa")).status).toBe(404);
     expect((await enviar(EMAILS_DEMO.atleta, idT, corpo)).status).toBe(403);
     expect((await enviar(EMAILS_DEMO.ibvar, idT, corpo, "/previa")).status).toBe(403);
-    const sem = await p.app.inject({ method: "POST", url: `/atletas/${idT}/avaliacoes`, payload: corpo });
+    const sem = await p.app.inject({
+      method: "POST",
+      url: `/atletas/${idT}/avaliacoes`,
+      payload: corpo,
+    });
     expect(sem.statusCode).toBe(401);
-    expect((await enviar(EMAILS_DEMO.gestor, "00000000-0000-4000-8000-000000000000", corpo)).status).toBe(404);
+    expect(
+      (await enviar(EMAILS_DEMO.gestor, "00000000-0000-4000-8000-000000000000", corpo)).status,
+    ).toBe(404);
   });
 
   it("validações: calculado, R, inexistente, repetido, faixas e corpo vazio -> 400", async () => {
@@ -181,7 +216,10 @@ describe("avaliações, prévia e gates", () => {
       { notas: Array.from({ length: 61 }, () => nota(1)) },
     ];
     for (const c of casos) {
-      expect((await enviar(EMAILS_DEMO.gestor, idT, c)).status, JSON.stringify(c).slice(0, 80)).toBe(400);
+      expect(
+        (await enviar(EMAILS_DEMO.gestor, idT, c)).status,
+        JSON.stringify(c).slice(0, 80),
+      ).toBe(400);
       expect((await enviar(EMAILS_DEMO.gestor, idT, c, "/previa")).status).toBe(400);
     }
     expect(await contar("avaliacoes")).toBe(antes);
@@ -199,21 +237,42 @@ describe("avaliações, prévia e gates", () => {
       });
       return { status: r.statusCode, corpo: r.json() };
     };
-    type Item = { gate: number; status: string; sugestaoAutomatica: string; ajustadoPeloGestor: boolean };
+    type Item = {
+      gate: number;
+      status: string;
+      sugestaoAutomatica: string;
+      ajustadoPeloGestor: boolean;
+    };
     const outro = (s: string) => (s === "apto" ? "alerta" : "apto");
 
     it("status diferente da sugestão ajusta; igual volta ao automático (nulo)", async () => {
       const id = await p.idDe("RJ-T03");
-      const ficha = (await p.app.inject({ method: "GET", url: `/atletas/${id}`, headers: await p.como(EMAILS_DEMO.gestor) })).json();
+      const ficha = (
+        await p.app.inject({
+          method: "GET",
+          url: `/atletas/${id}`,
+          headers: await p.como(EMAILS_DEMO.gestor),
+        })
+      ).json();
       const g2 = ficha.gates.itens.find((g: Item) => g.gate === 2) as Item;
 
-      const diferente = await decidir(EMAILS_DEMO.gestor, id, { gate: 2, status: outro(g2.sugestaoAutomatica), justificativa: "Texto sigiloso" });
+      const diferente = await decidir(EMAILS_DEMO.gestor, id, {
+        gate: 2,
+        status: outro(g2.sugestaoAutomatica),
+        justificativa: "Texto sigiloso",
+      });
       expect(diferente.status).toBe(200);
       const item = (diferente.corpo.itens as Item[]).find((g) => g.gate === 2)!;
-      expect(item).toMatchObject({ status: outro(g2.sugestaoAutomatica), ajustadoPeloGestor: true });
+      expect(item).toMatchObject({
+        status: outro(g2.sugestaoAutomatica),
+        ajustadoPeloGestor: true,
+      });
       expect(diferente.corpo.statusFinal).toEqual(expect.any(String));
 
-      const igual = await decidir(EMAILS_DEMO.gestor, id, { gate: 2, status: g2.sugestaoAutomatica });
+      const igual = await decidir(EMAILS_DEMO.gestor, id, {
+        gate: 2,
+        status: g2.sugestaoAutomatica,
+      });
       const item2 = (igual.corpo.itens as Item[]).find((g) => g.gate === 2)!;
       expect(item2).toMatchObject({ status: g2.sugestaoAutomatica, ajustadoPeloGestor: false });
       const ult = await p.db.query<{ status: string | null }>(
@@ -224,22 +283,51 @@ describe("avaliações, prévia e gates", () => {
 
       await decidir(EMAILS_DEMO.gestor, id, { gate: 2, status: outro(g2.sugestaoAutomatica) });
       const nulo = await decidir(EMAILS_DEMO.gestor, id, { gate: 2, status: null });
-      expect((nulo.corpo.itens as Item[]).find((g) => g.gate === 2)!.ajustadoPeloGestor).toBe(false);
+      expect((nulo.corpo.itens as Item[]).find((g) => g.gate === 2)!.ajustadoPeloGestor).toBe(
+        false,
+      );
 
-      const aud = await p.db.query<{ detalhes: unknown }>(`select detalhes from auditoria where acao = 'decidir_gate'`);
+      const aud = await p.db.query<{ detalhes: unknown }>(
+        `select detalhes from auditoria where acao = 'decidir_gate'`,
+      );
       expect(aud.rows.length).toBeGreaterThanOrEqual(4);
       expect(JSON.stringify(aud.rows)).not.toContain("sigiloso");
     });
 
     it("só gestor; validações", async () => {
-      expect((await decidir(EMAILS_DEMO.treinadora, idT, { gate: 1, status: "apto" })).status).toBe(403);
-      expect((await decidir(EMAILS_DEMO.atleta, idT, { gate: 1, status: "apto" })).status).toBe(403);
+      expect((await decidir(EMAILS_DEMO.treinadora, idT, { gate: 1, status: "apto" })).status).toBe(
+        403,
+      );
+      expect((await decidir(EMAILS_DEMO.atleta, idT, { gate: 1, status: "apto" })).status).toBe(
+        403,
+      );
       expect((await decidir(EMAILS_DEMO.ibvar, idT, { gate: 1, status: "apto" })).status).toBe(403);
-      expect((await decidir(EMAILS_DEMO.gestor, idT, { gate: 5, status: "apto" })).status).toBe(400);
-      expect((await decidir(EMAILS_DEMO.gestor, idT, { gate: 0, status: "apto" })).status).toBe(400);
-      expect((await decidir(EMAILS_DEMO.gestor, idT, { gate: 1, status: "ruim" })).status).toBe(400);
-      expect((await decidir(EMAILS_DEMO.gestor, idT, { gate: 1, status: "apto", justificativa: "x".repeat(501) })).status).toBe(400);
-      expect((await decidir(EMAILS_DEMO.gestor, "00000000-0000-4000-8000-000000000000", { gate: 1, status: "apto" })).status).toBe(404);
+      expect((await decidir(EMAILS_DEMO.gestor, idT, { gate: 5, status: "apto" })).status).toBe(
+        400,
+      );
+      expect((await decidir(EMAILS_DEMO.gestor, idT, { gate: 0, status: "apto" })).status).toBe(
+        400,
+      );
+      expect((await decidir(EMAILS_DEMO.gestor, idT, { gate: 1, status: "ruim" })).status).toBe(
+        400,
+      );
+      expect(
+        (
+          await decidir(EMAILS_DEMO.gestor, idT, {
+            gate: 1,
+            status: "apto",
+            justificativa: "x".repeat(501),
+          })
+        ).status,
+      ).toBe(400);
+      expect(
+        (
+          await decidir(EMAILS_DEMO.gestor, "00000000-0000-4000-8000-000000000000", {
+            gate: 1,
+            status: "apto",
+          })
+        ).status,
+      ).toBe(404);
     });
   });
 });

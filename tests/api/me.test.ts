@@ -21,7 +21,17 @@ describe("GET /me", () => {
   const casos: { papel: Papel; telas: string[]; telaInicial: string }[] = [
     {
       papel: "gestor",
-      telas: ["ranking", "avaliar", "cadastro", "ciclos", "revisoes", "investimento", "usuarios", "parametros", "auditoria"],
+      telas: [
+        "ranking",
+        "avaliar",
+        "cadastro",
+        "ciclos",
+        "revisoes",
+        "investimento",
+        "usuarios",
+        "parametros",
+        "auditoria",
+      ],
       telaInicial: "ranking",
     },
     { papel: "treinador", telas: ["ranking", "avaliar", "revisoes"], telaInicial: "ranking" },
@@ -29,22 +39,25 @@ describe("GET /me", () => {
     { papel: "ibvar", telas: ["investimento", "ranking"], telaInicial: "investimento" },
   ];
 
-  it.each(casos)("devolve telas e tela inicial do papel $papel", async ({ papel, telas, telaInicial }) => {
-    const u = await criarUsuarioDeTeste(db, { papel, nome: `Pessoa ${papel}` });
-    const r = await app.inject({
-      method: "GET",
-      url: "/me",
-      headers: cabecalhoAuth(await tokenPara(u.authUserId)),
-    });
-    expect(r.statusCode).toBe(200);
-    const corpo = r.json();
-    expect(corpo.usuario).toMatchObject({ id: u.id, nome: `Pessoa ${papel}`, papel });
-    expect(corpo.telas).toEqual(telas);
-    expect(corpo.telaInicial).toBe(telaInicial);
-    if (papel === "atleta") {
-      expect(corpo.atleta).toEqual({ id: u.atletaId, nome: "Pessoa atleta" });
-    } else {
-      expect(corpo.atleta).toBeNull();
-    }
-  });
+  it.each(casos)(
+    "devolve telas e tela inicial do papel $papel",
+    async ({ papel, telas, telaInicial }) => {
+      const u = await criarUsuarioDeTeste(db, { papel, nome: `Pessoa ${papel}` });
+      const r = await app.inject({
+        method: "GET",
+        url: "/me",
+        headers: cabecalhoAuth(await tokenPara(u.authUserId)),
+      });
+      expect(r.statusCode).toBe(200);
+      const corpo = r.json();
+      expect(corpo.usuario).toMatchObject({ id: u.id, nome: `Pessoa ${papel}`, papel });
+      expect(corpo.telas).toEqual(telas);
+      expect(corpo.telaInicial).toBe(telaInicial);
+      if (papel === "atleta") {
+        expect(corpo.atleta).toEqual({ id: u.atletaId, nome: "Pessoa atleta" });
+      } else {
+        expect(corpo.atleta).toBeNull();
+      }
+    },
+  );
 });

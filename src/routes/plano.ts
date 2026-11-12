@@ -33,7 +33,15 @@ export async function rotasPlano(app: FastifyInstance): Promise<void> {
           "Gestor, ou treinador dos próprios atletas. A ficha traz a sugestão calculada; quem registra é uma pessoa. 201 no primeiro plano do atleta, 200 nas versões seguintes.",
         security: [{ bearerAuth: [] }],
         params: z.object({ id: z.uuid() }),
-        body: z.object({ forcas: texto, lacunas: texto, meta12m: texto, meta24m: texto, recomendacao: texto }).strict(),
+        body: z
+          .object({
+            forcas: texto,
+            lacunas: texto,
+            meta12m: texto,
+            meta24m: texto,
+            recomendacao: texto,
+          })
+          .strict(),
         response: {
           200: esquemaPlanoRegistrado,
           201: esquemaPlanoRegistrado,
@@ -55,12 +63,21 @@ export async function rotasPlano(app: FastifyInstance): Promise<void> {
         await tx.query(
           `insert into plano_individual (atleta_id, forcas, lacunas, meta_12m, meta_24m, recomendacao, registrado_por, registrado_em)
            values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-          [base.id, body.forcas, body.lacunas, body.meta12m, body.meta24m, body.recomendacao, usuario.id, referencia],
+          [
+            base.id,
+            body.forcas,
+            body.lacunas,
+            body.meta12m,
+            body.meta24m,
+            body.recomendacao,
+            usuario.id,
+            referencia,
+          ],
         );
         // Auditoria sem o texto do plano: só quais campos mudaram.
-        const campos = (["forcas", "lacunas", "meta12m", "meta24m", "recomendacao"] as const).filter(
-          (c) => !anterior || anterior[c] !== body[c],
-        );
+        const campos = (
+          ["forcas", "lacunas", "meta12m", "meta24m", "recomendacao"] as const
+        ).filter((c) => !anterior || anterior[c] !== body[c]);
         await tx.query(
           `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
            values ($1, 'registrar_plano', 'atleta', $2, $3::jsonb, $4)`,

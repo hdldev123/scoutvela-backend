@@ -12,7 +12,9 @@ import {
 import { carregarParametros } from "../repositories/parametros.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 
-const esquemaCiclo = z.object({ nome: z.string(), prazo: z.string().describe("AAAA-MM-DD") }).nullable();
+const esquemaCiclo = z
+  .object({ nome: z.string(), prazo: z.string().describe("AAAA-MM-DD") })
+  .nullable();
 
 const esquemaItem = z.object({
   posicao: z.number().int(),
@@ -29,15 +31,23 @@ const esquemaItem = z.object({
   score: z.number(),
   faixa: z.object({ id: z.string(), nome: z.string(), nomeCurto: z.string() }),
   completo: z.boolean(),
-  pilares: z.array(z.object({ id: z.string(), nomeCurto: z.string(), nota: z.number().nullable() })),
-  statusGates: z.enum(["apto", "condicional", "nao_prioritario"]).describe("Status final pelos 4 gates (P7)"),
+  pilares: z.array(
+    z.object({ id: z.string(), nomeCurto: z.string(), nota: z.number().nullable() }),
+  ),
+  statusGates: z
+    .enum(["apto", "condicional", "nao_prioritario"])
+    .describe("Status final pelos 4 gates (P7)"),
   pontosCbvela: z.number(),
 });
 
 const esquemaRanking = z.object({
   ciclo: esquemaCiclo,
   itens: z.array(esquemaItem),
-  ocultosSemConsentimento: z.number().int().nullable().describe("Só para o IBVAR; nulo para os demais"),
+  ocultosSemConsentimento: z
+    .number()
+    .int()
+    .nullable()
+    .describe("Só para o IBVAR; nulo para os demais"),
 });
 
 const esquemaQuery = z.object({
@@ -65,7 +75,10 @@ export async function rotasRanking(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { classe, categoria, faixa, ordem } = req.query;
       const referencia = app.agora();
-      const [parametros, ciclo] = await Promise.all([carregarParametros(app.db), cicloAberto(app.db)]);
+      const [parametros, ciclo] = await Promise.all([
+        carregarParametros(app.db),
+        cicloAberto(app.db),
+      ]);
 
       const atletas = await listarAtletasVisiveis(app.db, req.usuario, {
         somenteTermoAceito: true,
@@ -98,14 +111,23 @@ export async function rotasRanking(app: FastifyInstance): Promise<void> {
           classe: { id: atleta.classe.id, nome: atleta.classe.nome, evento: atleta.classe.evento },
         },
         score: calculo.score,
-        faixa: { id: calculo.faixa.id, nome: calculo.faixa.nome, nomeCurto: calculo.faixa.nomeCurto },
+        faixa: {
+          id: calculo.faixa.id,
+          nome: calculo.faixa.nome,
+          nomeCurto: calculo.faixa.nomeCurto,
+        },
         completo: calculo.completo,
-        pilares: calculo.pilares.map((p) => ({ id: p.pilarId, nomeCurto: nomeCurto.get(p.pilarId) ?? p.pilarId, nota: p.nota })),
+        pilares: calculo.pilares.map((p) => ({
+          id: p.pilarId,
+          nomeCurto: nomeCurto.get(p.pilarId) ?? p.pilarId,
+          nota: p.nota,
+        })),
         statusGates: calculo.statusFinal,
         pontosCbvela: calculo.pontosCbvela,
       }));
 
-      const ocultos = req.usuario.papel === "ibvar" ? await contarSemConsentimentoIbvar(app.db) : null;
+      const ocultos =
+        req.usuario.papel === "ibvar" ? await contarSemConsentimentoIbvar(app.db) : null;
       return { ciclo, itens, ocultosSemConsentimento: ocultos };
     },
   );

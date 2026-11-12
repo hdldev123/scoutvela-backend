@@ -8,7 +8,16 @@ interface PilarFicha {
   id: string;
   restrito: boolean;
   nota: number | null;
-  indicadores: { id: string; nota: number | null; evidencia: string | null; avaliador: unknown; calculado: boolean; sugestaoPendente: unknown }[] | null;
+  indicadores:
+    | {
+        id: string;
+        nota: number | null;
+        evidencia: string | null;
+        avaliador: unknown;
+        calculado: boolean;
+        sugestaoPendente: unknown;
+      }[]
+    | null;
 }
 
 describe("GET /atletas/:id", () => {
@@ -20,7 +29,11 @@ describe("GET /atletas/:id", () => {
 
   const ficha = async (email: string, velaidOuId: string) => {
     const id = velaidOuId.includes("-T") ? await p.idDe(velaidOuId) : velaidOuId;
-    const r = await p.app.inject({ method: "GET", url: `/atletas/${id}`, headers: await p.como(email) });
+    const r = await p.app.inject({
+      method: "GET",
+      url: `/atletas/${id}`,
+      headers: await p.como(email),
+    });
     return { status: r.statusCode, corpo: r.json(), texto: r.body };
   };
 
@@ -28,13 +41,19 @@ describe("GET /atletas/:id", () => {
     const id = await p.idDe("SC-T01");
     expect((await p.app.inject({ method: "GET", url: `/atletas/${id}` })).statusCode).toBe(401);
     expect((await ficha(EMAILS_DEMO.gestor, "nao-e-uuid")).status).toBe(400);
-    expect((await ficha(EMAILS_DEMO.gestor, "00000000-0000-4000-8000-000000000000")).status).toBe(404);
+    expect((await ficha(EMAILS_DEMO.gestor, "00000000-0000-4000-8000-000000000000")).status).toBe(
+      404,
+    );
   });
 
   it("gestor vê tudo: sensíveis, classFit, financeiro completo e contato", async () => {
     const { status, corpo } = await ficha(EMAILS_DEMO.gestor, "SC-T01");
     expect(status).toBe(200);
-    expect(corpo.atleta).toMatchObject({ velaid: "SC-T01", termoAceito: true, idade: expect.any(Number) });
+    expect(corpo.atleta).toMatchObject({
+      velaid: "SC-T01",
+      termoAceito: true,
+      idade: expect.any(Number),
+    });
     expect(corpo.contato.treinador.nome).toBe("Ana Ribeiro");
     expect(corpo.contato.email).toEqual(expect.any(String));
     expect(corpo.pilares).toHaveLength(9);
@@ -48,9 +67,15 @@ describe("GET /atletas/:id", () => {
     expect(corpo.classFit).toMatchObject({ pesoKg: 72.4, pesoMedioKg: expect.any(Number) });
     expect(corpo.financeiro.componentes.length).toBeGreaterThan(0);
     expect(corpo.gates.itens.map((g: { nome: string }) => g.nome)).toEqual([
-      "Class Fit", "Evidência competitiva", "Alto rendimento", "Campanha",
+      "Class Fit",
+      "Evidência competitiva",
+      "Alto rendimento",
+      "Campanha",
     ]);
-    expect(corpo.historicoScore.map((h: { ciclo: string }) => h.ciclo)).toEqual(["Setembro de 2026", "Outubro de 2026"]);
+    expect(corpo.historicoScore.map((h: { ciclo: string }) => h.ciclo)).toEqual([
+      "Setembro de 2026",
+      "Outubro de 2026",
+    ]);
     expect(corpo.resultados.length).toBeGreaterThan(0);
     expect(corpo.ciclo.nome).toBe("Novembro de 2026");
   });
@@ -81,13 +106,17 @@ describe("GET /atletas/:id", () => {
     const { status, corpo, texto } = await ficha(EMAILS_DEMO.ibvar, "SC-T01");
     expect(status).toBe(200);
     const pilares = corpo.pilares as PilarFicha[];
-    const restritos = pilares.filter((x) => x.restrito).map((x) => x.id).sort();
+    const restritos = pilares
+      .filter((x) => x.restrito)
+      .map((x) => x.id)
+      .sort();
     expect(restritos).toEqual(["amb", "cf", "men"]);
     for (const x of pilares.filter((y) => y.restrito)) {
       expect(x.indicadores).toBeNull();
       expect(x.nota).not.toBeNull();
     }
-    for (const x of pilares.filter((y) => !y.restrito)) expect(x.indicadores!.length).toBeGreaterThan(0);
+    for (const x of pilares.filter((y) => !y.restrito))
+      expect(x.indicadores!.length).toBeGreaterThan(0);
     expect(corpo.classFit).toBeNull();
     expect(corpo.contato).toBeNull();
     expect(Object.keys(corpo.financeiro)).toEqual(["perfilSuporte"]);
@@ -111,7 +140,11 @@ describe("GET /atletas/:id", () => {
       [id, nova, EMAILS_DEMO.gestor],
     );
     const depois = (await ficha(EMAILS_DEMO.gestor, id)).corpo;
-    expect(depois.gates.itens[0]).toMatchObject({ status: nova, ajustadoPeloGestor: true, sugestaoAutomatica: automatica });
+    expect(depois.gates.itens[0]).toMatchObject({
+      status: nova,
+      ajustadoPeloGestor: true,
+      sugestaoAutomatica: automatica,
+    });
     expect(depois.gates.statusFinal).not.toBeUndefined();
   });
 

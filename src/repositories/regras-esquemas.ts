@@ -14,11 +14,20 @@ export const ESQUEMAS_REGRAS = {
     limites: z
       .array(z.number().positive().max(100))
       .length(5, "P3 precisa de 5 limites.")
-      .refine((l) => l.every((v, i) => i === 0 || v > (l[i - 1] as number)), "Os limites de P3 precisam ser crescentes."),
+      .refine(
+        (l) => l.every((v, i) => i === 0 || v > (l[i - 1] as number)),
+        "Os limites de P3 precisam ser crescentes.",
+      ),
   }),
   G1: z
-    .strictObject({ apto_ate: z.number().positive().max(100), condicional_ate: z.number().positive().max(100) })
-    .refine((v) => v.apto_ate < v.condicional_ate, "Em G1, apto_ate precisa ser menor que condicional_ate."),
+    .strictObject({
+      apto_ate: z.number().positive().max(100),
+      condicional_ate: z.number().positive().max(100),
+    })
+    .refine(
+      (v) => v.apto_ate < v.condicional_ate,
+      "Em G1, apto_ate precisa ser menor que condicional_ate.",
+    ),
   G2: z.strictObject({
     mundial_apto_ate_fracao: fracao,
     sul_americano_condicional_ate_posicao: posicao,

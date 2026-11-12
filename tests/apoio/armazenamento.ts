@@ -17,7 +17,10 @@ export function criarArmazenamentoFake(): ArmazenamentoFake {
     },
     async linkTemporario(caminho) {
       if (fake.falhar) throw new Error("storage fora do ar");
-      return { url: `https://storage.teste/assinado/${caminho}?token=abc`, expiraEm: "2026-11-06T15:05:00.000Z" };
+      return {
+        url: `https://storage.teste/assinado/${caminho}?token=abc`,
+        expiraEm: "2026-11-06T15:05:00.000Z",
+      };
     },
   };
   return fake;

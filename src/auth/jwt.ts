@@ -28,7 +28,11 @@ export function criarVerificadorSupabase(opcoes: {
   return async (token) => {
     const { payload } = chave
       ? await jwtVerify(token, chave, { issuer, audience, algorithms: ["HS256"] })
-      : await jwtVerify(token, jwks!, { issuer, audience, algorithms: ["ES256", "RS256", "EdDSA"] });
+      : await jwtVerify(token, jwks!, {
+          issuer,
+          audience,
+          algorithms: ["ES256", "RS256", "EdDSA"],
+        });
     if (typeof payload.sub !== "string" || payload.sub === "") throw new Error("Token sem sub");
     const email = typeof payload.email === "string" ? payload.email : undefined;
     const aal = payload.aal === "aal2" ? "aal2" : "aal1";

@@ -12,7 +12,10 @@ describe("armazenamento Supabase", () => {
     const fetchFalso = (async (url: string, init: RequestInit) => {
       chamadas.push({ url, init });
       return url.includes("/sign/")
-        ? new Response(JSON.stringify({ signedURL: `/object/sign/evidencias/${CAMINHO}?token=t` }), { status: 200 })
+        ? new Response(
+            JSON.stringify({ signedURL: `/object/sign/evidencias/${CAMINHO}?token=t` }),
+            { status: 200 },
+          )
         : new Response("{}", { status: 200 });
     }) as unknown as typeof fetch;
     const s = criarArmazenamentoSupabase({
@@ -23,13 +26,21 @@ describe("armazenamento Supabase", () => {
       agora: () => new Date("2026-11-06T12:00:00Z"),
     });
     await s.salvar(CAMINHO, new Uint8Array([1, 2]), "application/pdf");
-    expect(chamadas[0]!.url).toBe(`https://proj.supabase.co/storage/v1/object/evidencias/${CAMINHO}`);
+    expect(chamadas[0]!.url).toBe(
+      `https://proj.supabase.co/storage/v1/object/evidencias/${CAMINHO}`,
+    );
     expect(chamadas[0]!.init.method).toBe("POST");
-    expect(chamadas[0]!.init.headers).toMatchObject({ Authorization: "Bearer chave", "x-upsert": "false", "Content-Type": "application/pdf" });
+    expect(chamadas[0]!.init.headers).toMatchObject({
+      Authorization: "Bearer chave",
+      "x-upsert": "false",
+      "Content-Type": "application/pdf",
+    });
 
     const link = await s.linkTemporario(CAMINHO, "application/pdf", "x.pdf");
-    expect(chamadas[1]!.url).toBe(`https://proj.supabase.co/storage/v1/object/sign/evidencias/${CAMINHO}`);
-    expect(JSON.parse(String(chamadas[1]!.init.body))).toEqual({ expiresIn: 300 });
+    expect(chamadas[1]!.url).toBe(
+      `https://proj.supabase.co/storage/v1/object/sign/evidencias/${CAMINHO}`,
+    );
+    expect(JSON.parse(chamadas[1]!.init.body as string)).toEqual({ expiresIn: 300 });
     expect(link).toEqual({
       url: `https://proj.supabase.co/storage/v1/object/sign/evidencias/${CAMINHO}?token=t`,
       expiraEm: "2026-11-06T12:05:00.000Z",
@@ -41,7 +52,7 @@ describe("armazenamento Supabase", () => {
       supabaseUrl: "https://proj.supabase.co",
       chaveServico: "k",
       bucket: "evidencias",
-      fetchImpl: (async () => new Response("erro", { status: 500 })) as unknown as typeof fetch,
+      fetchImpl: async () => new Response("erro", { status: 500 }),
     });
     await expect(s.salvar(CAMINHO, new Uint8Array([1]), "application/pdf")).rejects.toThrow();
     await expect(s.salvar("../fora.pdf", new Uint8Array([1]), "application/pdf")).rejects.toThrow();

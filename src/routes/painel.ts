@@ -8,7 +8,8 @@ import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 
-const iso = (v: unknown): string => (v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString());
+const iso = (v: unknown): string =>
+  v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString();
 
 const esquemaConsentimento = z.object({
   termoAceitoEm: z.string().nullable().describe("Instante ISO do aceite do termo do piloto"),
@@ -39,7 +40,9 @@ const esquemaPainel = z.object({
         z.object({
           indicadorId: z.string(),
           enunciado: z.string(),
-          registradoNaoPontua: z.boolean().describe("Fica registrado, mas não entra na nota (tipo R)"),
+          registradoNaoPontua: z
+            .boolean()
+            .describe("Fica registrado, mas não entra na nota (tipo R)"),
           opcoes: z.array(z.object({ ordem: z.number().int(), texto: z.string() })),
           resposta: z.string().nullable(),
         }),
@@ -77,12 +80,19 @@ async function auditar(
 }
 
 async function cicloAbertoId(db: Db): Promise<string | null> {
-  const r = await db.query<{ id: string }>(`select id from ciclos_avaliacao where status = 'aberto' limit 1`);
+  const r = await db.query<{ id: string }>(
+    `select id from ciclos_avaliacao where status = 'aberto' limit 1`,
+  );
   return r.rows[0]?.id ?? null;
 }
 
 async function lerConsentimento(db: Db, atletaId: string) {
-  const r = await db.query<{ tipo: string; concedido: boolean; versao_termo: string | null; registrado_em: Date }>(
+  const r = await db.query<{
+    tipo: string;
+    concedido: boolean;
+    versao_termo: string | null;
+    registrado_em: Date;
+  }>(
     `select tipo, concedido, versao_termo, registrado_em from consentimento_atual where atleta_id = $1::uuid`,
     [atletaId],
   );
@@ -142,21 +152,29 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ["painel"],
         summary: "Painel do atleta: score, módulos do questionário e consentimento",
-        description: "Não expõe as notas sugeridas das opções: a resposta só vira nota quando o treinador confirma.",
+        description:
+          "Não expõe as notas sugeridas das opções: a resposta só vira nota quando o treinador confirma.",
         security: seguranca,
         response: { 200: esquemaPainel, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
       },
     },
     async (req) => {
       const usuario = req.usuario;
-      const base = usuario.atletaId ? await buscarAtletaVisivel(app.db, usuario, usuario.atletaId) : null;
+      const base = usuario.atletaId
+        ? await buscarAtletaVisivel(app.db, usuario, usuario.atletaId)
+        : null;
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
       const [parametros, ciclo, consentimento, perguntasRows] = await Promise.all([
         carregarParametros(app.db),
         cicloAberto(app.db),
         lerConsentimento(app.db, base.id),
-        app.db.query<{ indicador_id: string; enunciado: string; ordem: number | null; texto: string | null }>(
+        app.db.query<{
+          indicador_id: string;
+          enunciado: string;
+          ordem: number | null;
+          texto: string | null;
+        }>(
           `select q.indicador_id, q.enunciado, o.ordem, o.texto
              from perguntas_atleta q left join opcoes_resposta o on o.indicador_id = q.indicador_id
             order by q.indicador_id, o.ordem`,
@@ -166,7 +184,10 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       if (!avaliado) throw naoEncontrado("Atleta não encontrado.");
       const { dados, calculo } = avaliado;
 
-      const perguntas = new Map<string, { enunciado: string; opcoes: { ordem: number; texto: string }[] }>();
+      const perguntas = new Map<
+        string,
+        { enunciado: string; opcoes: { ordem: number; texto: string }[] }
+      >();
       for (const l of perguntasRows.rows) {
         const q = perguntas.get(l.indicador_id) ?? { enunciado: l.enunciado, opcoes: [] };
         if (l.ordem !== null && l.texto !== null) q.opcoes.push({ ordem: l.ordem, texto: l.texto });
@@ -176,11 +197,17 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
 
       const modulos = parametros.pilares.map((p) => {
         const c = calcPilar.get(p.id)!;
-        const doAtleta = p.indicadores.filter((i) => (i.tipo === "A" || i.tipo === "R") && perguntas.has(i.id));
+        const doAtleta = p.indicadores.filter(
+          (i) => (i.tipo === "A" || i.tipo === "R") && perguntas.has(i.id),
+        );
         const respostasFeitas = doAtleta.filter((i) => dados.respostas[i.id] != null).length;
         const temA = p.indicadores.some((i) => i.tipo === "A");
         const temT = p.indicadores.some((i) => i.tipo === "T");
-        const quemPreenche = temA ? (temT ? ("ambos" as const) : ("atleta" as const)) : ("treinador" as const);
+        const quemPreenche = temA
+          ? temT
+            ? ("ambos" as const)
+            : ("atleta" as const)
+          : ("treinador" as const);
         const situacao =
           doAtleta.length > 0 && respostasFeitas < doAtleta.length
             ? ("sua_vez" as const)
@@ -215,10 +242,16 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
         atleta: { id: base.id, nome: base.nome },
         ciclo,
         score: calculo.score,
-        faixa: { id: calculo.faixa.id, nome: calculo.faixa.nome, nomeCurto: calculo.faixa.nomeCurto },
+        faixa: {
+          id: calculo.faixa.id,
+          nome: calculo.faixa.nome,
+          nomeCurto: calculo.faixa.nomeCurto,
+        },
         completo: calculo.completo,
         modulos,
-        pendencias: modulos.filter((m) => m.respostasFeitas < m.respostasTotal).map((m) => m.nomeCurto),
+        pendencias: modulos
+          .filter((m) => m.respostasFeitas < m.respostasTotal)
+          .map((m) => m.nomeCurto),
         consentimento,
       };
     },
@@ -234,7 +267,10 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
         description:
           "A resposta deve ser o texto exato de uma opção. Se a opção tem nota sugerida, ela fica pendente: só entra no score quando o treinador confirmar.",
         security: seguranca,
-        body: z.object({ indicadorId: z.string().min(1).max(80), resposta: z.string().min(1).max(200) }),
+        body: z.object({
+          indicadorId: z.string().min(1).max(80),
+          resposta: z.string().min(1).max(200),
+        }),
         response: {
           201: z.object({ ok: z.literal(true), notaSugerida: z.number().int().nullable() }),
           400: esquemaErro,
@@ -254,11 +290,16 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
         [indicadorId, resposta],
       );
       if (!op.rows[0]) {
-        const existe = await app.db.query(`select 1 from perguntas_atleta where indicador_id = $1`, [indicadorId]);
+        const existe = await app.db.query(
+          `select 1 from perguntas_atleta where indicador_id = $1`,
+          [indicadorId],
+        );
         throw new ErroApi(
           400,
           "requisicao_invalida",
-          existe.rows.length === 0 ? "Este indicador não tem pergunta para o atleta." : "Resposta inválida para esta pergunta.",
+          existe.rows.length === 0
+            ? "Este indicador não tem pergunta para o atleta."
+            : "Resposta inválida para esta pergunta.",
         );
       }
       const notaSugerida = op.rows[0].nota_sugerida;
@@ -278,10 +319,17 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
             [usuario.atletaId, indicadorId, cicloId, notaSugerida, agora],
           );
         }
-        await auditar(tx, usuario.id, "responder_questionario", "respostas_atleta", usuario.atletaId, {
-          indicadorId,
-          geraSugestao: notaSugerida !== null,
-        });
+        await auditar(
+          tx,
+          usuario.id,
+          "responder_questionario",
+          "respostas_atleta",
+          usuario.atletaId,
+          {
+            indicadorId,
+            geraSugestao: notaSugerida !== null,
+          },
+        );
       });
       return reply.code(201).send({ ok: true as const, notaSugerida });
     },
@@ -297,7 +345,13 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
         description: "Cada decisão vira uma nova linha no histórico de consentimentos (LGPD).",
         security: seguranca,
         body: z.object({ compartilharIbvar: z.boolean() }),
-        response: { 200: esquemaConsentimento, 400: esquemaErro, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
+        response: {
+          200: esquemaConsentimento,
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+        },
       },
     },
     async (req) => {
@@ -332,9 +386,15 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           .object({
             pilarId: z.string().min(1).max(40).optional(),
             indicadorId: z.string().min(1).max(80).optional(),
-            motivo: z.string().trim().min(10, "O motivo precisa ter ao menos 10 caracteres.").max(2000),
+            motivo: z
+              .string()
+              .trim()
+              .min(10, "O motivo precisa ter ao menos 10 caracteres.")
+              .max(2000),
           })
-          .refine((b) => b.pilarId || b.indicadorId, { message: "Informe o pilar ou o indicador." }),
+          .refine((b) => b.pilarId || b.indicadorId, {
+            message: "Informe o pilar ou o indicador.",
+          }),
         response: {
           201: z.object({ id: z.string(), status: z.literal("aberto") }),
           400: esquemaErro,
@@ -354,13 +414,21 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
 
       if (pilarId) {
         const p = await app.db.query(`select 1 from pilares where id = $1`, [pilarId]);
-        if (p.rows.length === 0) throw new ErroApi(400, "requisicao_invalida", "Pilar inexistente.");
+        if (p.rows.length === 0)
+          throw new ErroApi(400, "requisicao_invalida", "Pilar inexistente.");
       }
       if (indicadorId) {
-        const i = await app.db.query<{ pilar_id: string }>(`select pilar_id from indicadores where id = $1`, [indicadorId]);
+        const i = await app.db.query<{ pilar_id: string }>(
+          `select pilar_id from indicadores where id = $1`,
+          [indicadorId],
+        );
         if (!i.rows[0]) throw new ErroApi(400, "requisicao_invalida", "Indicador inexistente.");
         if (pilarId && pilarId !== i.rows[0].pilar_id) {
-          throw new ErroApi(400, "requisicao_invalida", "O indicador não pertence ao pilar informado.");
+          throw new ErroApi(
+            400,
+            "requisicao_invalida",
+            "O indicador não pertence ao pilar informado.",
+          );
         }
         pilarId = i.rows[0].pilar_id;
       }
@@ -372,7 +440,10 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           [atletaId, pilarId, indicadorId, motivo, usuario.id, app.agora()],
         );
         const novo = r.rows[0]!.id;
-        await auditar(tx, usuario.id, "pedir_revisao", "pedidos_revisao", novo, { pilarId, indicadorId });
+        await auditar(tx, usuario.id, "pedir_revisao", "pedidos_revisao", novo, {
+          pilarId,
+          indicadorId,
+        });
         return novo;
       });
       return reply.code(201).send({ id, status: "aberto" as const });
@@ -385,7 +456,8 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       preHandler: [app.autenticar, exigirPapel("gestor", "treinador", "atleta")],
       schema: {
         tags: ["revisoes"],
-        summary: "Lista pedidos de revisão (gestor: todos, abertos primeiro; treinador: dos próprios atletas; atleta: os seus)",
+        summary:
+          "Lista pedidos de revisão (gestor: todos, abertos primeiro; treinador: dos próprios atletas; atleta: os seus)",
         security: seguranca,
         querystring: z.object({ status: z.enum(["aberto", "respondido"]).optional() }),
         response: { 200: z.array(esquemaRevisao), 401: esquemaErro, 403: esquemaErro },
@@ -428,7 +500,13 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
         description: "Pedido já respondido devolve 409 (código requisicao_invalida).",
         security: seguranca,
         params: z.object({ id: z.string().regex(/^\d{1,18}$/, "Identificador inválido.") }),
-        body: z.object({ resposta: z.string().trim().min(3, "A resposta precisa ter ao menos 3 caracteres.").max(2000) }),
+        body: z.object({
+          resposta: z
+            .string()
+            .trim()
+            .min(3, "A resposta precisa ter ao menos 3 caracteres.")
+            .max(2000),
+        }),
         response: {
           200: esquemaRevisao,
           400: esquemaErro,
@@ -451,7 +529,9 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           [id, req.body.resposta, usuario.id, app.agora()],
         );
         if (r.rows.length === 0) {
-          const existe = await tx.query(`select 1 from pedidos_revisao where id = $1::bigint`, [id]);
+          const existe = await tx.query(`select 1 from pedidos_revisao where id = $1::bigint`, [
+            id,
+          ]);
           if (existe.rows.length === 0) throw naoEncontrado("Pedido de revisão não encontrado.");
           throw new ErroApi(409, "requisicao_invalida", "Este pedido já foi respondido.");
         }

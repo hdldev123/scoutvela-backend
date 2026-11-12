@@ -14,5 +14,10 @@ export async function buscarTermoVigente(db: Db): Promise<TermoVigente> {
   );
   const l = r.rows[0];
   if (!l) throw new Error("Nenhum termo de consentimento cadastrado.");
-  return { versao: l.versao, titulo: l.titulo, texto: l.texto, vigenteDesde: new Date(l.vigente_desde).toISOString() };
+  return {
+    versao: l.versao,
+    titulo: l.titulo,
+    texto: l.texto,
+    vigenteDesde: new Date(l.vigente_desde).toISOString(),
+  };
 }

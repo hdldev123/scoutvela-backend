@@ -1,7 +1,13 @@
 import type { EntradaCalculo, NotaPilar, Parametros, ResultadoCalculo } from "./tipos.js";
 import { distanciaClassFit } from "./classfit.js";
 import { aplicarDecisoes, gatesAutomaticos, statusFinal } from "./gates.js";
-import { calcularScore, faixaDoScore, notaPilar, notasEfetivas, pontosRankingCbvela } from "./score.js";
+import {
+  calcularScore,
+  faixaDoScore,
+  notaPilar,
+  notasEfetivas,
+  pontosRankingCbvela,
+} from "./score.js";
 
 export function calcularAtleta(parametros: Parametros, entrada: EntradaCalculo): ResultadoCalculo {
   const notas = notasEfetivas(parametros, entrada);

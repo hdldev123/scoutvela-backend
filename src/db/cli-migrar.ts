@@ -9,7 +9,9 @@ if (!url) throw new Error("DATABASE_URL é obrigatória");
 const db = criarDbPg({ url, caCert: process.env.DATABASE_CA_CERT });
 try {
   const novas = await migrar(db);
-  console.log(novas.length ? `Migrations aplicadas: ${novas.join(", ")}` : "Banco já está atualizado.");
+  console.log(
+    novas.length ? `Migrations aplicadas: ${novas.join(", ")}` : "Banco já está atualizado.",
+  );
 } finally {
   await db.fechar();
 }

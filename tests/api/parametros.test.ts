@@ -13,16 +13,34 @@ describe("/parametros", () => {
   afterAll(() => p.encerrar());
 
   const ler = async (email: string) => {
-    const r = await p.app.inject({ method: "GET", url: "/parametros", headers: await p.como(email) });
+    const r = await p.app.inject({
+      method: "GET",
+      url: "/parametros",
+      headers: await p.como(email),
+    });
     return { status: r.statusCode, corpo: r.json() };
   };
   const gravar = async (email: string, corpo: unknown) => {
-    const r = await p.app.inject({ method: "PUT", url: "/parametros", headers: await p.como(email), payload: corpo as object });
+    const r = await p.app.inject({
+      method: "PUT",
+      url: "/parametros",
+      headers: await p.como(email),
+      payload: corpo as object,
+    });
     return { status: r.statusCode, corpo: r.json() };
   };
   const scores = async () => {
-    const r = await p.app.inject({ method: "GET", url: "/ranking", headers: await p.como(EMAILS_DEMO.gestor) });
-    return new Map((r.json().itens as { atleta: { velaid: string }; score: number }[]).map((i) => [i.atleta.velaid, i.score]));
+    const r = await p.app.inject({
+      method: "GET",
+      url: "/ranking",
+      headers: await p.como(EMAILS_DEMO.gestor),
+    });
+    return new Map(
+      (r.json().itens as { atleta: { velaid: string }; score: number }[]).map((i) => [
+        i.atleta.velaid,
+        i.score,
+      ]),
+    );
   };
 
   it("sem token -> 401; ibvar e atleta -> 403 na leitura", async () => {
@@ -43,16 +61,21 @@ describe("/parametros", () => {
       expect(corpo.regras.map((r: { codigo: string }) => r.codigo)).toContain("G1");
       const geral = corpo.rubricas.filter((r: { pilarId: string | null }) => r.pilarId === null);
       expect(geral.map((r: { nota: number }) => r.nota)).toEqual([0, 1, 2, 3, 4, 5]);
-      expect(corpo.rubricas.some((r: { pilarId: string | null }) => r.pilarId === "exp")).toBe(true);
-      const peso = corpo.pilares.find((x: { id: string }) => x.id === "cf").indicadores.find(
-        (i: { id: string }) => i.id === "cf_peso_kg",
+      expect(corpo.rubricas.some((r: { pilarId: string | null }) => r.pilarId === "exp")).toBe(
+        true,
       );
+      const peso = corpo.pilares
+        .find((x: { id: string }) => x.id === "cf")
+        .indicadores.find((i: { id: string }) => i.id === "cf_peso_kg");
       expect(peso.calculado).toBe(true);
     }
   });
 
   it("treinador, ibvar e atleta -> 403 no PUT; sem token -> 401", async () => {
-    expect((await p.app.inject({ method: "PUT", url: "/parametros", payload: { pesos: PESOS_WORD } })).statusCode).toBe(401);
+    expect(
+      (await p.app.inject({ method: "PUT", url: "/parametros", payload: { pesos: PESOS_WORD } }))
+        .statusCode,
+    ).toBe(401);
     for (const email of [EMAILS_DEMO.treinadora, EMAILS_DEMO.ibvar, EMAILS_DEMO.atleta]) {
       expect((await gravar(email, { pesos: PESOS_WORD })).status).toBe(403);
     }
@@ -86,14 +109,17 @@ describe("/parametros", () => {
     const novos = { ...PESOS_WORD, perf: 30, cf: 10 };
     const r = await gravar(EMAILS_DEMO.gestor, { pesos: novos });
     expect(r.status).toBe(200);
-    expect(Object.fromEntries(r.corpo.pilares.map((x: { id: string; peso: number }) => [x.id, x.peso]))).toEqual(novos);
+    expect(
+      Object.fromEntries(r.corpo.pilares.map((x: { id: string; peso: number }) => [x.id, x.peso])),
+    ).toEqual(novos);
 
     const depois = await scores();
     expect([...depois].some(([velaid, s]) => s !== antes.get(velaid))).toBe(true);
 
-    const aud = await p.db.query<{ detalhes: { pesos: { antes: unknown; depois: unknown } }; usuario_id: string }>(
-      "select detalhes, usuario_id from auditoria where acao = 'atualizar_parametros'",
-    );
+    const aud = await p.db.query<{
+      detalhes: { pesos: { antes: unknown; depois: unknown } };
+      usuario_id: string;
+    }>("select detalhes, usuario_id from auditoria where acao = 'atualizar_parametros'");
     expect(aud.rows).toHaveLength(1);
     expect(aud.rows[0]!.detalhes.pesos.antes).toEqual(PESOS_WORD);
     expect(aud.rows[0]!.detalhes.pesos.depois).toEqual(novos);
@@ -105,16 +131,23 @@ describe("/parametros", () => {
   it("atualiza a faixa de peso de uma classe e o Class Fit passa a usá-la", async () => {
     const g = EMAILS_DEMO.gestor;
     const classe = (await ler(g)).corpo.classes[0];
-    const r = await gravar(g, { classes: [{ id: classe.id, pesoMinKg: 50, pesoMedioKg: 60.5, pesoMaxKg: 70 }] });
+    const r = await gravar(g, {
+      classes: [{ id: classe.id, pesoMinKg: 50, pesoMedioKg: 60.5, pesoMaxKg: 70 }],
+    });
     expect(r.status).toBe(200);
     expect(r.corpo.classes.find((c: { id: string }) => c.id === classe.id)).toMatchObject({
       pesoMinKg: 50,
       pesoMedioKg: 60.5,
       pesoMaxKg: 70,
     });
-    const aud = await p.db.query<{ detalhes: { classes: { depois: Record<string, { pesoKg: number[]; ativa: boolean }> } } }>(
+    const aud = await p.db.query<{
+      detalhes: { classes: { depois: Record<string, { pesoKg: number[]; ativa: boolean }> } };
+    }>(
       "select detalhes from auditoria where acao = 'atualizar_parametros' order by id desc limit 1",
     );
-    expect(aud.rows[0]!.detalhes.classes.depois[classe.id]).toEqual({ pesoKg: [50, 60.5, 70], ativa: true });
+    expect(aud.rows[0]!.detalhes.classes.depois[classe.id]).toEqual({
+      pesoKg: [50, 60.5, 70],
+      ativa: true,
+    });
   });
 });

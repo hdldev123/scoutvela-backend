@@ -16,6 +16,7 @@ Node 22 (o Render lê `.node-version`), TypeScript, Fastify 5, Zod 4 (validaçã
 npm install
 npm run dev:local            # banco em .dados-locais/, emulador do Auth e API
 npm run dev:local -- --recriar   # apaga o banco local e semeia de novo
+npm run dev:local -- --mfa       # exige MFA (TOTP) de gestor e IBVAR, como em produção
 ```
 
 Sobe:
@@ -49,14 +50,20 @@ No painel do Supabase:
 
 No modo local, os links de convite e de redefinição de senha aparecem no terminal, em linhas `[auth-local]`. As senhas de contas convidadas ficam só em memória e somem quando o `dev:local` reinicia.
 
+### MFA no modo local
+
+`npm run dev:local -- --mfa` liga `EXIGIR_MFA`: gestor e IBVAR só passam da tela de verificação depois de cadastrar um app autenticador (leia o QR ou digite o segredo) e informar o código de 6 dígitos. Treinador e atleta não são afetados. O emulador implementa TOTP (RFC 6238, SHA-1, 6 dígitos, 30 s) e aceita o código do passo atual e de um passo para cada lado; o mesmo código não vale duas vezes. Os fatores ficam só em memória e somem quando o modo local reinicia, então o cadastro do app é refeito a cada execução. Sem a flag, o MFA fica desligado.
+
 ## Scripts
 
 | Script | O que faz |
 | --- | --- |
 | `dev` | API com recarga, usando o `.env` |
-| `dev:local` | modo local (PGlite, emulador do Auth, seed) |
+| `dev:local` | modo local (PGlite, emulador do Auth, seed); `-- --mfa` liga `EXIGIR_MFA`, `-- --recriar` recria o banco |
 | `test` | testes de domínio, permissões, rotas e banco |
 | `typecheck` / `build` / `start` | tipos, compilação para `dist/` e execução em produção |
+| `lint` | ESLint (typescript-eslint com regras que usam tipos) |
+| `format` / `format:check` | Prettier: formata ou só confere (o CI roda `format:check`) |
 | `db:migrate` / `db:migrate:prod` | aplica migrations (dev com tsx; produção a partir do `dist/`) |
 | `db:seed` / `seed:auth` | dados fictícios e contas de teste (nunca em produção) |
 | `openapi` | gera o `openapi.yaml`, o contrato com o front (o CI falha se estiver desatualizado) |
@@ -106,7 +113,7 @@ tests/           domínio, paridade com o protótipo, permissões, rotas, banco
 - **Requisições:** JWT validado em toda requisição (issuer, audience, expiração), CORS só para os domínios do front, Helmet (CSP `default-src 'none'`, HSTS), limite de 300 requisições por minuto por IP e corpo de até 1 MB.
 - **Logs e erros:** logs estruturados (pino) sem token, cookie nem corpo, e todo 401/403 vira log `acesso_negado`. Os erros seguem o formato `{ erro, mensagem }`, e o 500 não expõe detalhe interno.
 - **CSRF:** não se aplica. O token vai no header `Authorization`, não em cookie.
-- **Dependências:** CI com typecheck, testes, build, contrato OpenAPI e `npm audit --omit=dev`. Dependabot semanal.
+- **Dependências:** CI com typecheck, lint, formatação, testes, build, contrato OpenAPI e `npm audit --omit=dev`. Dependabot semanal.
 - **LGPD:** não guarda CPF, documento, endereço completo nem renda; a importação de CSV recusa essas colunas. O consentimento é registrado com histórico, e o atleta pode pedir revisão de nota (art. 20).
 
 ## Deploy (Render)

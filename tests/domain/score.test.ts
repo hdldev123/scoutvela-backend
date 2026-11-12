@@ -22,7 +22,13 @@ import {
 
 // Classe sintética: média 85, meia faixa 5 (distâncias exatas em ponto flutuante).
 const CLASSE_SINTETICA: Classe = {
-  id: "x", nome: "X", evento: "X", posicao: "ind", pesoMinKg: 80, pesoMedioKg: 85, pesoMaxKg: 90,
+  id: "x",
+  nome: "X",
+  evento: "X",
+  posicao: "ind",
+  pesoMinKg: 80,
+  pesoMedioKg: 85,
+  pesoMaxKg: 90,
 };
 
 describe("distanciaClassFit", () => {
@@ -52,13 +58,19 @@ describe("notasEfetivas", () => {
   const parametros = parametrosDeTeste();
   it("calcula cf_peso_kg pela P3 e ignora lançamento", () => {
     const n = notasEfetivas(parametros, {
-      classe: CLASSE_SINTETICA, pesoKg: 90, notas: { cf_peso_kg: 5, perf_mundial: 3 },
+      classe: CLASSE_SINTETICA,
+      pesoKg: 90,
+      notas: { cf_peso_kg: 5, perf_mundial: 3 },
     });
     expect(n.cf_peso_kg).toBe(4); // rel 1 → 4
     expect(n.perf_mundial).toBe(3);
   });
   it("sem peso, cf_peso_kg fica sem nota", () => {
-    const n = notasEfetivas(parametros, { classe: CLASSE_SINTETICA, pesoKg: null, notas: { cf_peso_kg: 5 } });
+    const n = notasEfetivas(parametros, {
+      classe: CLASSE_SINTETICA,
+      pesoKg: null,
+      notas: { cf_peso_kg: 5 },
+    });
     expect(n.cf_peso_kg).toBeNull();
   });
   it("usa os limites dos parâmetros", () => {
@@ -73,7 +85,9 @@ describe("notaPilar", () => {
   const amb = parametrosDeTeste().pilares.find((p) => p.id === "amb")!;
   it("ignora indicador tipo R e notas nulas ou ausentes", () => {
     const n = notaPilar(amb, {
-      amb_apoio_familiar: 4, amb_disponibilidade: 2, amb_estabilidade: null,
+      amb_apoio_familiar: 4,
+      amb_disponibilidade: 2,
+      amb_estabilidade: null,
       amb_historico_familiar: 5, // R: não pontua
     });
     expect(n).toBe(3);
@@ -109,7 +123,13 @@ describe("faixaDoScore", () => {
   const { faixas } = parametrosDeTeste();
   it("respeita os cortes", () => {
     expect([85, 84.9, 75, 74.9, 65, 64.9, 0].map((s) => faixaDoScore(s, faixas).id)).toEqual([
-      "f1", "f2", "f2", "f3", "f3", "f4", "f4",
+      "f1",
+      "f2",
+      "f2",
+      "f3",
+      "f3",
+      "f4",
+      "f4",
     ]);
   });
   it("não depende da ordem recebida", () => {
@@ -120,13 +140,26 @@ describe("faixaDoScore", () => {
 describe("pontosRankingCbvela", () => {
   const nac = (data: string, pts: number) => resultadoDeTeste({ data, pontosCbvela: pts });
   it("soma só nacionais e ignora internacionais", () => {
-    const r = [nac("2026-08-22", 10), nac("2026-05-30", 5),
-      resultadoDeTeste({ internacional: true, nivel: "mundial", pontosCbvela: null, data: "2026-07-18" })];
+    const r = [
+      nac("2026-08-22", 10),
+      nac("2026-05-30", 5),
+      resultadoDeTeste({
+        internacional: true,
+        nivel: "mundial",
+        pontosCbvela: null,
+        data: "2026-07-18",
+      }),
+    ];
     expect(pontosRankingCbvela(r, REFERENCIA_TESTE, 52)).toBe(15);
   });
   it("janela de 52 semanas: início exclusivo, fim inclusivo", () => {
     // referência 2026-11-06; 52 semanas = 364 dias → início 2025-11-07 (exclusivo)
-    const r = [nac("2025-11-07", 1), nac("2025-11-08", 2), nac("2026-11-06", 4), nac("2026-11-07", 8)];
+    const r = [
+      nac("2025-11-07", 1),
+      nac("2025-11-08", 2),
+      nac("2026-11-06", 4),
+      nac("2026-11-07", 8),
+    ];
     expect(pontosRankingCbvela(r, REFERENCIA_TESTE, 52)).toBe(6);
   });
   it("usa a janela do parâmetro", () => {
@@ -156,7 +189,10 @@ describe("funcaoNaClasse", () => {
 describe("calcularAtleta", () => {
   it("monta o resultado e conta preenchimento sem R nem nulos", () => {
     const parametros = parametrosDeTeste();
-    const r = calcularAtleta(parametros, entradaDeTeste({ notas: { ...notasUniformes(4), tec_trim: null } }));
+    const r = calcularAtleta(
+      parametros,
+      entradaDeTeste({ notas: { ...notasUniformes(4), tec_trim: null } }),
+    );
     expect(r.total).toBe(41); // 42 indicadores menos 1 do tipo R
     expect(r.preenchidos).toBe(40);
     expect(r.completo).toBe(false);

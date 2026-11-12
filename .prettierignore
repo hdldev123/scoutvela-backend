@@ -1,0 +1,7 @@
+dist
+coverage
+.dados-locais
+.dados-e2e
+package-lock.json
+openapi.yaml
+*.md
