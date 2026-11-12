@@ -110,6 +110,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -134,6 +135,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -346,6 +348,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -370,6 +373,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -394,6 +398,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -979,6 +984,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1003,6 +1009,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1027,6 +1034,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1051,6 +1059,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1137,6 +1146,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1161,6 +1171,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1185,6 +1196,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1209,6 +1221,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1395,6 +1408,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1419,6 +1433,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1443,6 +1458,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1467,6 +1483,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1626,6 +1643,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1650,6 +1668,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1674,6 +1693,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1698,6 +1718,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1816,6 +1837,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1840,6 +1862,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1864,6 +1887,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1888,6 +1912,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1993,6 +2018,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2017,6 +2043,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2041,6 +2068,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2065,6 +2093,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2113,6 +2142,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2137,6 +2167,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2238,6 +2269,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2262,6 +2294,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2286,6 +2319,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2310,6 +2344,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2334,6 +2369,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2401,6 +2437,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2425,6 +2462,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2494,6 +2532,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2518,6 +2557,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2542,6 +2582,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2566,6 +2607,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2590,6 +2632,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2691,6 +2734,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2715,6 +2759,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2739,6 +2784,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2949,6 +2995,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2973,6 +3020,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2997,6 +3045,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3069,6 +3118,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3093,6 +3143,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3117,6 +3168,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3141,6 +3193,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3210,6 +3263,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3234,6 +3288,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3258,6 +3313,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3282,6 +3338,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3351,6 +3408,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3375,6 +3433,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3399,6 +3458,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3423,6 +3483,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3535,6 +3596,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3559,6 +3621,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3681,6 +3744,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3705,6 +3769,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3729,6 +3794,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3753,6 +3819,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3777,6 +3844,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3994,6 +4062,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4018,6 +4087,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4222,6 +4292,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4246,6 +4317,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4540,6 +4612,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4564,6 +4637,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4588,6 +4662,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4670,6 +4745,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4694,6 +4770,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4718,6 +4795,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4816,6 +4894,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4840,6 +4919,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4864,6 +4944,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4888,6 +4969,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4984,6 +5066,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5008,6 +5091,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5032,6 +5116,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5056,6 +5141,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5080,6 +5166,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5175,6 +5262,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5199,6 +5287,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5223,6 +5312,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5247,6 +5337,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5271,6 +5362,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5425,6 +5517,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5449,6 +5542,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5473,6 +5567,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5497,6 +5592,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5629,6 +5725,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5653,6 +5750,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5677,6 +5775,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5701,6 +5800,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5725,6 +5825,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5875,6 +5976,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5899,6 +6001,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5923,6 +6026,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6052,6 +6156,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6076,6 +6181,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6100,6 +6206,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6111,8 +6218,9 @@ paths:
       summary: Registra um pedido do titular (acesso, correção, exclusão ou revogação)
       tags:
         - titular
-      description: O pedido fica aberto até o gestor responder. Exclusão e revogação
-        são tratadas manualmente pelo gestor, fora da API.
+      description: O pedido fica aberto até o gestor responder. Revogação é tratada
+        pelo gestor; a exclusão é atendida pela anonimização (`POST
+        /atletas/{id}/anonimizar`).
       requestBody:
         required: true
         content:
@@ -6171,6 +6279,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6195,6 +6304,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6219,6 +6329,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6243,6 +6354,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6328,6 +6440,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6352,6 +6465,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6364,10 +6478,10 @@ paths:
       tags:
         - titular
       description: "Registra a resposta e fecha o pedido. A exclusão de dados NÃO é
-        feita por esta rota: é procedimento manual do gestor, porque a série
-        histórica (notas, respostas, medidas, gates, financeiro) só aceita
-        inserção. Pedido já respondido devolve 409 (código
-        requisicao_invalida)."
+        feita por esta rota: para pedido de exclusão use `POST
+        /atletas/{id}/anonimizar`, que anonimiza o atleta e responde o pedido (a
+        série histórica, que só aceita inserção, é mantida sem identificação
+        direta). Pedido já respondido devolve 409 (código requisicao_invalida)."
       requestBody:
         required: true
         content:
@@ -6460,6 +6574,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6484,6 +6599,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6508,6 +6624,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6532,6 +6649,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6556,6 +6674,214 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/anonimizar:
+    post:
+      summary: Anonimiza o atleta a pedido de exclusão (LGPD, art. 18)
+      tags:
+        - titular
+      description: "Só o gestor, com o pedido de exclusão do próprio atleta (aberto) e
+        a confirmação `ANONIMIZAR`. Numa transação: tira nome, contato, clube,
+        cidade, número de vela, ID World Sailing e código VelaID (vira
+        `ANON-xxxxxxxx`), apaga a linha do VelaID, anonimiza a conta de login,
+        revoga os consentimentos, marca as evidências como removidas, responde o
+        pedido e audita. A série histórica (notas, respostas, medidas, gates,
+        financeiro, plano) é mantida, sem identificação direta. Depois do commit
+        remove os arquivos do Storage e a conta do Supabase Auth: se algo
+        falhar, a anonimização vale e a resposta traz `pendencias`. Repetir a
+        chamada com o mesmo pedido só tenta de novo essas pendências. Atleta já
+        anonimizado por outro pedido, ou pedido já respondido, devolve 409."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pedidoTitularId:
+                  type: string
+                  pattern: ^\d{1,18}$
+                confirmacao:
+                  type: string
+                  enum:
+                    - ANONIMIZAR
+              required:
+                - pedidoTitularId
+                - confirmacao
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  atletaId:
+                    type: string
+                  anonimizadoEm:
+                    type: string
+                    description: Instante ISO
+                  evidenciasRemovidas:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  pendencias:
+                    type: object
+                    properties:
+                      arquivos:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                        description: Arquivos que ainda não saíram do Storage
+                      conta:
+                        type: boolean
+                        description: A conta no Supabase Auth ainda não foi apagada
+                    required:
+                      - arquivos
+                      - conta
+                    additionalProperties: false
+                required:
+                  - atletaId
+                  - anonimizadoEm
+                  - evidenciasRemovidas
+                  - pendencias
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6714,6 +7040,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6738,6 +7065,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6762,6 +7090,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6786,6 +7115,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6867,6 +7197,11 @@ paths:
                   enviadoEm:
                     type: string
                     description: Instante ISO
+                  removidoEm:
+                    nullable: true
+                    description: Instante ISO em que o arquivo foi removido (anonimização); nulo =
+                      disponível
+                    type: string
                 required:
                   - id
                   - nomeArquivo
@@ -6874,6 +7209,7 @@ paths:
                   - tamanhoBytes
                   - indicadorId
                   - enviadoEm
+                  - removidoEm
                 additionalProperties: false
         "400":
           description: Default Response
@@ -6893,6 +7229,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6917,6 +7254,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6941,6 +7279,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6965,6 +7304,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6989,6 +7329,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7013,6 +7354,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7066,6 +7408,11 @@ paths:
                         enviadoEm:
                           type: string
                           description: Instante ISO
+                        removidoEm:
+                          nullable: true
+                          description: Instante ISO em que o arquivo foi removido (anonimização); nulo =
+                            disponível
+                          type: string
                       required:
                         - id
                         - nomeArquivo
@@ -7073,6 +7420,7 @@ paths:
                         - tamanhoBytes
                         - indicadorId
                         - enviadoEm
+                        - removidoEm
                       additionalProperties: false
                 required:
                   - anexos
@@ -7095,6 +7443,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7119,6 +7468,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7143,6 +7493,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7154,8 +7505,9 @@ paths:
       summary: Link temporário (5 minutos) para abrir a evidência
       tags:
         - evidencias
-      description: Mesmo acesso da listagem, pelo atleta do anexo. Cada geração de
-        link fica na auditoria.
+      description: Mesmo acesso da listagem, pelo atleta do anexo. Anexo removido
+        (anonimização) devolve 410 `evidencia_removida`. Cada geração de link
+        fica na auditoria.
       parameters:
         - schema:
             type: string
@@ -7201,6 +7553,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7225,6 +7578,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7249,6 +7603,32 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "410":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7273,6 +7653,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7358,6 +7739,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7382,6 +7764,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7510,6 +7893,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7534,6 +7918,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7558,6 +7943,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7582,6 +7968,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7606,6 +7993,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7712,6 +8100,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7736,6 +8125,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7760,6 +8150,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7784,6 +8175,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7839,6 +8231,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7863,6 +8256,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7887,6 +8281,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7911,6 +8306,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7935,6 +8331,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7959,6 +8356,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -8015,6 +8413,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -8039,6 +8438,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -8100,6 +8500,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -8124,6 +8525,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -8148,6 +8550,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -8172,6 +8575,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
