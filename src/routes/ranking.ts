@@ -82,6 +82,7 @@ export async function rotasRanking(app: FastifyInstance): Promise<void> {
 
       const atletas = await listarAtletasVisiveis(app.db, req.usuario, {
         somenteTermoAceito: true,
+        agora: referencia,
         ...(classe ? { classeEvento: classe } : {}),
         ...(categoria ? { genero: categoria } : {}),
       });
@@ -127,7 +128,9 @@ export async function rotasRanking(app: FastifyInstance): Promise<void> {
       }));
 
       const ocultos =
-        req.usuario.papel === "ibvar" ? await contarSemConsentimentoIbvar(app.db) : null;
+        req.usuario.papel === "ibvar"
+          ? await contarSemConsentimentoIbvar(app.db, referencia)
+          : null;
       return { ciclo, itens, ocultosSemConsentimento: ocultos };
     },
   );

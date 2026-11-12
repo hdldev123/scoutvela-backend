@@ -177,7 +177,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
     },
     async (req) => {
       const referencia = app.agora();
-      const base = await buscarAtletaVisivel(app.db, req.usuario, req.params.id);
+      const base = await buscarAtletaVisivel(app.db, req.usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
       validarNotas(parametros, req.body);
@@ -230,7 +230,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const referencia = app.agora();
       const { usuario, body } = req;
-      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id);
+      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
       validarNotas(parametros, body);
@@ -345,7 +345,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
     async (req) => {
       const referencia = app.agora();
       const { usuario, body } = req;
-      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id);
+      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
 

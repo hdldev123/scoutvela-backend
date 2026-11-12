@@ -86,11 +86,20 @@ const esquemaAtualizacao = z
       .max(100)
       .optional()
       .describe("Upsert por (pilarId, nota)"),
+    rubricasRemover: z
+      .array(z.string().max(40).nullable())
+      .min(1)
+      .max(20)
+      .refine((l) => new Set(l).size === l.length, "Pilar repetido em rubricasRemover.")
+      .optional()
+      .describe(
+        "Ids de pilar cujas rubricas próprias saem (volta a valer a escala geral). A escala geral não pode ser removida: nulo ou vazio dão 400 com mensagem explícita",
+      ),
     regras: z
       .record(z.string().min(1).max(40), z.unknown())
       .optional()
       .describe(
-        "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4, RANKING_CBVELA. O valor segue o formato lido em GET /parametros",
+        "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4, RANKING_CBVELA, TERMO_EXIGE_REACEITE. O valor segue o formato lido em GET /parametros",
       ),
     classes: z
       .array(
@@ -110,9 +119,13 @@ const esquemaAtualizacao = z
       d.pesos !== undefined ||
       (d.faixas?.length ?? 0) > 0 ||
       (d.rubricas?.length ?? 0) > 0 ||
+      (d.rubricasRemover?.length ?? 0) > 0 ||
       (d.regras !== undefined && Object.keys(d.regras).length > 0) ||
       (d.classes?.length ?? 0) > 0,
-    { message: "Informe ao menos um de: pesos, faixas, rubricas, regras ou classes." },
+    {
+      message:
+        "Informe ao menos um de: pesos, faixas, rubricas, rubricasRemover, regras ou classes.",
+    },
   );
 
 export async function rotasParametros(app: FastifyInstance): Promise<void> {

@@ -5,6 +5,7 @@ import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
+import { buscarTermoVigente } from "../repositories/termo.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 
@@ -13,7 +14,9 @@ const iso = (v: unknown): string =>
 
 const esquemaConsentimento = z.object({
   termoAceitoEm: z.string().nullable().describe("Instante ISO do aceite do termo do piloto"),
-  termoVersao: z.string().nullable(),
+  termoVersao: z.string().nullable().describe("Última versão do termo aceita"),
+  termoVigenteVersao: z.string().describe("Versão do termo vigente hoje"),
+  termoPendente: z.boolean().describe("true quando o atleta ainda não aceitou a versão vigente"),
   compartilharIbvar: z.boolean(),
   atualizadoEm: z.string().nullable().describe("Instante ISO da última decisão sobre o IBVAR"),
 });
@@ -63,6 +66,13 @@ const esquemaRevisao = z.object({
   criadoEm: z.string(),
   resposta: z.string().nullable(),
   respondidoEm: z.string().nullable(),
+  avaliacaoId: z.string().nullable().describe("Lançamento ligado à resposta, se houver"),
+  notaAnterior: z
+    .number()
+    .int()
+    .nullable()
+    .describe("Nota do lançamento anterior ao ligado (mesmo atleta e indicador)"),
+  notaNova: z.number().int().nullable().describe("Nota do lançamento ligado"),
 });
 
 async function auditar(
@@ -86,7 +96,8 @@ async function cicloAbertoId(db: Db): Promise<string | null> {
   return r.rows[0]?.id ?? null;
 }
 
-async function lerConsentimento(db: Db, atletaId: string) {
+async function lerConsentimento(db: Db, atletaId: string, agora: Date) {
+  const vigente = await buscarTermoVigente(db, agora);
   const r = await db.query<{
     tipo: string;
     concedido: boolean;
@@ -101,6 +112,8 @@ async function lerConsentimento(db: Db, atletaId: string) {
   return {
     termoAceitoEm: termo?.concedido ? iso(termo.registrado_em) : null,
     termoVersao: termo?.concedido ? termo.versao_termo : null,
+    termoVigenteVersao: vigente.versao,
+    termoPendente: !(termo?.concedido && termo.versao_termo === vigente.versao),
     compartilharIbvar: ibvar?.concedido ?? false,
     atualizadoEm: ibvar ? iso(ibvar.registrado_em) : null,
   };
@@ -119,15 +132,24 @@ interface LinhaRevisao {
   criado_em: Date;
   resposta: string | null;
   respondido_em: Date | null;
+  avaliacao_id: string | null;
+  nota_anterior: number | null;
+  nota_nova: number | null;
 }
 
 const SQL_REVISAO = `select r.id::text as id, r.atleta_id, a.nome as atleta_nome,
          r.pilar_id, p.nome_curto as pilar_nome_curto, r.indicador_id, i.nome as indicador_nome,
-         r.motivo, r.status, r.criado_em, r.resposta, r.respondido_em
+         r.motivo, r.status, r.criado_em, r.resposta, r.respondido_em,
+         r.avaliacao_id::text as avaliacao_id, av.valor as nota_nova,
+         (select ant.valor from avaliacoes ant
+           where ant.atleta_id = av.atleta_id and ant.indicador_id = av.indicador_id
+             and (ant.lancado_em < av.lancado_em or (ant.lancado_em = av.lancado_em and ant.id < av.id))
+           order by ant.lancado_em desc, ant.id desc limit 1) as nota_anterior
     from pedidos_revisao r
     join atletas a on a.id = r.atleta_id
     left join pilares p on p.id = r.pilar_id
-    left join indicadores i on i.id = r.indicador_id`;
+    left join indicadores i on i.id = r.indicador_id
+    left join avaliacoes av on av.id = r.avaliacao_id`;
 
 const paraRevisao = (l: LinhaRevisao) => ({
   id: l.id,
@@ -139,6 +161,9 @@ const paraRevisao = (l: LinhaRevisao) => ({
   criadoEm: iso(l.criado_em),
   resposta: l.resposta,
   respondidoEm: l.respondido_em ? iso(l.respondido_em) : null,
+  avaliacaoId: l.avaliacao_id,
+  notaAnterior: l.avaliacao_id ? l.nota_anterior : null,
+  notaNova: l.avaliacao_id ? l.nota_nova : null,
 });
 
 export async function rotasPainel(app: FastifyInstance): Promise<void> {
@@ -161,14 +186,14 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
     async (req) => {
       const usuario = req.usuario;
       const base = usuario.atletaId
-        ? await buscarAtletaVisivel(app.db, usuario, usuario.atletaId)
+        ? await buscarAtletaVisivel(app.db, usuario, usuario.atletaId, app.agora())
         : null;
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
       const [parametros, ciclo, consentimento, perguntasRows] = await Promise.all([
         carregarParametros(app.db),
         cicloAberto(app.db),
-        lerConsentimento(app.db, base.id),
+        lerConsentimento(app.db, base.id, app.agora()),
         app.db.query<{
           indicador_id: string;
           enunciado: string;
@@ -370,7 +395,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           concedido: compartilharIbvar,
         });
       });
-      return lerConsentimento(app.db, atletaId);
+      return lerConsentimento(app.db, atletaId, app.agora());
     },
   );
 
@@ -497,7 +522,8 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ["revisoes"],
         summary: "Responde um pedido de revisão",
-        description: "Pedido já respondido devolve 409 (código requisicao_invalida).",
+        description:
+          "Pedido já respondido devolve 409 (código requisicao_invalida). avaliacaoId (opcional) liga a resposta ao lançamento que a atendeu: do mesmo atleta, do indicador do pedido (ou de um indicador do pilar, se o pedido foi por pilar) e lançado depois do pedido. Depois de gravar, o atleta recebe um e-mail só com o aviso e o link; falha no envio não desfaz a resposta.",
         security: seguranca,
         params: z.object({ id: z.string().regex(/^\d{1,18}$/, "Identificador inválido.") }),
         body: z.object({
@@ -506,6 +532,13 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
             .trim()
             .min(3, "A resposta precisa ter ao menos 3 caracteres.")
             .max(2000),
+          avaliacaoId: z
+            .union([
+              z.string().regex(/^\d{1,18}$/, "Identificador inválido."),
+              z.number().int().positive(),
+            ])
+            .optional()
+            .describe("Id do lançamento (série histórica) que atendeu o pedido"),
         }),
         response: {
           200: esquemaRevisao,
@@ -520,23 +553,92 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
     async (req) => {
       const usuario = req.usuario;
       const { id } = req.params;
-      await app.db.transacao(async (tx) => {
-        const r = await tx.query(
-          `update pedidos_revisao
-              set status = 'respondido', resposta = $2, respondido_por = $3::uuid, respondido_em = $4
-            where id = $1::bigint and status = 'aberto'
-        returning id`,
-          [id, req.body.resposta, usuario.id, app.agora()],
-        );
-        if (r.rows.length === 0) {
-          const existe = await tx.query(`select 1 from pedidos_revisao where id = $1::bigint`, [
-            id,
-          ]);
-          if (existe.rows.length === 0) throw naoEncontrado("Pedido de revisão não encontrado.");
+      const avaliacaoId = req.body.avaliacaoId === undefined ? null : String(req.body.avaliacaoId);
+      const atletaDoPedido = await app.db.transacao(async (tx) => {
+        const pedido = (
+          await tx.query<{
+            atleta_id: string;
+            pilar_id: string | null;
+            indicador_id: string | null;
+            status: string;
+            criado_em: Date;
+          }>(
+            `select atleta_id, pilar_id, indicador_id, status, criado_em
+               from pedidos_revisao where id = $1::bigint for update`,
+            [id],
+          )
+        ).rows[0];
+        if (!pedido) throw naoEncontrado("Pedido de revisão não encontrado.");
+        if (pedido.status !== "aberto")
           throw new ErroApi(409, "requisicao_invalida", "Este pedido já foi respondido.");
+
+        if (avaliacaoId !== null) {
+          const av = (
+            await tx.query<{
+              atleta_id: string;
+              indicador_id: string;
+              pilar_id: string;
+              lancado_em: Date;
+            }>(
+              `select a.atleta_id, a.indicador_id, i.pilar_id, a.lancado_em
+                 from avaliacoes a join indicadores i on i.id = a.indicador_id
+                where a.id = $1::bigint`,
+              [avaliacaoId],
+            )
+          ).rows[0];
+          const invalido = (m: string) => new ErroApi(400, "requisicao_invalida", m);
+          if (!av) throw invalido("Lançamento não encontrado.");
+          if (av.atleta_id !== pedido.atleta_id) throw invalido("O lançamento é de outro atleta.");
+          if (pedido.indicador_id && av.indicador_id !== pedido.indicador_id)
+            throw invalido("O lançamento não é do indicador do pedido.");
+          if (!pedido.indicador_id && pedido.pilar_id && av.pilar_id !== pedido.pilar_id)
+            throw invalido("O lançamento não é de um indicador do pilar do pedido.");
+          if (new Date(av.lancado_em).getTime() <= new Date(pedido.criado_em).getTime())
+            throw invalido("O lançamento precisa ser posterior ao pedido de revisão.");
         }
-        await auditar(tx, usuario.id, "responder_revisao", "pedidos_revisao", id, {});
+
+        await tx.query(
+          `update pedidos_revisao
+              set status = 'respondido', resposta = $2, respondido_por = $3::uuid, respondido_em = $4,
+                  avaliacao_id = $5::bigint
+            where id = $1::bigint`,
+          [id, req.body.resposta, usuario.id, app.agora(), avaliacaoId],
+        );
+        await auditar(tx, usuario.id, "responder_revisao", "pedidos_revisao", id, { avaliacaoId });
+        return pedido.atleta_id;
       });
+
+      // Aviso por e-mail só depois do commit; a falha não desfaz a resposta. Sem nota, motivo ou resposta.
+      try {
+        const dest = await app.db.query<{ email: string | null }>(
+          `select coalesce(
+                    (select u.email from usuarios u where u.atleta_id = a.id and u.papel = 'atleta' and u.ativo limit 1),
+                    a.email_contato) as email
+             from atletas a where a.id = $1::uuid`,
+          [atletaDoPedido],
+        );
+        const email = dest.rows[0]?.email;
+        if (!email) {
+          req.log.warn({ evento: "email_revisao_sem_destinatario", revisaoId: id }, "sem e-mail");
+        } else {
+          const front = app.config.FRONT_URL.replace(/\/+$/, "");
+          await app.email.enviar({
+            para: email,
+            assunto: "Scout Vela: seu pedido de revisão foi respondido",
+            texto: [
+              "Olá,",
+              `Seu pedido de revisão no Scout Vela recebeu uma resposta. Para ler, acesse: ${front}/revisoes`,
+              "Scout Vela",
+            ].join("\n\n"),
+          });
+        }
+      } catch (e) {
+        req.log.error(
+          { evento: "email_revisao_falhou", erro: e instanceof Error ? e.name : "Erro" },
+          "falha ao avisar o atleta da resposta da revisão",
+        );
+      }
+
       const r = await app.db.query<LinhaRevisao>(`${SQL_REVISAO} where r.id = $1::bigint`, [id]);
       return paraRevisao(r.rows[0]!);
     },

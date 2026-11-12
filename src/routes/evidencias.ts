@@ -119,7 +119,7 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const { usuario, body } = req;
       const referencia = app.agora();
-      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id);
+      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
       if (
@@ -230,7 +230,7 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
       },
     },
     async (req) => {
-      const base = await buscarAtletaVisivel(app.db, req.usuario, req.params.id);
+      const base = await buscarAtletaVisivel(app.db, req.usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const r = await app.db.query<LinhaAnexo>(
         `select ${COLUNAS} from evidencias_anexos where atleta_id = $1::uuid order by enviado_em desc, id`,
@@ -273,7 +273,9 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
       );
       const anexo = r.rows[0];
       // Anexo inexistente e anexo de atleta fora do acesso dão o mesmo 404.
-      const base = anexo ? await buscarAtletaVisivel(app.db, usuario, anexo.atleta_id) : null;
+      const base = anexo
+        ? await buscarAtletaVisivel(app.db, usuario, anexo.atleta_id, app.agora())
+        : null;
       if (!anexo || !base) throw naoEncontrado("Evidência não encontrada.");
 
       // Arquivo já removido: nada a assinar, o Storage nem é consultado.

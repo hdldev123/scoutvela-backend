@@ -190,7 +190,10 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
         if (!atual) throw naoEncontrado("Ciclo não encontrado.");
         if (atual.status !== "aberto") throw conflito("Este ciclo já está fechado.");
 
-        const atletas = await listarAtletasVisiveis(tx, gestor, { somenteTermoAceito: true });
+        const atletas = await listarAtletasVisiveis(tx, gestor, {
+          somenteTermoAceito: true,
+          agora,
+        });
         const avaliados = await carregarEAvaliarAtletas(tx, parametros, atletas, agora);
         for (const x of avaliados) {
           await tx.query(

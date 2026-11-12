@@ -55,7 +55,7 @@ export async function rotasPlano(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const { usuario, body } = req;
       const referencia = app.agora();
-      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id);
+      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
       const { primeiro, plano } = await app.db.transacao(async (tx) => {

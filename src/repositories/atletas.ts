@@ -1,3 +1,4 @@
+import { termoSql } from "./termo.js";
 import type { UsuarioAutenticado } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import type {
@@ -90,9 +91,6 @@ export interface OpcoesCarga {
   historico?: boolean;
 }
 
-const TERMO_ACEITO_SQL = `exists (select 1 from consentimento_atual ct
-                                   where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido)`;
-
 /**
  * WHERE da matriz de acesso ("Score, pilares e gates"). Os parâmetros são posicionais,
  * a partir de `proximoIndiceParam`. Atleta sem consentimento nunca sai do banco para o IBVAR.
@@ -146,7 +144,9 @@ interface LinhaBase {
 }
 
 export interface FiltrosListagem {
-  /** Só atletas com o termo do piloto aceito (ranking e listas do piloto). */
+  /** Instante de referência (`app.agora()`): decide qual termo é o vigente. */
+  agora: Date;
+  /** Só atletas com o termo do piloto aceito (ranking e listas do piloto; segue TERMO_EXIGE_REACEITE). */
   somenteTermoAceito?: boolean;
   /** Evento da classe (ex.: "ILCA 7"). */
   classeEvento?: string;
@@ -159,7 +159,7 @@ export interface FiltrosListagem {
 export async function listarAtletasVisiveis(
   db: Db,
   usuario: UsuarioDeAcesso,
-  filtros: FiltrosListagem = {},
+  filtros: FiltrosListagem,
 ): Promise<AtletaBase[]> {
   const vis = filtroVisibilidade(usuario, "a", 1);
   const params: unknown[] = [...vis.params];
@@ -168,7 +168,8 @@ export async function listarAtletasVisiveis(
     params.push(v);
     return `$${params.length}`;
   };
-  if (filtros.somenteTermoAceito) condicoes.push(TERMO_ACEITO_SQL);
+  const termoAceito = termoSql.aceitoNoPiloto("a.id", param(filtros.agora));
+  if (filtros.somenteTermoAceito) condicoes.push(termoAceito);
   if (filtros.classeEvento) condicoes.push(`c.evento = ${param(filtros.classeEvento)}`);
   if (filtros.genero) condicoes.push(`a.genero = ${param(filtros.genero)}`);
   if (filtros.atletaId) condicoes.push(`a.id = ${param(filtros.atletaId)}::uuid`);
@@ -177,7 +178,7 @@ export async function listarAtletasVisiveis(
     `select a.id, a.velaid_codigo, a.nome, a.genero, a.data_nascimento::text as data_nascimento,
             a.clube, a.cidade, a.uf, a.numero_vela, a.email_contato,
             a.treinador_id, t.nome as treinador_nome,
-            ${TERMO_ACEITO_SQL} as termo_aceito,
+            ${termoAceito} as termo_aceito,
             c.id as classe_id, c.nome as classe_nome, c.evento as classe_evento, c.posicao as classe_posicao,
             c.peso_min_kg, c.peso_medio_kg, c.peso_max_kg
        from atletas a
@@ -217,19 +218,21 @@ export async function buscarAtletaVisivel(
   db: Db,
   usuario: UsuarioDeAcesso,
   id: string,
+  agora: Date,
 ): Promise<AtletaBase | null> {
-  const lista = await listarAtletasVisiveis(db, usuario, { atletaId: id });
+  const lista = await listarAtletasVisiveis(db, usuario, { atletaId: id, agora });
   return lista[0] ?? null;
 }
 
 /** Atletas ativos do piloto (termo aceito) sem consentimento de compartilhamento com o IBVAR. */
-export async function contarSemConsentimentoIbvar(db: Db): Promise<number> {
+export async function contarSemConsentimentoIbvar(db: Db, agora: Date): Promise<number> {
   const r = await db.query<{ n: string }>(
     `select count(*)::text as n
        from atletas a
-      where a.ativo and ${TERMO_ACEITO_SQL}
+      where a.ativo and ${termoSql.aceitoNoPiloto("a.id", "$1")}
         and not exists (select 1 from consentimento_atual ci
                          where ci.atleta_id = a.id and ci.tipo = 'compartilhar_ibvar' and ci.concedido)`,
+    [agora],
   );
   return Number(r.rows[0]?.n ?? 0);
 }

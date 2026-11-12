@@ -90,7 +90,7 @@ export async function rotasInvestimento(app: FastifyInstance): Promise<void> {
       const todos = await listarAtletasVisiveis(
         app.db,
         { id: req.usuario.id, papel: "gestor", atletaId: null },
-        { somenteTermoAceito: true },
+        { somenteTermoAceito: true, agora: referencia },
       );
       const avaliados = await carregarEAvaliarAtletas(app.db, parametros, todos, referencia);
       const n = avaliados.length;
