@@ -3,8 +3,10 @@ import { promisify } from "node:util";
 import cors from "@fastify/cors";
 import Fastify, { type FastifyInstance, type FastifyReply } from "fastify";
 import { SignJWT, jwtVerify } from "jose";
+import { renderSVG } from "uqr";
 import type { Db } from "../src/db/db.js";
 import { CONTAS_DEMO, type ContaDemo } from "../seed/contas-demo.js";
+import { base32Codificar, novoSegredoTotp, verificarTotp } from "./totp.js";
 
 /**
  * Emulador mínimo do Supabase Auth (GoTrue) SÓ PARA DESENVOLVIMENTO: deixa o
@@ -14,6 +16,9 @@ import { CONTAS_DEMO, type ContaDemo } from "../seed/contas-demo.js";
 
 const scryptAsync = promisify(scrypt) as (senha: string, sal: Buffer, tamanho: number) => Promise<Buffer>;
 const VALIDADE_SEGUNDOS = 3600;
+const VALIDADE_DESAFIO_MS = 5 * 60 * 1000;
+const MAX_FATORES = 10;
+const ISSUER_PADRAO = "Scout Vela (local)";
 
 export interface OpcoesAuthLocal {
   db: Db;
@@ -49,9 +54,38 @@ interface LinkEmail {
   expiraEm: number;
 }
 
+type Aal = "aal1" | "aal2";
+
+interface Amr {
+  method: string;
+  timestamp: number;
+}
+
 interface SessaoRefresh {
   authUserId: string;
   sessionId: string;
+  aal: Aal;
+  amr: Amr[];
+}
+
+/** Fator MFA (TOTP) de um usuário. O segredo nunca sai do emulador, exceto na resposta do enroll. */
+interface FatorMfa {
+  id: string;
+  friendly_name: string;
+  factor_type: "totp";
+  status: "verified" | "unverified";
+  segredo: Buffer;
+  criado: Date;
+  atualizado: Date;
+  /** Último passo TOTP aceito (anti-replay: o mesmo passo não vale duas vezes). */
+  ultimoPassoUsado: number | null;
+}
+
+interface DesafioMfa {
+  id: string;
+  factorId: string;
+  authUserId: string;
+  expiraEm: number;
 }
 
 async function hashDaSenha(senha: string): Promise<SenhaComHash> {
@@ -101,10 +135,14 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
   // Refresh tokens ficam só em memória, indexados pelo SHA-256 (uso único).
   const refreshTokens = new Map<string, SessaoRefresh>();
 
+  // Fatores e desafios MFA ficam só em memória (por auth_user_id): se perdem ao reiniciar, como os refresh tokens.
+  const fatores = new Map<string, FatorMfa[]>();
+  const desafios = new Map<string, DesafioMfa>();
+
   const app = Fastify({ logger: false, bodyLimit: 16 * 1024 });
   await app.register(cors, {
     origin: opcoes.origens,
-    methods: ["GET", "POST", "PUT", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["authorization", "apikey", "content-type", "x-client-info", "x-supabase-api-version"],
   });
 
@@ -132,6 +170,14 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
       user_metadata: {},
       created_at: criado,
       updated_at: criado,
+      factors: (fatores.get(u.auth_user_id) ?? []).map((f) => ({
+        id: f.id,
+        friendly_name: f.friendly_name,
+        factor_type: f.factor_type,
+        status: f.status,
+        created_at: f.criado.toISOString(),
+        updated_at: f.atualizado.toISOString(),
+      })),
     };
   }
 
@@ -150,14 +196,15 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
     return token;
   }
 
-  async function criarSessao(u: UsuarioAuth, sessionId: string) {
+  async function criarSessao(u: UsuarioAuth, sessionId: string, aal: Aal, amr: Amr[]) {
     const emitidoEm = Math.floor(agora().getTime() / 1000);
     const expiraEm = emitidoEm + VALIDADE_SEGUNDOS;
     const accessToken = await new SignJWT({
       email: u.email,
       role: "authenticated",
       session_id: sessionId,
-      aal: "aal1",
+      aal,
+      amr,
       is_anonymous: false,
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
@@ -172,13 +219,15 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
       token_type: "bearer",
       expires_in: VALIDADE_SEGUNDOS,
       expires_at: expiraEm,
-      refresh_token: novoRefresh({ authUserId: u.auth_user_id, sessionId }),
+      refresh_token: novoRefresh({ authUserId: u.auth_user_id, sessionId, aal, amr }),
       user: objetoUser(u),
     };
   }
 
   /** Valida o Bearer (assinatura, emissor, audiência, validade) e devolve o auth_user_id e o e-mail do token. */
-  async function claimsDoBearer(cabecalho: string | undefined): Promise<{ sub: string; email: string | null } | null> {
+  async function claimsDoBearer(
+    cabecalho: string | undefined,
+  ): Promise<{ sub: string; email: string | null; aal: Aal; sessionId: string; amr: Amr[] } | null> {
     const m = /^Bearer (\S+)$/.exec(cabecalho ?? "");
     if (!m) return null;
     try {
@@ -189,7 +238,19 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
         currentDate: agora(),
       });
       if (typeof payload.sub !== "string" || payload.sub === "") return null;
-      return { sub: payload.sub, email: typeof payload.email === "string" ? payload.email : null };
+      const amr = Array.isArray(payload.amr)
+        ? (payload.amr as unknown[]).filter(
+            (a): a is Amr =>
+              typeof a === "object" && a !== null && typeof (a as Amr).method === "string" && typeof (a as Amr).timestamp === "number",
+          )
+        : [];
+      return {
+        sub: payload.sub,
+        email: typeof payload.email === "string" ? payload.email : null,
+        aal: payload.aal === "aal2" ? "aal2" : "aal1",
+        sessionId: typeof payload.session_id === "string" ? payload.session_id : randomUUID(),
+        amr,
+      };
     } catch {
       return null;
     }
@@ -220,6 +281,7 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
     const q = new URLSearchParams({ token, type: dados.tipo, redirect_to: destino });
     return `${base}/auth/v1/verify?${q.toString()}`;
   }
+  const segundosAgora = (): number => Math.floor(agora().getTime() / 1000);
   const urlBase = (host: string | undefined): string => (host ? `http://${host}` : emissor.replace(/\/auth\/v1$/, ""));
 
   const credenciaisInvalidas = (resp: FastifyReply) =>
@@ -238,7 +300,7 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
       if (!ref || !confere) return credenciaisInvalidas(resp);
       const usuario = await buscarUsuario("email", email);
       if (!usuario) return credenciaisInvalidas(resp);
-      return resp.code(200).send(await criarSessao(usuario, randomUUID()));
+      return resp.code(200).send(await criarSessao(usuario, randomUUID(), "aal1", [{ method: "password", timestamp: segundosAgora() }]));
     }
 
     if (tipo === "refresh_token") {
@@ -250,7 +312,7 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
       if (!sessao || !usuario) {
         return erro(resp, 400, "refresh_token_not_found", "Invalid Refresh Token: Refresh Token Not Found");
       }
-      return resp.code(200).send(await criarSessao(usuario, sessao.sessionId));
+      return resp.code(200).send(await criarSessao(usuario, sessao.sessionId, sessao.aal, sessao.amr));
     }
 
     return erro(resp, 400, "validation_failed", "unsupported_grant_type");
@@ -339,7 +401,12 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
     }
     // Como no Supabase, a conta passa a existir no Auth: amarra o login ao cadastro se ainda não estiver.
     await db.query("update usuarios set auth_user_id = $1 where email = $2 and auth_user_id is null", [link.authUserId, link.email]);
-    const sessao = await criarSessao({ auth_user_id: link.authUserId, email: link.email, criado_em: rows[0].criado_em }, randomUUID());
+    const sessao = await criarSessao(
+      { auth_user_id: link.authUserId, email: link.email, criado_em: rows[0].criado_em },
+      randomUUID(),
+      "aal1",
+      [{ method: "otp", timestamp: segundosAgora() }],
+    );
     const frag = new URLSearchParams({
       access_token: sessao.access_token,
       refresh_token: sessao.refresh_token,
@@ -361,6 +428,116 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
     }
     contas.set(usuario.email.toLowerCase(), await hashDaSenha(senha));
     return resp.code(200).send(objetoUser(usuario));
+  });
+
+  // --- MFA (TOTP) ---
+
+  async function usuarioAutenticado(req: { headers: { authorization?: string } }) {
+    const claims = await claimsDoBearer(req.headers.authorization);
+    const usuario = claims ? await buscarUsuario("auth_user_id", claims.sub) : null;
+    return claims && usuario ? { claims, usuario } : null;
+  }
+
+  function acharFator(authUserId: string, id: string): FatorMfa | undefined {
+    return (fatores.get(authUserId) ?? []).find((f) => f.id === id);
+  }
+
+  app.post("/auth/v1/factors", async (req, resp) => {
+    const ctx = await usuarioAutenticado(req);
+    if (!ctx) return erro(resp, 401, "bad_jwt", "invalid JWT");
+    const corpo = (req.body ?? {}) as Record<string, unknown>;
+    if (corpo.factor_type !== "totp") return erro(resp, 422, "validation_failed", "Only totp factors are supported");
+    const { usuario } = ctx;
+    const existentes = fatores.get(usuario.auth_user_id) ?? [];
+    if (existentes.length >= MAX_FATORES) {
+      return erro(resp, 422, "too_many_enrolled_mfa_factors", "Maximum number of enrolled factors reached");
+    }
+    const issuer = typeof corpo.issuer === "string" && corpo.issuer.trim() !== "" ? corpo.issuer.trim().slice(0, 100) : ISSUER_PADRAO;
+    const nome =
+      typeof corpo.friendly_name === "string" && corpo.friendly_name.trim() !== "" ? corpo.friendly_name.trim().slice(0, 100) : null;
+    if (nome !== null && existentes.some((f) => f.friendly_name === nome)) {
+      return erro(resp, 422, "mfa_factor_name_conflict", "A factor with the friendly name already exists");
+    }
+    const id = randomUUID();
+    const segredo = novoSegredoTotp();
+    const agoraDate = agora();
+    const fator: FatorMfa = {
+      id,
+      friendly_name: nome ?? `Fator ${id.slice(0, 8)}`,
+      factor_type: "totp",
+      status: "unverified",
+      segredo,
+      criado: agoraDate,
+      atualizado: agoraDate,
+      ultimoPassoUsado: null,
+    };
+    fatores.set(usuario.auth_user_id, [...existentes, fator]);
+    const b32 = base32Codificar(segredo);
+    const uri =
+      `otpauth://totp/${encodeURIComponent(issuer)}:${encodeURIComponent(usuario.email)}` +
+      `?secret=${b32}&issuer=${encodeURIComponent(issuer)}&algorithm=SHA1&digits=6&period=30`;
+    // O cliente monta "data:image/svg+xml;utf-8," + qr_code sem codificar: o SVG não pode ter "#" (cores nomeadas).
+    const qr = renderSVG(uri, { whiteColor: "white", blackColor: "black" });
+    return resp.code(200).send({ id, type: "totp", friendly_name: fator.friendly_name, totp: { qr_code: qr, secret: b32, uri } });
+  });
+
+  app.post("/auth/v1/factors/:id/challenge", async (req, resp) => {
+    const ctx = await usuarioAutenticado(req);
+    if (!ctx) return erro(resp, 401, "bad_jwt", "invalid JWT");
+    const fator = acharFator(ctx.usuario.auth_user_id, (req.params as { id: string }).id);
+    if (!fator) return erro(resp, 404, "mfa_factor_not_found", "MFA factor not found");
+    const expiraEm = agora().getTime() + VALIDADE_DESAFIO_MS;
+    const desafio: DesafioMfa = { id: randomUUID(), factorId: fator.id, authUserId: ctx.usuario.auth_user_id, expiraEm };
+    desafios.set(desafio.id, desafio);
+    return resp.code(200).send({ id: desafio.id, type: "totp", expires_at: Math.floor(expiraEm / 1000) });
+  });
+
+  // Divergência consciente do GoTrue: desafio inexistente responde 404 mfa_challenge_not_found (o GoTrue usa 422 em alguns casos).
+  app.post("/auth/v1/factors/:id/verify", async (req, resp) => {
+    const ctx = await usuarioAutenticado(req);
+    if (!ctx) return erro(resp, 401, "bad_jwt", "invalid JWT");
+    const { usuario, claims } = ctx;
+    const fator = acharFator(usuario.auth_user_id, (req.params as { id: string }).id);
+    if (!fator) return erro(resp, 404, "mfa_factor_not_found", "MFA factor not found");
+    const corpo = (req.body ?? {}) as Record<string, unknown>;
+    const idDesafio = typeof corpo.challenge_id === "string" ? corpo.challenge_id : "";
+    const codigo = typeof corpo.code === "string" ? corpo.code : "";
+    const desafio = desafios.get(idDesafio);
+    if (!desafio || desafio.factorId !== fator.id || desafio.authUserId !== usuario.auth_user_id) {
+      return erro(resp, 404, "mfa_challenge_not_found", "MFA challenge not found");
+    }
+    if (desafio.expiraEm < agora().getTime()) {
+      desafios.delete(desafio.id);
+      return erro(resp, 422, "mfa_challenge_expired", "MFA challenge has expired, verify against another challenge or create a new challenge.");
+    }
+    const passo = verificarTotp(fator.segredo, codigo, agora().getTime());
+    // Mesmo passo (ou anterior) já usado: recusa, para o código não valer duas vezes.
+    if (passo === null || (fator.ultimoPassoUsado !== null && passo <= fator.ultimoPassoUsado)) {
+      return erro(resp, 422, "mfa_verification_failed", "Invalid TOTP code entered");
+    }
+    fator.ultimoPassoUsado = passo;
+    fator.status = "verified";
+    fator.atualizado = agora();
+    desafios.delete(desafio.id);
+    const ts = segundosAgora();
+    const base = claims.amr.length > 0 ? claims.amr : [{ method: "password", timestamp: ts }];
+    const sessao = await criarSessao(usuario, claims.sessionId, "aal2", [...base.filter((a) => a.method !== "totp"), { method: "totp", timestamp: ts }]);
+    return resp.code(200).send(sessao);
+  });
+
+  app.delete("/auth/v1/factors/:id", async (req, resp) => {
+    const ctx = await usuarioAutenticado(req);
+    if (!ctx) return erro(resp, 401, "bad_jwt", "invalid JWT");
+    const { usuario, claims } = ctx;
+    const fator = acharFator(usuario.auth_user_id, (req.params as { id: string }).id);
+    if (!fator) return erro(resp, 404, "mfa_factor_not_found", "MFA factor not found");
+    // Como no GoTrue: remover fator verificado exige sessão aal2.
+    if (fator.status === "verified" && claims.aal !== "aal2") {
+      return erro(resp, 403, "insufficient_aal", "AAL2 required to unenroll verified factor");
+    }
+    fatores.set(usuario.auth_user_id, (fatores.get(usuario.auth_user_id) ?? []).filter((f) => f.id !== fator.id));
+    for (const [k, d] of desafios) if (d.factorId === fator.id) desafios.delete(k);
+    return resp.code(200).send({ id: fator.id });
   });
 
   app.get("/auth/v1/health", async () => ({ status: "ok", name: "auth-local" }));
