@@ -29,10 +29,10 @@ interface Chamada {
 function fetchFalso(existentes: string[]) {
   const chamadas: Chamada[] = [];
   const f = (async (url: string | URL | Request, init?: RequestInit) => {
-    const u = String(url);
+    const u = url as string;
     const metodo = init?.method ?? "GET";
     const h = new Headers(init?.headers);
-    const corpo = init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : null;
+    const corpo = init?.body ? (JSON.parse(init.body as string) as Record<string, unknown>) : null;
     chamadas.push({ metodo, url: u, auth: h.get("authorization"), corpo });
     const json = (status: number, obj: unknown) =>
       new Response(JSON.stringify(obj), {

@@ -501,9 +501,11 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       if (Buffer.byteLength(conteudo, "utf8") > 512 * 1024) {
         throw requisicaoInvalida("O arquivo passa de 512 KB.");
       }
-      // eslint-disable-next-line no-control-regex
       const arquivoNome =
-        req.body.arquivoNome?.replace(/[\u0000-\u001f\u007f]/g, "").trim() || null;
+        req.body.arquivoNome
+          // eslint-disable-next-line no-control-regex -- remove caracteres de controle do nome do arquivo
+          ?.replace(/[\u0000-\u001f\u007f]/g, "")
+          .trim() || null;
       try {
         const res = await importarCsv(app.db, {
           tipo,

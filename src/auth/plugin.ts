@@ -111,6 +111,8 @@ export function registrarAutenticacao(
 
 /** preHandler que libera só os papéis listados. Use depois de `app.autenticar`. */
 export function exigirPapel(...papeis: Papel[]): preHandlerAsyncHookHandler {
+  // preHandlerAsyncHookHandler exige Promise; a checagem em si é síncrona.
+  // eslint-disable-next-line @typescript-eslint/require-await
   return async (req) => {
     if (!papeis.includes(req.usuario.papel)) {
       logarAcessoNegado(req, "papel_nao_permitido", req.usuario);

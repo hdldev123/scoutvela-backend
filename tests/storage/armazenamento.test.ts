@@ -40,7 +40,7 @@ describe("armazenamento Supabase", () => {
     expect(chamadas[1]!.url).toBe(
       `https://proj.supabase.co/storage/v1/object/sign/evidencias/${CAMINHO}`,
     );
-    expect(JSON.parse(String(chamadas[1]!.init.body))).toEqual({ expiresIn: 300 });
+    expect(JSON.parse(chamadas[1]!.init.body as string)).toEqual({ expiresIn: 300 });
     expect(link).toEqual({
       url: `https://proj.supabase.co/storage/v1/object/sign/evidencias/${CAMINHO}?token=t`,
       expiraEm: "2026-11-06T12:05:00.000Z",
@@ -52,7 +52,7 @@ describe("armazenamento Supabase", () => {
       supabaseUrl: "https://proj.supabase.co",
       chaveServico: "k",
       bucket: "evidencias",
-      fetchImpl: (async () => new Response("erro", { status: 500 })) as unknown as typeof fetch,
+      fetchImpl: async () => new Response("erro", { status: 500 }),
     });
     await expect(s.salvar(CAMINHO, new Uint8Array([1]), "application/pdf")).rejects.toThrow();
     await expect(s.salvar("../fora.pdf", new Uint8Array([1]), "application/pdf")).rejects.toThrow();

@@ -639,7 +639,7 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
     return resp.code(200).send({ id: fator.id });
   });
 
-  app.get("/auth/v1/health", async () => ({ status: "ok", name: "auth-local" }));
+  app.get("/auth/v1/health", () => ({ status: "ok", name: "auth-local" }));
 
   return app;
 }

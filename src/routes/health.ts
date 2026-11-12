@@ -13,6 +13,6 @@ export async function rotasHealth(app: FastifyInstance): Promise<void> {
         response: { 200: z.object({ ok: z.literal(true) }) },
       },
     },
-    async () => ({ ok: true as const }),
+    () => ({ ok: true as const }),
   );
 }

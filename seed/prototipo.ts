@@ -635,7 +635,7 @@ function gerar(): AtletaProto[] {
         n: e.n,
         pos,
         intl: false,
-        pts: (((e.n - pos + 1) / e.n) * e.cat) as number | null,
+        pts: ((e.n - pos + 1) / e.n) * e.cat,
       };
     });
     const intl = [

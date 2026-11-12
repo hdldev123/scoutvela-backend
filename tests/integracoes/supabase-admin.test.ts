@@ -4,7 +4,7 @@ import { ContaJaExiste, criarAdminAuth } from "../../src/integracoes/supabase-ad
 function comResposta(status: number, corpo: unknown) {
   const chamadas: { url: string; init: RequestInit }[] = [];
   const f = (async (url: string | URL | Request, init?: RequestInit) => {
-    chamadas.push({ url: String(url), init: init ?? {} });
+    chamadas.push({ url: url as string, init: init ?? {} });
     return new Response(JSON.stringify(corpo), {
       status,
       headers: { "content-type": "application/json" },

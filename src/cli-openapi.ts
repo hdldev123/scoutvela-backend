@@ -5,9 +5,7 @@ import { lerConfig } from "./config.js";
 import type { Db } from "./db/db.js";
 
 // Só gera a especificação: nenhuma rota é executada, então o banco nunca é tocado.
-const falha = async (): Promise<never> => {
-  throw new Error("cli-openapi não acessa o banco");
-};
+const falha = (): Promise<never> => Promise.reject(new Error("cli-openapi não acessa o banco"));
 const semBanco: Db = { query: falha, exec: falha, transacao: falha, fechar: falha };
 
 const app = await criarApp({
@@ -22,9 +20,7 @@ const app = await criarApp({
     PORT: 0,
     CORS_ORIGINS: [],
   },
-  verificarToken: async () => {
-    throw new Error("cli-openapi não verifica tokens");
-  },
+  verificarToken: () => Promise.reject(new Error("cli-openapi não verifica tokens")),
   logger: false,
 });
 await app.ready();

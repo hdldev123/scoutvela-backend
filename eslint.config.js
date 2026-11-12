@@ -21,6 +21,11 @@ export default tseslint.config(
       "@typescript-eslint/no-floating-promises": "error",
       "@typescript-eslint/no-explicit-any": "error",
       "no-console": "error",
+      // Variáveis com prefixo _ são descartes intencionais (ex.: desestruturação para omitir chave).
+      "@typescript-eslint/no-unused-vars": [
+        "error",
+        { varsIgnorePattern: "^_", argsIgnorePattern: "^_", ignoreRestSiblings: true },
+      ],
     },
   },
   {
@@ -28,6 +33,12 @@ export default tseslint.config(
     // CLIs (cli-*.ts) e o seed.
     files: ["dev/**", "src/jobs/**", "**/cli-*.ts", "seed/**"],
     rules: { "no-console": "off" },
+  },
+  {
+    // Plugins do Fastify são async por convenção (o registro espera a Promise), mesmo sem await.
+    // Nos testes, fakes de interfaces que devolvem Promise seguem o mesmo raciocínio.
+    files: ["src/routes/**", "tests/**"],
+    rules: { "@typescript-eslint/require-await": "off" },
   },
   {
     // Nos testes, res.json() e os mocks devolvem any; tipar cada resposta não agrega.
