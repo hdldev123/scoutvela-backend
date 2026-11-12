@@ -2378,9 +2378,11 @@ paths:
                 additionalProperties: false
   /atletas/pendentes:
     get:
-      summary: Atletas cadastrados que ainda não aceitaram o termo do piloto
+      summary: Atletas com aceite do termo do piloto pendente
       tags:
         - cadastro
+      description: Quem nunca aceitou (termoAceitoVersao nulo) e quem aceitou só uma
+        versão anterior à vigente (termoAceitoVersao preenchido).
       security: *a1
       responses:
         "200":
@@ -2412,12 +2414,17 @@ paths:
                     criadoEm:
                       type: string
                       description: Instante ISO
+                    termoAceitoVersao:
+                      nullable: true
+                      description: Última versão aceita; nulo = nunca aceitou
+                      type: string
                   required:
                     - id
                     - nome
                     - velaid
                     - classe
                     - criadoEm
+                    - termoAceitoVersao
                   additionalProperties: false
         "401":
           description: Default Response
@@ -2954,7 +2961,14 @@ paths:
                         type: string
                       termoVersao:
                         nullable: true
+                        description: Última versão do termo aceita
                         type: string
+                      termoVigenteVersao:
+                        type: string
+                        description: Versão do termo vigente hoje
+                      termoPendente:
+                        type: boolean
+                        description: true quando o atleta ainda não aceitou a versão vigente
                       compartilharIbvar:
                         type: boolean
                       atualizadoEm:
@@ -2964,6 +2978,8 @@ paths:
                     required:
                       - termoAceitoEm
                       - termoVersao
+                      - termoVigenteVersao
+                      - termoPendente
                       - compartilharIbvar
                       - atualizadoEm
                     additionalProperties: false
@@ -3232,7 +3248,14 @@ paths:
                     type: string
                   termoVersao:
                     nullable: true
+                    description: Última versão do termo aceita
                     type: string
+                  termoVigenteVersao:
+                    type: string
+                    description: Versão do termo vigente hoje
+                  termoPendente:
+                    type: boolean
+                    description: true quando o atleta ainda não aceitou a versão vigente
                   compartilharIbvar:
                     type: boolean
                   atualizadoEm:
@@ -3242,6 +3265,8 @@ paths:
                 required:
                   - termoAceitoEm
                   - termoVersao
+                  - termoVigenteVersao
+                  - termoPendente
                   - compartilharIbvar
                   - atualizadoEm
                 additionalProperties: false
@@ -3567,6 +3592,22 @@ paths:
                     respondidoEm:
                       nullable: true
                       type: string
+                    avaliacaoId:
+                      nullable: true
+                      description: Lançamento ligado à resposta, se houver
+                      type: string
+                    notaAnterior:
+                      nullable: true
+                      description: Nota do lançamento anterior ao ligado (mesmo atleta e indicador)
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                    notaNova:
+                      nullable: true
+                      description: Nota do lançamento ligado
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
                   required:
                     - id
                     - atleta
@@ -3577,6 +3618,9 @@ paths:
                     - criadoEm
                     - resposta
                     - respondidoEm
+                    - avaliacaoId
+                    - notaAnterior
+                    - notaNova
                   additionalProperties: false
         "401":
           description: Default Response
@@ -3633,7 +3677,12 @@ paths:
       summary: Responde um pedido de revisão
       tags:
         - revisoes
-      description: Pedido já respondido devolve 409 (código requisicao_invalida).
+      description: "Pedido já respondido devolve 409 (código requisicao_invalida).
+        avaliacaoId (opcional) liga a resposta ao lançamento que a atendeu: do
+        mesmo atleta, do indicador do pedido (ou de um indicador do pilar, se o
+        pedido foi por pilar) e lançado depois do pedido. Depois de gravar, o
+        atleta recebe um e-mail só com o aviso e o link; falha no envio não
+        desfaz a resposta."
       requestBody:
         required: true
         content:
@@ -3645,6 +3694,15 @@ paths:
                   type: string
                   minLength: 3
                   maxLength: 2000
+                avaliacaoId:
+                  description: Id do lançamento (série histórica) que atendeu o pedido
+                  anyOf:
+                    - type: string
+                      pattern: ^\d{1,18}$
+                    - type: integer
+                      minimum: 0
+                      exclusiveMinimum: true
+                      maximum: 9007199254740991
               required:
                 - resposta
       parameters:
@@ -3715,6 +3773,22 @@ paths:
                   respondidoEm:
                     nullable: true
                     type: string
+                  avaliacaoId:
+                    nullable: true
+                    description: Lançamento ligado à resposta, se houver
+                    type: string
+                  notaAnterior:
+                    nullable: true
+                    description: Nota do lançamento anterior ao ligado (mesmo atleta e indicador)
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  notaNova:
+                    nullable: true
+                    description: Nota do lançamento ligado
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
                 required:
                   - id
                   - atleta
@@ -3725,6 +3799,9 @@ paths:
                   - criadoEm
                   - resposta
                   - respondidoEm
+                  - avaliacaoId
+                  - notaAnterior
+                  - notaNova
                 additionalProperties: false
         "400":
           description: Default Response
@@ -4388,10 +4465,21 @@ paths:
                       - pilarId
                       - nota
                       - descricao
+                rubricasRemover:
+                  description: "Ids de pilar cujas rubricas próprias saem (volta a valer a escala
+                    geral). A escala geral não pode ser removida: nulo ou vazio
+                    dão 400 com mensagem explícita"
+                  minItems: 1
+                  maxItems: 20
+                  type: array
+                  items:
+                    nullable: true
+                    type: string
+                    maxLength: 40
                 regras:
                   description: "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4,
-                    RANKING_CBVELA. O valor segue o formato lido em GET
-                    /parametros"
+                    RANKING_CBVELA, TERMO_EXIGE_REACEITE. O valor segue o
+                    formato lido em GET /parametros"
                   type: object
                   additionalProperties: {}
                 classes:
@@ -8368,8 +8456,8 @@ paths:
       summary: Termo de consentimento vigente
       tags:
         - termo
-      description: Texto da versão vigente (a de maior vigente_desde). Qualquer
-        usuário autenticado lê.
+      description: Texto da versão vigente (a de maior vigente_desde que já começou).
+        Qualquer usuário autenticado lê.
       security: &a7
         - bearerAuth: []
       responses:
@@ -8558,6 +8646,256 @@ paths:
                   - mensagem
                 additionalProperties: false
         "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /termos:
+    get:
+      summary: Versões do termo de consentimento (gestor)
+      tags:
+        - termo
+      description: Da mais nova para a mais antiga, com a quantidade de aceites de
+        cada uma. Sem o texto (o vigente vem em GET /termo).
+      security: *a7
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    versao:
+                      type: string
+                    titulo:
+                      type: string
+                    vigenteDesde:
+                      type: string
+                      description: Instante ISO
+                    criadoEm:
+                      type: string
+                      description: Instante ISO
+                    vigente:
+                      type: boolean
+                      description: É a versão vigente agora
+                    futura:
+                      type: boolean
+                      description: Ainda não começou a valer
+                    aceites:
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                      description: Atletas distintos com aceite concedido desta versão
+                  required:
+                    - versao
+                    - titulo
+                    - vigenteDesde
+                    - criadoEm
+                    - vigente
+                    - futura
+                    - aceites
+                  additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    post:
+      summary: Publica uma nova versão do termo (gestor)
+      tags:
+        - termo
+      description: A versão passa a valer em vigenteDesde, que não pode estar no
+        passado nem ser anterior ou igual à vigência de outra versão (inclusive
+        futura). Quem aceitou só a anterior fica com aceite pendente; se o
+        ranking os exclui depende da regra TERMO_EXIGE_REACEITE. A auditoria não
+        guarda o texto.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                versao:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                titulo:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+                texto:
+                  type: string
+                  minLength: 50
+                  maxLength: 50000
+                vigenteDesde:
+                  type: string
+                  format: date-time
+                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+              required:
+                - versao
+                - titulo
+                - texto
+                - vigenteDesde
+              additionalProperties: false
+      security: *a7
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versao:
+                    type: string
+                  titulo:
+                    type: string
+                  vigenteDesde:
+                    type: string
+                    description: Instante ISO
+                  criadoEm:
+                    type: string
+                    description: Instante ISO
+                  vigente:
+                    type: boolean
+                    description: É a versão vigente agora
+                  futura:
+                    type: boolean
+                    description: Ainda não começou a valer
+                  aceites:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                    description: Atletas distintos com aceite concedido desta versão
+                required:
+                  - versao
+                  - titulo
+                  - vigenteDesde
+                  - criadoEm
+                  - vigente
+                  - futura
+                  - aceites
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
           description: Default Response
           content:
             application/json:
