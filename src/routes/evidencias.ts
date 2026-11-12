@@ -3,7 +3,13 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
-import { esquemaErro, naoEncontrado, requisicaoInvalida, servicoIndisponivel } from "../erros.js";
+import {
+  esquemaErro,
+  evidenciaRemovida,
+  naoEncontrado,
+  requisicaoInvalida,
+  servicoIndisponivel,
+} from "../erros.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
 
 const TAMANHO_MAXIMO_BYTES = 5 * 1024 * 1024;
@@ -26,6 +32,10 @@ const esquemaAnexo = z.object({
   tamanhoBytes: z.number().int(),
   indicadorId: z.string().nullable(),
   enviadoEm: z.string().describe("Instante ISO"),
+  removidoEm: z
+    .string()
+    .nullable()
+    .describe("Instante ISO em que o arquivo foi removido (anonimização); nulo = disponível"),
 });
 
 interface LinhaAnexo {
@@ -35,6 +45,7 @@ interface LinhaAnexo {
   tamanho_bytes: number;
   indicador_id: string | null;
   enviado_em: Date;
+  removido_em: Date | null;
 }
 
 const paraAnexo = (l: LinhaAnexo) => ({
@@ -44,9 +55,10 @@ const paraAnexo = (l: LinhaAnexo) => ({
   tamanhoBytes: l.tamanho_bytes,
   indicadorId: l.indicador_id,
   enviadoEm: new Date(l.enviado_em).toISOString(),
+  removidoEm: l.removido_em ? new Date(l.removido_em).toISOString() : null,
 });
 
-const COLUNAS = "id, nome_arquivo, tipo_mime, tamanho_bytes, indicador_id, enviado_em";
+const COLUNAS = "id, nome_arquivo, tipo_mime, tamanho_bytes, indicador_id, enviado_em, removido_em";
 
 // Sem caracteres de controle nem barras (o nome só serve de rótulo; o arquivo é guardado com nome gerado).
 const nomeArquivoValido = (n: string) => {
@@ -236,12 +248,13 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
         tags: ["evidencias"],
         summary: "Link temporário (5 minutos) para abrir a evidência",
         description:
-          "Mesmo acesso da listagem, pelo atleta do anexo. Cada geração de link fica na auditoria.",
+          "Mesmo acesso da listagem, pelo atleta do anexo. Anexo removido (anonimização) devolve 410 `evidencia_removida`. Cada geração de link fica na auditoria.",
         security: [{ bearerAuth: [] }],
         params,
         response: {
           200: z.object({ url: z.string(), expiraEm: z.string().describe("Instante ISO") }),
           ...respostasComuns,
+          410: esquemaErro,
           503: esquemaErro,
         },
       },
@@ -253,14 +266,18 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
         caminho: string;
         tipo_mime: string;
         nome_arquivo: string;
+        removido_em: Date | null;
       }>(
-        `select atleta_id, caminho, tipo_mime, nome_arquivo from evidencias_anexos where id = $1::uuid`,
+        `select atleta_id, caminho, tipo_mime, nome_arquivo, removido_em from evidencias_anexos where id = $1::uuid`,
         [req.params.id],
       );
       const anexo = r.rows[0];
       // Anexo inexistente e anexo de atleta fora do acesso dão o mesmo 404.
       const base = anexo ? await buscarAtletaVisivel(app.db, usuario, anexo.atleta_id) : null;
       if (!anexo || !base) throw naoEncontrado("Evidência não encontrada.");
+
+      // Arquivo já removido: nada a assinar, o Storage nem é consultado.
+      if (anexo.removido_em) throw evidenciaRemovida();
 
       let link;
       try {

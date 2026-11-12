@@ -13,6 +13,8 @@ export const codigosDeErro = [
   "mfa_obrigatorio",
   /** 503: recurso depende de integração não configurada (ex.: convite sem chave de servidor). */
   "servico_indisponivel",
+  /** 410: a evidência foi removida (anonimização); o registro fica, o arquivo não. */
+  "evidencia_removida",
 ] as const;
 export type CodigoDeErro = (typeof codigosDeErro)[number];
 
@@ -45,6 +47,9 @@ export const requisicaoInvalida = (m = "Requisição inválida.") =>
 export const conflito = (m: string) => new ErroApi(409, "requisicao_invalida", m);
 export const mfaObrigatorio = (m = "Ative a verificação em duas etapas para continuar.") =>
   new ErroApi(403, "mfa_obrigatorio", m);
+/** O recurso existia e foi removido de propósito. */
+export const evidenciaRemovida = (m = "Esta evidência foi removida.") =>
+  new ErroApi(410, "evidencia_removida", m);
 export const servicoIndisponivel = (m = "Serviço indisponível no momento.") =>
   new ErroApi(503, "servico_indisponivel", m);
 
