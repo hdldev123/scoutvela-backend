@@ -62,6 +62,8 @@ No modo local, os links de convite e de redefinição de senha aparecem no termi
 | `dev:local` | modo local (PGlite, emulador do Auth, seed); `-- --mfa` liga `EXIGIR_MFA`, `-- --recriar` recria o banco |
 | `test` | testes de domínio, permissões, rotas e banco |
 | `typecheck` / `build` / `start` | tipos, compilação para `dist/` e execução em produção |
+| `lint` | ESLint (typescript-eslint com regras que usam tipos) |
+| `format` / `format:check` | Prettier: formata ou só confere (o CI roda `format:check`) |
 | `db:migrate` / `db:migrate:prod` | aplica migrations (dev com tsx; produção a partir do `dist/`) |
 | `db:seed` / `seed:auth` | dados fictícios e contas de teste (nunca em produção) |
 | `openapi` | gera o `openapi.yaml`, o contrato com o front (o CI falha se estiver desatualizado) |
@@ -111,7 +113,7 @@ tests/           domínio, paridade com o protótipo, permissões, rotas, banco
 - **Requisições:** JWT validado em toda requisição (issuer, audience, expiração), CORS só para os domínios do front, Helmet (CSP `default-src 'none'`, HSTS), limite de 300 requisições por minuto por IP e corpo de até 1 MB.
 - **Logs e erros:** logs estruturados (pino) sem token, cookie nem corpo, e todo 401/403 vira log `acesso_negado`. Os erros seguem o formato `{ erro, mensagem }`, e o 500 não expõe detalhe interno.
 - **CSRF:** não se aplica. O token vai no header `Authorization`, não em cookie.
-- **Dependências:** CI com typecheck, testes, build, contrato OpenAPI e `npm audit --omit=dev`. Dependabot semanal.
+- **Dependências:** CI com typecheck, lint, formatação, testes, build, contrato OpenAPI e `npm audit --omit=dev`. Dependabot semanal.
 - **LGPD:** não guarda CPF, documento, endereço completo nem renda; a importação de CSV recusa essas colunas. O consentimento é registrado com histórico, e o atleta pode pedir revisão de nota (art. 20).
 
 ## Deploy (Render)
