@@ -3,10 +3,19 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
-import { esquemaErro, naoEncontrado, requisicaoInvalida, servicoIndisponivel } from "../erros.js";
+import {
+  esquemaErro,
+  evidenciaRemovida,
+  naoEncontrado,
+  requisicaoInvalida,
+  servicoIndisponivel,
+} from "../erros.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
 
 const TAMANHO_MAXIMO_BYTES = 5 * 1024 * 1024;
+/** Envios por minuto, por usuário autenticado (não por IP). Conta também as tentativas recusadas. */
+const LIMITE_ENVIOS = 20;
+
 /** Base64 de 5 MB tem ~6,7 milhões de caracteres. */
 const BASE64_MAXIMO = 7_000_000;
 
@@ -23,6 +32,10 @@ const esquemaAnexo = z.object({
   tamanhoBytes: z.number().int(),
   indicadorId: z.string().nullable(),
   enviadoEm: z.string().describe("Instante ISO"),
+  removidoEm: z
+    .string()
+    .nullable()
+    .describe("Instante ISO em que o arquivo foi removido (anonimização); nulo = disponível"),
 });
 
 interface LinhaAnexo {
@@ -32,6 +45,7 @@ interface LinhaAnexo {
   tamanho_bytes: number;
   indicador_id: string | null;
   enviado_em: Date;
+  removido_em: Date | null;
 }
 
 const paraAnexo = (l: LinhaAnexo) => ({
@@ -41,9 +55,10 @@ const paraAnexo = (l: LinhaAnexo) => ({
   tamanhoBytes: l.tamanho_bytes,
   indicadorId: l.indicador_id,
   enviadoEm: new Date(l.enviado_em).toISOString(),
+  removidoEm: l.removido_em ? new Date(l.removido_em).toISOString() : null,
 });
 
-const COLUNAS = "id, nome_arquivo, tipo_mime, tamanho_bytes, indicador_id, enviado_em";
+const COLUNAS = "id, nome_arquivo, tipo_mime, tamanho_bytes, indicador_id, enviado_em, removido_em";
 
 // Sem caracteres de controle nem barras (o nome só serve de rótulo; o arquivo é guardado com nome gerado).
 const nomeArquivoValido = (n: string) => {
@@ -64,11 +79,20 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
     {
       preHandler: [app.autenticar, exigirPapel("gestor", "treinador")],
       bodyLimit: 8 * 1024 * 1024,
+      // preHandler: roda depois de autenticar, então req.usuario já existe e 401 não gasta a cota.
+      config: {
+        rateLimit: {
+          max: LIMITE_ENVIOS,
+          timeWindow: 60_000,
+          hook: "preHandler",
+          keyGenerator: (req) => `evidencias:${req.usuario.id}`,
+        },
+      },
       schema: {
         tags: ["evidencias"],
         summary: "Anexa uma evidência (PDF, JPEG ou PNG de até 5 MB) ao atleta",
         description:
-          "Gestor, ou treinador dos próprios atletas. O arquivo vai em base64, é conferido pelo tamanho e pela assinatura e fica no Storage privado. Use o `id` retornado como `anexoId` ao lançar a nota.",
+          "Gestor, ou treinador dos próprios atletas. O arquivo vai em base64, é conferido pelo tamanho e pela assinatura e fica no Storage privado. Use o `id` retornado como `anexoId` ao lançar a nota. Limite de 20 envios por minuto por usuário (429 `limite_excedido`).",
         security: [{ bearerAuth: [] }],
         params,
         body: z
@@ -83,7 +107,13 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
             indicadorId: z.string().min(1).max(64).optional(),
           })
           .strict(),
-        response: { 201: esquemaAnexo, 400: esquemaErro, ...respostasComuns, 503: esquemaErro },
+        response: {
+          201: esquemaAnexo,
+          400: esquemaErro,
+          ...respostasComuns,
+          429: esquemaErro,
+          503: esquemaErro,
+        },
       },
     },
     async (req, reply) => {
@@ -123,43 +153,62 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
       }
       const sha256 = createHash("sha256").update(bytes).digest("hex");
 
-      const anexo = await app.db.transacao(async (tx) => {
-        const r = await tx.query<LinhaAnexo>(
-          `insert into evidencias_anexos
+      let anexo: LinhaAnexo;
+      try {
+        anexo = await app.db.transacao(async (tx) => {
+          const r = await tx.query<LinhaAnexo>(
+            `insert into evidencias_anexos
              (atleta_id, indicador_id, nome_arquivo, tipo_mime, tamanho_bytes, caminho, sha256, enviado_por, enviado_em)
            values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            returning ${COLUNAS}`,
-          [
-            base.id,
-            body.indicadorId ?? null,
-            body.nomeArquivo,
-            body.tipoMime,
-            bytes.length,
-            caminho,
-            sha256,
-            usuario.id,
-            referencia,
-          ],
-        );
-        const linha = r.rows[0]!;
-        // Auditoria sem o nome do arquivo: só id, tipo e tamanho.
-        await tx.query(
-          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+            [
+              base.id,
+              body.indicadorId ?? null,
+              body.nomeArquivo,
+              body.tipoMime,
+              bytes.length,
+              caminho,
+              sha256,
+              usuario.id,
+              referencia,
+            ],
+          );
+          const linha = r.rows[0]!;
+          // Auditoria sem o nome do arquivo: só id, tipo e tamanho.
+          await tx.query(
+            `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
            values ($1, 'anexar_evidencia', 'atleta', $2, $3::jsonb, $4)`,
-          [
-            usuario.id,
-            base.id,
-            JSON.stringify({
-              anexoId: linha.id,
-              tipoMime: body.tipoMime,
-              tamanhoBytes: bytes.length,
-              indicadorId: body.indicadorId ?? null,
-            }),
-            referencia,
-          ],
-        );
-        return linha;
-      });
+            [
+              usuario.id,
+              base.id,
+              JSON.stringify({
+                anexoId: linha.id,
+                tipoMime: body.tipoMime,
+                tamanhoBytes: bytes.length,
+                indicadorId: body.indicadorId ?? null,
+              }),
+              referencia,
+            ],
+          );
+          return linha;
+        });
+      } catch (e) {
+        // O arquivo já está no Storage e o registro não saiu: não deixa arquivo órfão.
+        try {
+          await app.armazenamento.remover(caminho);
+        } catch (e2) {
+          // Sem caminho, nome de arquivo nem dados do atleta no log.
+          const falha = e2 as { code?: unknown; name?: string };
+          req.log.error(
+            {
+              evento: "evidencia_orfa",
+              erro: typeof falha.code === "string" ? falha.code : (falha.name ?? "Error"),
+            },
+            "falha ao remover arquivo órfão",
+          );
+        }
+        throw e;
+      }
       return reply.code(201).send(paraAnexo(anexo));
     },
   );
@@ -199,12 +248,13 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
         tags: ["evidencias"],
         summary: "Link temporário (5 minutos) para abrir a evidência",
         description:
-          "Mesmo acesso da listagem, pelo atleta do anexo. Cada geração de link fica na auditoria.",
+          "Mesmo acesso da listagem, pelo atleta do anexo. Anexo removido (anonimização) devolve 410 `evidencia_removida`. Cada geração de link fica na auditoria.",
         security: [{ bearerAuth: [] }],
         params,
         response: {
           200: z.object({ url: z.string(), expiraEm: z.string().describe("Instante ISO") }),
           ...respostasComuns,
+          410: esquemaErro,
           503: esquemaErro,
         },
       },
@@ -216,14 +266,18 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
         caminho: string;
         tipo_mime: string;
         nome_arquivo: string;
+        removido_em: Date | null;
       }>(
-        `select atleta_id, caminho, tipo_mime, nome_arquivo from evidencias_anexos where id = $1::uuid`,
+        `select atleta_id, caminho, tipo_mime, nome_arquivo, removido_em from evidencias_anexos where id = $1::uuid`,
         [req.params.id],
       );
       const anexo = r.rows[0];
       // Anexo inexistente e anexo de atleta fora do acesso dão o mesmo 404.
       const base = anexo ? await buscarAtletaVisivel(app.db, usuario, anexo.atleta_id) : null;
       if (!anexo || !base) throw naoEncontrado("Evidência não encontrada.");
+
+      // Arquivo já removido: nada a assinar, o Storage nem é consultado.
+      if (anexo.removido_em) throw evidenciaRemovida();
 
       let link;
       try {

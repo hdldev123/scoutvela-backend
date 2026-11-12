@@ -425,6 +425,35 @@ describe("convite e redefinição de senha no emulador", () => {
     });
     expect(curta.status).toBe(422);
   });
+
+  it("DELETE /admin/users/:id exige a chave de servidor, apaga a conta e invalida as sessões", async () => {
+    const c = cliente();
+    const { data } = await c.auth.signInWithPassword({
+      email: "treinadora@scoutvela.dev",
+      password: "treino123",
+    });
+    const id = data.user!.id;
+    const refresh = data.session!.refresh_token;
+    const apagar = (key?: string) =>
+      fetch(`${url2}/auth/v1/admin/users/${id}`, {
+        method: "DELETE",
+        headers: key ? { authorization: `Bearer ${key}`, apikey: key } : {},
+      });
+    expect((await apagar()).status).toBe(401);
+    expect((await apagar("outra-chave")).status).toBe(401);
+    const ok = await apagar(CHAVE);
+    expect(ok.status).toBe(200);
+    expect(await ok.json()).toEqual({});
+    // A sessão antiga não renova mais e a senha deixa de valer.
+    expect((await cliente().auth.refreshSession({ refresh_token: refresh })).error).not.toBeNull();
+    const login = await cliente().auth.signInWithPassword({
+      email: "treinadora@scoutvela.dev",
+      password: "treino123",
+    });
+    expect(login.error).not.toBeNull();
+    // Idempotente.
+    expect((await apagar(CHAVE)).status).toBe(200);
+  });
 });
 
 describe("MFA TOTP no emulador", () => {

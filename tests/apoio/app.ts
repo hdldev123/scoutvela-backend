@@ -147,6 +147,10 @@ export interface AdminAuthFalso extends AdminAuth {
   contasExistentes: Set<string>;
   /** Quando preenchido, convidar falha com este erro genérico. */
   falhar: boolean;
+  /** ids de conta removidos com sucesso. */
+  removidas: string[];
+  /** Quando true, removerConta falha. */
+  falharRemocao: boolean;
 }
 
 /** AdminAuth em memória, só para testes. */
@@ -155,6 +159,12 @@ export function criarAdminAuthFalso(): AdminAuthFalso {
     convites: [],
     contasExistentes: new Set(),
     falhar: false,
+    removidas: [],
+    falharRemocao: false,
+    async removerConta(authUserId) {
+      if (falso.falharRemocao) throw new Error("falha simulada");
+      falso.removidas.push(authUserId);
+    },
     async convidar(email, redirectTo) {
       if (falso.falhar) throw new Error("falha simulada");
       if (falso.contasExistentes.has(email)) throw new ContaJaExiste();

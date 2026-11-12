@@ -18,6 +18,7 @@ import { criarProvedorEmailLog, type ProvedorEmail } from "./email/index.js";
 import { registrarTratamentoDeErros } from "./erros.js";
 import type { AdminAuth } from "./integracoes/supabase-admin.js";
 import { rotasHealth } from "./routes/health.js";
+import { rotasAnonimizacao } from "./routes/anonimizacao.js";
 import { rotasAtletas } from "./routes/atletas.js";
 import { rotasAuditoria } from "./routes/auditoria.js";
 import { rotasAvaliacoes } from "./routes/avaliacoes.js";
@@ -85,6 +86,7 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasCampanha,
   rotasAuditoria,
   rotasTitular,
+  rotasAnonimizacao,
   rotasPlano,
   rotasEvidencias,
   rotasUsuarios,

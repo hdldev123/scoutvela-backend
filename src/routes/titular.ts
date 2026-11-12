@@ -7,7 +7,7 @@ import { conflito, esquemaErro, naoEncontrado } from "../erros.js";
 
 /**
  * Direitos do titular (LGPD, art. 18) para o atleta: exportar os próprios dados e
- * pedir acesso, correção, exclusão ou revogação. A exclusão em si é manual (procedimento do gestor),
+ * pedir acesso, correção, exclusão ou revogação. A exclusão é atendida pela anonimização (`POST /atletas/:id/anonimizar`),
  * porque a série histórica só aceita inserção.
  */
 
@@ -227,7 +227,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         tags: ["titular"],
         summary: "Registra um pedido do titular (acesso, correção, exclusão ou revogação)",
         description:
-          "O pedido fica aberto até o gestor responder. Exclusão e revogação são tratadas manualmente pelo gestor, fora da API.",
+          "O pedido fica aberto até o gestor responder. Revogação é tratada pelo gestor; a exclusão é atendida pela anonimização (`POST /atletas/{id}/anonimizar`).",
         security: seguranca,
         body: z.object({
           tipo: z.enum(tiposPedido),
@@ -298,7 +298,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         tags: ["titular"],
         summary: "Responde um pedido do titular",
         description:
-          "Registra a resposta e fecha o pedido. A exclusão de dados NÃO é feita por esta rota: é procedimento manual do gestor, porque a série histórica (notas, respostas, medidas, gates, financeiro) só aceita inserção. Pedido já respondido devolve 409 (código requisicao_invalida).",
+          "Registra a resposta e fecha o pedido. A exclusão de dados NÃO é feita por esta rota: para pedido de exclusão use `POST /atletas/{id}/anonimizar`, que anonimiza o atleta e responde o pedido (a série histórica, que só aceita inserção, é mantida sem identificação direta). Pedido já respondido devolve 409 (código requisicao_invalida).",
         security: seguranca,
         params: z.object({ id: z.string().regex(/^\d{1,18}$/, "Identificador inválido.") }),
         body: z.object({

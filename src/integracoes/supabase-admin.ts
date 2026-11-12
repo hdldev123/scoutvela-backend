@@ -14,6 +14,8 @@ export class ContaJaExiste extends Error {
 export interface AdminAuth {
   /** Cria a conta sem senha e envia o e-mail de convite. `redirectTo` é a tela de definir senha. */
   convidar(email: string, redirectTo: string): Promise<{ authUserId: string }>;
+  /** Apaga a conta (e as sessões) no Supabase Auth. Conta inexistente (404) conta como sucesso. */
+  removerConta(authUserId: string): Promise<void>;
 }
 
 export function criarAdminAuth(opcoes: {
@@ -52,6 +54,18 @@ export function criarAdminAuth(opcoes: {
       if (typeof corpo.id !== "string" || corpo.id === "")
         throw new Error("Supabase Auth: resposta do convite sem id");
       return { authUserId: corpo.id };
+    },
+    async removerConta(authUserId) {
+      const r = await f(`${base}/auth/v1/admin/users/${encodeURIComponent(authUserId)}`, {
+        method: "DELETE",
+        headers: {
+          apikey: opcoes.serviceRoleKey,
+          Authorization: `Bearer ${opcoes.serviceRoleKey}`,
+        },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (r.status === 404) return;
+      if (!r.ok) throw new Error(`Supabase Auth: falha ao remover conta (HTTP ${r.status})`);
     },
   };
 }

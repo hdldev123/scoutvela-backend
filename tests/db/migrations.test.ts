@@ -48,4 +48,61 @@ describe("Migrations", () => {
     await expect(db.exec("update avaliacoes set valor = 5")).rejects.toThrow(/aceita só inserção/);
     await expect(db.exec("delete from avaliacoes")).rejects.toThrow(/aceita só inserção/);
   });
+
+  describe("evidências: update controlado (0010)", () => {
+    const ATLETA = "00000000-0000-0000-0000-0000000000cc";
+    const USUARIO = "00000000-0000-0000-0000-0000000000dd";
+    const hash = "a".repeat(64);
+    beforeAll(async () => {
+      await db.exec(`
+        insert into classes (id, nome, evento, posicao, peso_min_kg, peso_medio_kg, peso_max_kg, ordem)
+          values ('t_cls2', 'Classe teste 2', 'Teste', 'ind', 60, 65, 70, 98);
+        insert into usuarios (id, email, nome, papel) values ('${USUARIO}', 'ev@t.dev', 'Ev', 'gestor');
+        insert into atletas (id, velaid_codigo, nome, genero, data_nascimento, classe_id)
+          values ('${ATLETA}', 'XX-EV1', 'Atleta Ev', 'F', '2000-01-01', 't_cls2');
+      `);
+    });
+    const inserir = async (caminho: string) => {
+      const r = await db.query<{ id: string }>(
+        `insert into evidencias_anexos (atleta_id, nome_arquivo, tipo_mime, tamanho_bytes, caminho, sha256, enviado_por)
+         values ($1, 'laudo.pdf', 'application/pdf', 10, $2, $3, $4) returning id`,
+        [ATLETA, caminho, hash, USUARIO],
+      );
+      return r.rows[0]!.id;
+    };
+
+    it("aceita marcar a remoção (removido_em + nome 'removido') e mais nada depois", async () => {
+      const id = await inserir("a/1.pdf");
+      await db.query(
+        `update evidencias_anexos set removido_em = now(), nome_arquivo = 'removido' where id = $1`,
+        [id],
+      );
+      await expect(
+        db.query(`update evidencias_anexos set removido_em = null where id = $1`, [id]),
+      ).rejects.toThrow(/aceita só inserção/);
+      await expect(
+        db.query(`update evidencias_anexos set removido_em = now() where id = $1`, [id]),
+      ).rejects.toThrow(/aceita só inserção/);
+      await expect(db.query(`delete from evidencias_anexos where id = $1`, [id])).rejects.toThrow(
+        /aceita só inserção/,
+      );
+    });
+
+    it("recusa trocar caminho, nome livre, outras colunas ou marcar sem o nome neutro", async () => {
+      const id = await inserir("a/2.pdf");
+      const recusar = (sql: string) =>
+        expect(db.query(sql, [id])).rejects.toThrow(/aceita só inserção/);
+      await recusar(`update evidencias_anexos set caminho = 'a/outro.pdf' where id = $1`);
+      await recusar(`update evidencias_anexos set nome_arquivo = 'outro.pdf' where id = $1`);
+      await recusar(`update evidencias_anexos set sha256 = repeat('b', 64) where id = $1`);
+      await recusar(`update evidencias_anexos set removido_em = now() where id = $1`);
+      await recusar(
+        `update evidencias_anexos set removido_em = now(), nome_arquivo = 'removido', caminho = 'a/x.pdf' where id = $1`,
+      );
+      await recusar(
+        `update evidencias_anexos set removido_em = now(), nome_arquivo = 'removido', indicador_id = null, tamanho_bytes = 11 where id = $1`,
+      );
+      await recusar(`delete from evidencias_anexos where id = $1`);
+    });
+  });
 });
