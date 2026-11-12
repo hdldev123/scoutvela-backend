@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, normalize, resolve, sep } from "node:path";
 import type { Config } from "../config.js";
 
@@ -12,6 +12,8 @@ export interface LinkTemporario {
 export interface ArmazenamentoEvidencias {
   salvar(caminho: string, bytes: Uint8Array, tipoMime: string): Promise<void>;
   linkTemporario(caminho: string, tipoMime: string, nomeArquivo: string): Promise<LinkTemporario>;
+  /** Apaga o arquivo. Idempotente: arquivo que não existe não é erro. */
+  remover(caminho: string): Promise<void>;
 }
 
 export const VALIDADE_LINK_SEGUNDOS = 300;
@@ -48,6 +50,13 @@ export function criarArmazenamentoLocal(dir: string): ArmazenamentoEvidencias {
         expiraEm: new Date(Date.now() + VALIDADE_LINK_SEGUNDOS * 1000).toISOString(),
       };
     },
+    async remover(caminho) {
+      try {
+        await unlink(arquivo(caminho));
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+      }
+    },
   };
 }
 
@@ -78,6 +87,15 @@ export function criarArmazenamentoSupabase(o: OpcoesSupabase): ArmazenamentoEvid
         },
       );
       if (!r.ok) throw new ErroArmazenamento(`Storage recusou o envio (HTTP ${r.status}).`);
+    },
+    async remover(caminho) {
+      // Objeto inexistente volta como 200 com lista vazia: também não é erro.
+      const r = await f(`${base}/storage/v1/object/${encodeURIComponent(o.bucket)}`, {
+        method: "DELETE",
+        headers: { ...cabecalho, "Content-Type": "application/json" },
+        body: JSON.stringify({ prefixes: [caminhoSeguro(caminho)] }),
+      });
+      if (!r.ok) throw new ErroArmazenamento(`Storage recusou a remoção (HTTP ${r.status}).`);
     },
     async linkTemporario(caminho) {
       const r = await f(
