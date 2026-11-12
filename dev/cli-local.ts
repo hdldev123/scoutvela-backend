@@ -61,6 +61,9 @@ await vincularContasLocais(db);
 // Chave de servidor só deste processo (nova a cada execução): o emulador a exige em /auth/v1/invite.
 const serviceRoleKey = randomBytes(24).toString("hex");
 
+// --mfa: a API passa a exigir aal2 de gestor e IBVAR (os fatores TOTP ficam em memória no emulador).
+const exigirMfa = process.argv.includes("--mfa");
+
 const config = lerConfig({
   APP_ENV: "desenvolvimento",
   HOST: "127.0.0.1",
@@ -70,6 +73,7 @@ const config = lerConfig({
   SUPABASE_JWT_SECRET: jwtSecret,
   CORS_ORIGINS: ORIGENS.join(","),
   SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
+  EXIGIR_MFA: exigirMfa ? "true" : "false",
   FRONT_URL: ORIGENS[0]!,
 });
 
@@ -109,6 +113,8 @@ Variáveis do front (vela-front/.env.local):
   VITE_API_URL=http://127.0.0.1:${PORTA_API}
   VITE_SUPABASE_URL=${URL_AUTH}
   VITE_SUPABASE_ANON_KEY=chave-local-dev
+
+MFA: ${exigirMfa ? "exigido para gestor e IBVAR (--mfa). O QR aparece na tela de verificação do front; os fatores somem ao reiniciar." : "desligado (use npm run dev:local -- --mfa para exigir)."}
 
 Convites e redefinição de senha: o "e-mail" não é enviado; o link aparece neste terminal
 (linhas [auth-local]). Abra o link no navegador para definir a senha.
