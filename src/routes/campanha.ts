@@ -90,7 +90,7 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { usuario, body } = req;
       const agora = app.agora();
-      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id);
+      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
       const ids = body.componentes.map((c) => c.componenteId);
@@ -170,7 +170,7 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
         throw requisicaoInvalida("A posição não pode passar do tamanho da frota.");
       if (body.data > dataIso(agora))
         throw requisicaoInvalida("A data do resultado não pode ser futura.");
-      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id);
+      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
       const resultado = await app.db.transacao(async (tx) => {

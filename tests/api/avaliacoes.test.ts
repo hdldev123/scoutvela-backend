@@ -60,6 +60,7 @@ describe("avaliações, prévia e gates", () => {
       p.db,
       { id: "x", papel: "gestor", atletaId: null },
       id,
+      AGORA(),
     ))!;
     const [av] = await carregarEAvaliarAtletas(p.db, parametros, [base], AGORA());
     return calcularAtleta(parametros, {

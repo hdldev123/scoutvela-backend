@@ -1,4 +1,5 @@
 import type { Db } from "../db/db.js";
+import { termoSql } from "../repositories/termo.js";
 import type { MensagemEmail, ProvedorEmail } from "../email/index.js";
 
 export interface OpcoesLembretes {
@@ -42,21 +43,20 @@ interface Pendente {
 }
 
 /** Treinadores ativos com atletas ativos (termo aceito) sem nota nos indicadores T do ciclo atual. */
-async function pendenciasDosTreinadores(db: Db, cicloId: string): Promise<Pendente[]> {
+async function pendenciasDosTreinadores(db: Db, cicloId: string, agora: Date): Promise<Pendente[]> {
   const r = await db.query<{ usuario_id: string; email: string; quantidade: string }>(
     `select u.id as usuario_id, u.email, count(distinct a.id)::text as quantidade
        from usuarios u
        join atletas a on a.treinador_id = u.id and a.ativo
       where u.papel = 'treinador' and u.ativo
-        and exists (select 1 from consentimento_atual ct
-                     where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido)
+        and ${termoSql.aceitoNoPiloto("a.id", "$2")}
         and exists (select 1 from indicadores i
                      where i.tipo = 'T' and not i.calculado
                        and not exists (select 1 from avaliacoes n
                                         where n.atleta_id = a.id and n.indicador_id = i.id
                                           and n.ciclo_id = $1::uuid and n.origem <> 'resposta_sugerida'))
       group by u.id, u.email`,
-    [cicloId],
+    [cicloId, agora],
   );
   return r.rows.map((l) => ({
     usuarioId: l.usuario_id,
@@ -66,7 +66,7 @@ async function pendenciasDosTreinadores(db: Db, cicloId: string): Promise<Penden
 }
 
 /** Usuários atleta ativos (termo aceito) com perguntas ainda sem resposta. */
-async function pendenciasDosAtletas(db: Db): Promise<Pendente[]> {
+async function pendenciasDosAtletas(db: Db, agora: Date): Promise<Pendente[]> {
   const r = await db.query<{ usuario_id: string; email: string; quantidade: string }>(
     `select u.id as usuario_id, u.email,
             (select count(*) from perguntas_atleta q
@@ -75,8 +75,8 @@ async function pendenciasDosAtletas(db: Db): Promise<Pendente[]> {
        from usuarios u
        join atletas a on a.id = u.atleta_id and a.ativo
       where u.papel = 'atleta' and u.ativo
-        and exists (select 1 from consentimento_atual ct
-                     where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido)`,
+        and ${termoSql.aceitoNoPiloto("a.id", "$1")}`,
+    [agora],
   );
   return r.rows
     .map((l) => ({ usuarioId: l.usuario_id, email: l.email, quantidade: Number(l.quantidade) }))
@@ -144,10 +144,14 @@ export async function executarLembretes(opcoes: OpcoesLembretes): Promise<Result
   const grupos = [
     {
       tipo: "treinador" as const,
-      pendentes: await pendenciasDosTreinadores(db, ciclo.id),
+      pendentes: await pendenciasDosTreinadores(db, ciclo.id, opcoes.agora),
       montar: mensagemTreinador,
     },
-    { tipo: "atleta" as const, pendentes: await pendenciasDosAtletas(db), montar: mensagemAtleta },
+    {
+      tipo: "atleta" as const,
+      pendentes: await pendenciasDosAtletas(db, opcoes.agora),
+      montar: mensagemAtleta,
+    },
   ];
 
   for (const g of grupos) {

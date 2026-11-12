@@ -46,6 +46,7 @@ export const ESQUEMAS_REGRAS = {
     ),
   G4: z.strictObject({ A: perfilG4, B: perfilG4, C: perfilG4, D: perfilG4 }),
   RANKING_CBVELA: z.strictObject({ janela_semanas: z.number().int().min(1).max(104) }),
+  TERMO_EXIGE_REACEITE: z.strictObject({ ativa: z.boolean() }),
 } as const;
 
 export type CodigoRegra = keyof typeof ESQUEMAS_REGRAS;

@@ -164,7 +164,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
     async (req) => {
       const usuario = req.usuario;
       const referencia = app.agora();
-      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id);
+      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
       const [parametros, ciclo] = await Promise.all([

@@ -5,6 +5,7 @@ import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
+import { buscarTermoVigente } from "../repositories/termo.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 
@@ -13,7 +14,9 @@ const iso = (v: unknown): string =>
 
 const esquemaConsentimento = z.object({
   termoAceitoEm: z.string().nullable().describe("Instante ISO do aceite do termo do piloto"),
-  termoVersao: z.string().nullable(),
+  termoVersao: z.string().nullable().describe("Última versão do termo aceita"),
+  termoVigenteVersao: z.string().describe("Versão do termo vigente hoje"),
+  termoPendente: z.boolean().describe("true quando o atleta ainda não aceitou a versão vigente"),
   compartilharIbvar: z.boolean(),
   atualizadoEm: z.string().nullable().describe("Instante ISO da última decisão sobre o IBVAR"),
 });
@@ -86,7 +89,8 @@ async function cicloAbertoId(db: Db): Promise<string | null> {
   return r.rows[0]?.id ?? null;
 }
 
-async function lerConsentimento(db: Db, atletaId: string) {
+async function lerConsentimento(db: Db, atletaId: string, agora: Date) {
+  const vigente = await buscarTermoVigente(db, agora);
   const r = await db.query<{
     tipo: string;
     concedido: boolean;
@@ -101,6 +105,8 @@ async function lerConsentimento(db: Db, atletaId: string) {
   return {
     termoAceitoEm: termo?.concedido ? iso(termo.registrado_em) : null,
     termoVersao: termo?.concedido ? termo.versao_termo : null,
+    termoVigenteVersao: vigente.versao,
+    termoPendente: !(termo?.concedido && termo.versao_termo === vigente.versao),
     compartilharIbvar: ibvar?.concedido ?? false,
     atualizadoEm: ibvar ? iso(ibvar.registrado_em) : null,
   };
@@ -161,14 +167,14 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
     async (req) => {
       const usuario = req.usuario;
       const base = usuario.atletaId
-        ? await buscarAtletaVisivel(app.db, usuario, usuario.atletaId)
+        ? await buscarAtletaVisivel(app.db, usuario, usuario.atletaId, app.agora())
         : null;
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
       const [parametros, ciclo, consentimento, perguntasRows] = await Promise.all([
         carregarParametros(app.db),
         cicloAberto(app.db),
-        lerConsentimento(app.db, base.id),
+        lerConsentimento(app.db, base.id, app.agora()),
         app.db.query<{
           indicador_id: string;
           enunciado: string;
@@ -370,7 +376,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           concedido: compartilharIbvar,
         });
       });
-      return lerConsentimento(app.db, atletaId);
+      return lerConsentimento(app.db, atletaId, app.agora());
     },
   );
 

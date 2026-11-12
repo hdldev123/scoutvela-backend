@@ -5,7 +5,7 @@ import { exigirPapel } from "../auth/plugin.js";
 import { idadeEm } from "../domain/index.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { ContaJaExiste } from "../integracoes/supabase-admin.js";
-import { buscarTermoVigente } from "../repositories/termo.js";
+import { buscarTermoVigente, termoSql } from "../repositories/termo.js";
 import { ArquivoRejeitado, importarCsv } from "../importacao/index.js";
 
 const IDADE_MINIMA_PILOTO = 18;
@@ -213,7 +213,7 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       const { classeId, treinadorId, criarConta } = req.body;
       const usuarioId = req.usuario.id;
       const referencia = app.agora();
-      const termo = await buscarTermoVigente(app.db);
+      const termo = await buscarTermoVigente(app.db, referencia);
 
       const criado = await app.db
         .transacao(async (tx) => {
@@ -380,7 +380,9 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       preHandler: soGestor,
       schema: {
         tags: ["cadastro"],
-        summary: "Atletas cadastrados que ainda não aceitaram o termo do piloto",
+        summary: "Atletas com aceite do termo do piloto pendente",
+        description:
+          "Quem nunca aceitou (termoAceitoVersao nulo) e quem aceitou só uma versão anterior à vigente (termoAceitoVersao preenchido).",
         security: seguranca,
         response: {
           200: z.array(
@@ -390,6 +392,10 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
               velaid: z.string(),
               classe: z.object({ id: z.string(), nome: z.string() }),
               criadoEm: z.string().describe("Instante ISO"),
+              termoAceitoVersao: z
+                .string()
+                .nullable()
+                .describe("Última versão aceita; nulo = nunca aceitou"),
             }),
           ),
           401: esquemaErro,
@@ -398,6 +404,7 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       },
     },
     async () => {
+      const agora = app.agora();
       const { rows } = await app.db.query<{
         id: string;
         nome: string;
@@ -405,13 +412,15 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         classe_id: string;
         classe_nome: string;
         criado_em: Date;
+        termo_aceito_versao: string | null;
       }>(
-        `select a.id, a.nome, a.velaid_codigo as velaid, c.id as classe_id, c.nome as classe_nome, a.criado_em
+        `select a.id, a.nome, a.velaid_codigo as velaid, c.id as classe_id, c.nome as classe_nome, a.criado_em,
+                (select ct.versao_termo from consentimento_atual ct
+                  where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido) as termo_aceito_versao
            from atletas a join classes c on c.id = a.classe_id
-          where a.ativo
-            and not exists (select 1 from consentimento_atual ct
-                             where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido)
+          where a.ativo and not ${termoSql.aceitoVigente("a.id", "$1")}
           order by a.criado_em, a.nome`,
+        [agora],
       );
       return rows.map((l) => ({
         id: l.id,
@@ -419,6 +428,7 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         velaid: l.velaid,
         classe: { id: l.classe_id, nome: l.classe_nome },
         criadoEm: new Date(l.criado_em).toISOString(),
+        termoAceitoVersao: l.termo_aceito_versao,
       }));
     },
   );
@@ -449,20 +459,22 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       const { id } = req.params;
       const usuarioId = req.usuario.id;
       await app.db.transacao(async (tx) => {
-        const vigente = await buscarTermoVigente(tx);
+        const agora = app.agora();
+        const vigente = await buscarTermoVigente(tx, agora);
         if (req.body.versao !== vigente.versao)
           throw requisicaoInvalida("A versão do termo não é a vigente.");
         const a = await tx.query("select 1 from atletas where id = $1 and ativo for update", [id]);
         if (a.rows.length === 0) throw naoEncontrado("Atleta não encontrado.");
         const aceito = await tx.query(
-          "select 1 from consentimento_atual where atleta_id = $1 and tipo = 'termo_piloto' and concedido",
-          [id],
+          `select 1 from consentimento_atual where atleta_id = $1 and tipo = 'termo_piloto' and concedido and versao_termo = $2`,
+          [id, vigente.versao],
         );
-        if (aceito.rows.length > 0) throw conflito("O termo deste atleta já foi aceito.");
+        if (aceito.rows.length > 0)
+          throw conflito("Esta versão do termo já foi aceita por este atleta.");
         await tx.query(
           `insert into consentimentos (atleta_id, tipo, concedido, versao_termo, registrado_em, registrado_por)
            values ($1, 'termo_piloto', true, $2, $3, $4)`,
-          [id, req.body.versao, app.agora(), usuarioId],
+          [id, req.body.versao, agora, usuarioId],
         );
         await tx.query(
           `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
