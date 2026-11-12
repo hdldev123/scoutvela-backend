@@ -6,6 +6,7 @@ import type { Db } from "../db/db.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
 import { buscarTermoVigente } from "../repositories/termo.js";
+import { lancamentoEhElegivel, listarLancamentosElegiveis } from "../repositories/revisoes.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 
@@ -515,6 +516,56 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
     },
   );
 
+  rotas.get(
+    "/revisoes/:id/lancamentos",
+    {
+      preHandler: [app.autenticar, exigirPapel("gestor")],
+      schema: {
+        tags: ["revisoes"],
+        summary: "Lista os lançamentos que podem ser ligados ao pedido de revisão",
+        description:
+          "Só os lançamentos que o PUT /revisoes/:id aceitaria em avaliacaoId (mesmo atleta, indicador do pedido ou de um indicador do pilar, e lançados depois do pedido), do mais novo para o mais antigo. Vale para pedido aberto ou respondido. Sem evidência.",
+        security: seguranca,
+        params: z.object({ id: z.string().regex(/^\d{1,18}$/, "Identificador inválido.") }),
+        response: {
+          200: z.object({
+            lancamentos: z.array(
+              z.object({
+                id: z.string(),
+                indicadorId: z.string(),
+                indicadorNome: z.string(),
+                valor: z.number(),
+                lancadoEm: z.string().describe("Instante ISO do lançamento"),
+                origem: z.string(),
+                avaliador: z.object({ id: z.string(), nome: z.string() }).nullable(),
+              }),
+            ),
+          }),
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+        },
+      },
+    },
+    async (req) => {
+      const pedido = (
+        await app.db.query<{
+          atleta_id: string;
+          pilar_id: string | null;
+          indicador_id: string | null;
+          criado_em: Date;
+        }>(
+          `select atleta_id, pilar_id, indicador_id, criado_em
+             from pedidos_revisao where id = $1::bigint`,
+          [req.params.id],
+        )
+      ).rows[0];
+      if (!pedido) throw naoEncontrado("Pedido de revisão não encontrado.");
+      return { lancamentos: await listarLancamentosElegiveis(app.db, pedido) };
+    },
+  );
+
   rotas.put(
     "/revisoes/:id",
     {
@@ -573,28 +624,12 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           throw new ErroApi(409, "requisicao_invalida", "Este pedido já foi respondido.");
 
         if (avaliacaoId !== null) {
-          const av = (
-            await tx.query<{
-              atleta_id: string;
-              indicador_id: string;
-              pilar_id: string;
-              lancado_em: Date;
-            }>(
-              `select a.atleta_id, a.indicador_id, i.pilar_id, a.lancado_em
-                 from avaliacoes a join indicadores i on i.id = a.indicador_id
-                where a.id = $1::bigint`,
-              [avaliacaoId],
-            )
-          ).rows[0];
-          const invalido = (m: string) => new ErroApi(400, "requisicao_invalida", m);
-          if (!av) throw invalido("Lançamento não encontrado.");
-          if (av.atleta_id !== pedido.atleta_id) throw invalido("O lançamento é de outro atleta.");
-          if (pedido.indicador_id && av.indicador_id !== pedido.indicador_id)
-            throw invalido("O lançamento não é do indicador do pedido.");
-          if (!pedido.indicador_id && pedido.pilar_id && av.pilar_id !== pedido.pilar_id)
-            throw invalido("O lançamento não é de um indicador do pilar do pedido.");
-          if (new Date(av.lancado_em).getTime() <= new Date(pedido.criado_em).getTime())
-            throw invalido("O lançamento precisa ser posterior ao pedido de revisão.");
+          if (!(await lancamentoEhElegivel(tx, pedido, avaliacaoId)))
+            throw new ErroApi(
+              400,
+              "requisicao_invalida",
+              "O lançamento não pode ser ligado a este pedido: precisa ser do mesmo atleta, do indicador (ou do pilar) do pedido e posterior a ele.",
+            );
         }
 
         await tx.query(
