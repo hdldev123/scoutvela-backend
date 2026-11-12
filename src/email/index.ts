@@ -76,7 +76,6 @@ export function criarProvedorEmail(
 /** Logger JSON de uma linha no stdout, para o server.ts e os jobs (antes ou fora do Fastify). */
 export const loggerConsole: LoggerEmail = {
   info(obj, msg) {
-    process.stdout.write(`${JSON.stringify({ level: "info", msg, ...obj })}
-`);
+    process.stdout.write(`${JSON.stringify({ level: "info", msg, ...obj })}\n`);
   },
 };
