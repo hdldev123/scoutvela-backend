@@ -121,14 +121,23 @@ const esquemaFicha = z.object({
         mesesAssegurados: z.number().int().nullable(),
         patrocinioPrivado: z.enum(["sim", "em_negociacao", "nao"]).nullable(),
         componentes: z.array(
-          z.object({ id: z.string(), nome: z.string(), autonomia: z.string(), apoioCbvela: z.string() }),
+          z.object({
+            id: z.string(),
+            nome: z.string(),
+            autonomia: z.string(),
+            apoioCbvela: z.string(),
+          }),
         ),
       }),
       z.object({ perfilSuporte: z.enum(["A", "B", "C", "D"]) }),
     ])
     .nullable(),
-  plano: esquemaPlanoRegistrado.nullable().describe("Plano registrado por uma pessoa. Nulo para o IBVAR ou sem plano."),
-  sugestaoPlano: esquemaTextosPlano.nullable().describe("Sugestão calculada pelo sistema. Nula para o IBVAR."),
+  plano: esquemaPlanoRegistrado
+    .nullable()
+    .describe("Plano registrado por uma pessoa. Nulo para o IBVAR ou sem plano."),
+  sugestaoPlano: esquemaTextosPlano
+    .nullable()
+    .describe("Sugestão calculada pelo sistema. Nula para o IBVAR."),
 });
 
 export async function rotasAtletas(app: FastifyInstance): Promise<void> {
@@ -143,7 +152,13 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
           "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo 404. IBVAR: sem indicadores sensíveis, Class Fit, contato e financeiro detalhado.",
         security: [{ bearerAuth: [] }],
         params: z.object({ id: z.uuid() }),
-        response: { 200: esquemaFicha, 400: esquemaErro, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
+        response: {
+          200: esquemaFicha,
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+        },
       },
     },
     async (req) => {
@@ -152,7 +167,10 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
       const base = await buscarAtletaVisivel(app.db, usuario, req.params.id);
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
-      const [parametros, ciclo] = await Promise.all([carregarParametros(app.db), cicloAberto(app.db)]);
+      const [parametros, ciclo] = await Promise.all([
+        carregarParametros(app.db),
+        cicloAberto(app.db),
+      ]);
       const [avaliado] = await carregarEAvaliarAtletas(app.db, parametros, [base], referencia, {
         componentesFinanceiro: usuario.papel === "gestor" || usuario.papel === "atleta",
         historico: true,
@@ -249,10 +267,15 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
       const sugestaoPlano = ibvar
         ? null
         : sugerirPlano({
-            pilares: parametros.pilares.map((p) => ({ nome: p.nome, nota: pilaresCalc.get(p.id)?.nota ?? null })),
+            pilares: parametros.pilares.map((p) => ({
+              nome: p.nome,
+              nota: pilaresCalc.get(p.id)?.nota ?? null,
+            })),
             temResultadoMundial: dados.resultados.some((r) => r.nivel === "mundial"),
             statusFinal: calculo.statusFinal,
-            gatesNaoAptos: calculo.gates.filter((g) => g.status !== "apto").map((g) => NOMES_GATES[g.gate] ?? `G${g.gate}`),
+            gatesNaoAptos: calculo.gates
+              .filter((g) => g.status !== "apto")
+              .map((g) => NOMES_GATES[g.gate] ?? `G${g.gate}`),
             perfilSuporte: dados.financeiro?.perfilSuporte ?? null,
             faixaNome: calculo.faixa.nome,
           });
@@ -280,7 +303,11 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         contato: ibvar ? null : { email: atleta.emailContato, treinador: atleta.treinador },
         ciclo,
         score: calculo.score,
-        faixa: { id: calculo.faixa.id, nome: calculo.faixa.nome, nomeCurto: calculo.faixa.nomeCurto },
+        faixa: {
+          id: calculo.faixa.id,
+          nome: calculo.faixa.nome,
+          nomeCurto: calculo.faixa.nomeCurto,
+        },
         completo: calculo.completo,
         preenchidos: calculo.preenchidos,
         total: calculo.total,

@@ -13,7 +13,11 @@ const semBanco: Db = { query: falha, exec: falha, transacao: falha, fechar: falh
 const app = await criarApp({
   db: semBanco,
   config: {
-    ...lerConfig({ APP_ENV: "desenvolvimento", DATABASE_URL: "nao-usado", SUPABASE_URL: "http://supabase.invalid" }),
+    ...lerConfig({
+      APP_ENV: "desenvolvimento",
+      DATABASE_URL: "nao-usado",
+      SUPABASE_URL: "http://supabase.invalid",
+    }),
     HOST: "127.0.0.1",
     PORT: 0,
     CORS_ORIGINS: [],

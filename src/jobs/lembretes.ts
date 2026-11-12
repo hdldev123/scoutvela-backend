@@ -24,7 +24,12 @@ const MS_DIA = 86_400_000;
 
 /** Data civil (AAAA-MM-DD) de um instante no fuso de Brasília. */
 function diaEmBrasilia(d: Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: FUSO,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
 
 const dias = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / MS_DIA;
@@ -53,7 +58,11 @@ async function pendenciasDosTreinadores(db: Db, cicloId: string): Promise<Penden
       group by u.id, u.email`,
     [cicloId],
   );
-  return r.rows.map((l) => ({ usuarioId: l.usuario_id, email: l.email, quantidade: Number(l.quantidade) }));
+  return r.rows.map((l) => ({
+    usuarioId: l.usuario_id,
+    email: l.email,
+    quantidade: Number(l.quantidade),
+  }));
 }
 
 /** Usuários atleta ativos (termo aceito) com perguntas ainda sem resposta. */
@@ -80,11 +89,21 @@ function frasePrazo(prazo: string, restam: number): string {
   return `O prazo termina em ${dataBr(prazo)}.`;
 }
 
-type Montar = (para: string, ciclo: string, prazo: string, restam: number, n: number, url: string) => MensagemEmail;
+type Montar = (
+  para: string,
+  ciclo: string,
+  prazo: string,
+  restam: number,
+  n: number,
+  url: string,
+) => MensagemEmail;
 
 const mensagemTreinador: Montar = (para, ciclo, prazo, restam, n, url) => ({
   para,
-  assunto: restam < 0 ? `Scout Vela: avaliações do ciclo ${ciclo} em atraso` : `Scout Vela: avaliações do ciclo ${ciclo} pendentes`,
+  assunto:
+    restam < 0
+      ? `Scout Vela: avaliações do ciclo ${ciclo} em atraso`
+      : `Scout Vela: avaliações do ciclo ${ciclo} pendentes`,
   texto:
     `Olá,\n\nNo ciclo ${ciclo} você tem ${n === 1 ? "1 atleta" : `${n} atletas`} com avaliação incompleta. ` +
     `${frasePrazo(prazo, restam)}\n\nLance as notas em: ${url}/avaliar\n\nScout Vela`,
@@ -92,7 +111,10 @@ const mensagemTreinador: Montar = (para, ciclo, prazo, restam, n, url) => ({
 
 const mensagemAtleta: Montar = (para, ciclo, prazo, restam, n, url) => ({
   para,
-  assunto: restam < 0 ? `Scout Vela: questionário do ciclo ${ciclo} em atraso` : `Scout Vela: questionário do ciclo ${ciclo} pendente`,
+  assunto:
+    restam < 0
+      ? `Scout Vela: questionário do ciclo ${ciclo} em atraso`
+      : `Scout Vela: questionário do ciclo ${ciclo} pendente`,
   texto:
     `Olá,\n\nNo ciclo ${ciclo} você tem ${n === 1 ? "1 pergunta" : `${n} perguntas`} sem resposta. ` +
     `${frasePrazo(prazo, restam)}\n\nResponda em: ${url}/painel\n\nScout Vela`,
@@ -120,7 +142,11 @@ export async function executarLembretes(opcoes: OpcoesLembretes): Promise<Result
 
   const url = frontUrl.replace(/\/+$/, "");
   const grupos = [
-    { tipo: "treinador" as const, pendentes: await pendenciasDosTreinadores(db, ciclo.id), montar: mensagemTreinador },
+    {
+      tipo: "treinador" as const,
+      pendentes: await pendenciasDosTreinadores(db, ciclo.id),
+      montar: mensagemTreinador,
+    },
     { tipo: "atleta" as const, pendentes: await pendenciasDosAtletas(db), montar: mensagemAtleta },
   ];
 
@@ -147,10 +173,16 @@ export async function executarLembretes(opcoes: OpcoesLembretes): Promise<Result
           [ciclo.id, p.usuarioId, g.tipo, hoje],
         );
         resultado.ignorados++;
-        log?.info({ evento: "lembrete_falhou", tipo: g.tipo, usuarioId: p.usuarioId }, "falha ao enviar lembrete");
+        log?.info(
+          { evento: "lembrete_falhou", tipo: g.tipo, usuarioId: p.usuarioId },
+          "falha ao enviar lembrete",
+        );
       }
     }
   }
-  log?.info({ evento: "lembretes_concluidos", cicloId: ciclo.id, diasParaOPrazo: restam, ...resultado }, "lembretes concluídos");
+  log?.info(
+    { evento: "lembretes_concluidos", cicloId: ciclo.id, diasParaOPrazo: restam, ...resultado },
+    "lembretes concluídos",
+  );
   return resultado;
 }

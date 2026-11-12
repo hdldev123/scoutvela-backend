@@ -12,7 +12,10 @@ describe("armazenamento Supabase", () => {
     const fetchFalso = (async (url: string, init: RequestInit) => {
       chamadas.push({ url, init });
       return url.includes("/sign/")
-        ? new Response(JSON.stringify({ signedURL: `/object/sign/evidencias/${CAMINHO}?token=t` }), { status: 200 })
+        ? new Response(
+            JSON.stringify({ signedURL: `/object/sign/evidencias/${CAMINHO}?token=t` }),
+            { status: 200 },
+          )
         : new Response("{}", { status: 200 });
     }) as unknown as typeof fetch;
     const s = criarArmazenamentoSupabase({
@@ -23,12 +26,20 @@ describe("armazenamento Supabase", () => {
       agora: () => new Date("2026-11-06T12:00:00Z"),
     });
     await s.salvar(CAMINHO, new Uint8Array([1, 2]), "application/pdf");
-    expect(chamadas[0]!.url).toBe(`https://proj.supabase.co/storage/v1/object/evidencias/${CAMINHO}`);
+    expect(chamadas[0]!.url).toBe(
+      `https://proj.supabase.co/storage/v1/object/evidencias/${CAMINHO}`,
+    );
     expect(chamadas[0]!.init.method).toBe("POST");
-    expect(chamadas[0]!.init.headers).toMatchObject({ Authorization: "Bearer chave", "x-upsert": "false", "Content-Type": "application/pdf" });
+    expect(chamadas[0]!.init.headers).toMatchObject({
+      Authorization: "Bearer chave",
+      "x-upsert": "false",
+      "Content-Type": "application/pdf",
+    });
 
     const link = await s.linkTemporario(CAMINHO, "application/pdf", "x.pdf");
-    expect(chamadas[1]!.url).toBe(`https://proj.supabase.co/storage/v1/object/sign/evidencias/${CAMINHO}`);
+    expect(chamadas[1]!.url).toBe(
+      `https://proj.supabase.co/storage/v1/object/sign/evidencias/${CAMINHO}`,
+    );
     expect(JSON.parse(String(chamadas[1]!.init.body))).toEqual({ expiresIn: 300 });
     expect(link).toEqual({
       url: `https://proj.supabase.co/storage/v1/object/sign/evidencias/${CAMINHO}?token=t`,

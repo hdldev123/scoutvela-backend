@@ -17,8 +17,13 @@ interface AtletaGabarito {
   statusFinal: string;
   notas: Record<string, number | null>;
   resultados: {
-    nivel: string; evento: string; data: string; posicao: number;
-    tamanhoFrota: number; internacional: boolean; pontos: number | null;
+    nivel: string;
+    evento: string;
+    data: string;
+    posicao: number;
+    tamanhoFrota: number;
+    internacional: boolean;
+    pontos: number | null;
   }[];
 }
 
@@ -34,7 +39,11 @@ const NIVEIS: Record<string, NivelCompeticao> = {
   Estadual: "estadual",
   Regional: "regional",
 };
-const STATUS_FINAL: Record<string, string> = { apto: "apto", cond: "condicional", nao: "nao_prioritario" };
+const STATUS_FINAL: Record<string, string> = {
+  apto: "apto",
+  cond: "condicional",
+  nao: "nao_prioritario",
+};
 
 // O protótipo escreve "internacionalis" no plural do G3 (erro de grafia); a porta usa "internacionais".
 const corrigir = (motivo: string) => motivo.replace("internacionalis", "internacionais");

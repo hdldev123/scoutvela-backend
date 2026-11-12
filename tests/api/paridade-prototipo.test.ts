@@ -12,12 +12,23 @@ interface AtletaGabarito {
   statusFinal: string;
 }
 
-const gabarito = JSON.parse(readFileSync(new URL("../fixtures/prototipo.json", import.meta.url), "utf8")) as {
+const gabarito = JSON.parse(
+  readFileSync(new URL("../fixtures/prototipo.json", import.meta.url), "utf8"),
+) as {
   atletas: AtletaGabarito[];
 };
 
-const STATUS_FINAL: Record<string, string> = { apto: "apto", cond: "condicional", nao: "nao_prioritario" };
-const STATUS_GATE: Record<string, string> = { apto: "apto", cond: "condicional", alerta: "alerta", nao: "alerta" };
+const STATUS_FINAL: Record<string, string> = {
+  apto: "apto",
+  cond: "condicional",
+  nao: "nao_prioritario",
+};
+const STATUS_GATE: Record<string, string> = {
+  apto: "apto",
+  cond: "condicional",
+  alerta: "alerta",
+  nao: "alerta",
+};
 // O protótipo escreve "internacionalis" no plural do G3 (erro de grafia); o domínio gera "internacionais".
 const corrigir = (motivo: string) => motivo.replace("internacionalis", "internacionais");
 
@@ -29,7 +40,11 @@ describe("paridade com o protótipo (via API)", () => {
   afterAll(() => p.encerrar());
 
   it("ranking do gestor segue a ordem do gabarito", async () => {
-    const r = await p.app.inject({ method: "GET", url: "/ranking", headers: await p.como(EMAILS_DEMO.gestor) });
+    const r = await p.app.inject({
+      method: "GET",
+      url: "/ranking",
+      headers: await p.como(EMAILS_DEMO.gestor),
+    });
     expect(r.statusCode).toBe(200);
     const itens = r.json().itens as { atleta: { velaid: string } }[];
     const esperada = [...gabarito.atletas].sort((a, b) => b.score - a.score).map((a) => a.velaid);
@@ -39,7 +54,11 @@ describe("paridade com o protótipo (via API)", () => {
   for (const g of gabarito.atletas) {
     it(`${g.velaid}: score, faixa, gates e pontos batem`, async () => {
       const id = await p.idDe(g.velaid);
-      const r = await p.app.inject({ method: "GET", url: `/atletas/${id}`, headers: await p.como(EMAILS_DEMO.gestor) });
+      const r = await p.app.inject({
+        method: "GET",
+        url: `/atletas/${id}`,
+        headers: await p.como(EMAILS_DEMO.gestor),
+      });
       expect(r.statusCode).toBe(200);
       const f = r.json();
       expect(f.score).toBeCloseTo(g.score, 9);

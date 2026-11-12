@@ -86,7 +86,9 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
         tags: ["ciclos"],
         summary: "Abre um ciclo de avaliação (só um aberto por vez)",
         security: seguranca,
-        body: z.object({ nome: z.string().trim().min(3).max(60), inicio: dataIso, prazo: dataIso }).strict(),
+        body: z
+          .object({ nome: z.string().trim().min(3).max(60), inicio: dataIso, prazo: dataIso })
+          .strict(),
         response: { 201: esquemaCiclo, ...erros, 409: esquemaErro },
       },
     },
@@ -97,8 +99,12 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
       try {
         const ciclo = await app.db.transacao(async (tx) => {
           const aberto = await tx.query(`select 1 from ciclos_avaliacao where status = 'aberto'`);
-          if (aberto.rows.length > 0) throw conflito("Já existe um ciclo aberto. Feche-o antes de abrir outro.");
-          const repetido = await tx.query(`select 1 from ciclos_avaliacao where lower(nome) = lower($1)`, [nome]);
+          if (aberto.rows.length > 0)
+            throw conflito("Já existe um ciclo aberto. Feche-o antes de abrir outro.");
+          const repetido = await tx.query(
+            `select 1 from ciclos_avaliacao where lower(nome) = lower($1)`,
+            [nome],
+          );
           if (repetido.rows.length > 0) throw conflito("Já existe um ciclo com este nome.");
           const r = await tx.query<{ id: string }>(
             `insert into ciclos_avaliacao (nome, inicio, prazo, status) values ($1, $2, $3, 'aberto') returning id`,
@@ -138,9 +144,14 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
       return app.db.transacao(async (tx) => {
         const atual = await buscarCiclo(tx, req.params.id, true);
         if (!atual) throw naoEncontrado("Ciclo não encontrado.");
-        if (atual.status !== "aberto") throw conflito("Só é possível alterar o prazo de um ciclo aberto.");
-        if (req.body.prazo < atual.inicio) throw requisicaoInvalida("O prazo não pode ser anterior ao início.");
-        await tx.query(`update ciclos_avaliacao set prazo = $2 where id = $1`, [atual.id, req.body.prazo]);
+        if (atual.status !== "aberto")
+          throw conflito("Só é possível alterar o prazo de um ciclo aberto.");
+        if (req.body.prazo < atual.inicio)
+          throw requisicaoInvalida("O prazo não pode ser anterior ao início.");
+        await tx.query(`update ciclos_avaliacao set prazo = $2 where id = $1`, [
+          atual.id,
+          req.body.prazo,
+        ]);
         await tx.query(
           `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
            values ($1, 'ajustar_prazo_ciclo', 'ciclo', $2, $3::jsonb, $4)`,

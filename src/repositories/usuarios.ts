@@ -11,7 +11,10 @@ export interface UsuarioRegistro {
   ativo: boolean;
 }
 
-export async function buscarUsuarioPorAuthId(db: Db, authUserId: string): Promise<UsuarioRegistro | null> {
+export async function buscarUsuarioPorAuthId(
+  db: Db,
+  authUserId: string,
+): Promise<UsuarioRegistro | null> {
   const r = await db.query<{
     id: string;
     auth_user_id: string;
@@ -38,8 +41,14 @@ export async function buscarUsuarioPorAuthId(db: Db, authUserId: string): Promis
   };
 }
 
-export async function buscarNomeDoAtleta(db: Db, atletaId: string): Promise<{ id: string; nome: string } | null> {
-  const r = await db.query<{ id: string; nome: string }>(`select id, nome from atletas where id = $1`, [atletaId]);
+export async function buscarNomeDoAtleta(
+  db: Db,
+  atletaId: string,
+): Promise<{ id: string; nome: string } | null> {
+  const r = await db.query<{ id: string; nome: string }>(
+    `select id, nome from atletas where id = $1`,
+    [atletaId],
+  );
   return r.rows[0] ?? null;
 }
 
@@ -47,7 +56,11 @@ export async function buscarNomeDoAtleta(db: Db, atletaId: string): Promise<{ id
  * Grava o auth_user_id no usuário ativo ainda sem login cujo e-mail é o do token.
  * Devolve o usuário vinculado ou null (sem cadastro, ou já vinculado a outro login).
  */
-export async function vincularContaPorEmail(db: Db, authUserId: string, email: string): Promise<UsuarioRegistro | null> {
+export async function vincularContaPorEmail(
+  db: Db,
+  authUserId: string,
+  email: string,
+): Promise<UsuarioRegistro | null> {
   try {
     await db.transacao(async (tx) => {
       const r = await tx.query<{ id: string }>(

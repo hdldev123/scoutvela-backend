@@ -71,22 +71,28 @@ const esquemaParams = z.object({ id: z.uuid() });
 
 const requisicaoInvalida = (m: string) => new ErroApi(400, "requisicao_invalida", m);
 
-const fmtDecimal = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fmtDecimal = (v: number) =>
+  v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** Rejeita indicador inexistente, calculado, tipo R ou repetido. */
 function validarNotas(parametros: Parametros, corpo: Corpo): void {
-  const indicadores = new Map(parametros.pilares.flatMap((p) => p.indicadores).map((i) => [i.id, i]));
+  const indicadores = new Map(
+    parametros.pilares.flatMap((p) => p.indicadores).map((i) => [i.id, i]),
+  );
   const vistos = new Set<string>();
   for (const n of corpo.notas) {
     const ind = indicadores.get(n.indicadorId);
     if (!ind) throw requisicaoInvalida(`Indicador inexistente: ${n.indicadorId}.`);
     if (ind.calculado) {
-      throw requisicaoInvalida(`O indicador ${n.indicadorId} é calculado pelo sistema: informe o peso na medida.`);
+      throw requisicaoInvalida(
+        `O indicador ${n.indicadorId} é calculado pelo sistema: informe o peso na medida.`,
+      );
     }
     if (ind.tipo === "R") {
       throw requisicaoInvalida(`O indicador ${n.indicadorId} é só registro e não recebe nota.`);
     }
-    if (vistos.has(n.indicadorId)) throw requisicaoInvalida(`Indicador repetido no envio: ${n.indicadorId}.`);
+    if (vistos.has(n.indicadorId))
+      throw requisicaoInvalida(`Indicador repetido no envio: ${n.indicadorId}.`);
     vistos.add(n.indicadorId);
   }
 }
@@ -184,7 +190,8 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
         referencia,
       );
       if (!depois) throw naoEncontrado("Atleta não encontrado.");
-      const pilares = (c: ResultadoCalculo) => c.pilares.map((p) => ({ id: p.pilarId, nota: p.nota }));
+      const pilares = (c: ResultadoCalculo) =>
+        c.pilares.map((p) => ({ id: p.pilarId, nota: p.nota }));
       return {
         antes: { ...resumo(antes.calculo), pilares: pilares(antes.calculo) },
         depois: {
@@ -234,7 +241,8 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           `select id from evidencias_anexos where atleta_id = $1::uuid and id = any($2::uuid[])`,
           [base.id, anexoIds],
         );
-        if (ok.rows.length !== anexoIds.length) throw requisicaoInvalida("Anexo inexistente ou de outro atleta.");
+        if (ok.rows.length !== anexoIds.length)
+          throw requisicaoInvalida("Anexo inexistente ou de outro atleta.");
       }
 
       const resultado = await app.db.transacao(async (tx) => {
@@ -266,7 +274,9 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
         if (m) {
           const evidencia =
             m.evidencia ??
-            (m.pesoKg !== undefined ? `Pesagem: ${fmtDecimal(m.pesoKg)} kg` : `Altura: ${fmtDecimal(m.alturaCm ?? 0)} cm`);
+            (m.pesoKg !== undefined
+              ? `Pesagem: ${fmtDecimal(m.pesoKg)} kg`
+              : `Altura: ${fmtDecimal(m.alturaCm ?? 0)} cm`);
           await tx.query(
             `insert into medidas_corporais (atleta_id, peso_kg, altura_cm, medido_em, evidencia, registrado_por)
              values ($1, $2, $3, $4, $5, $6)`,
@@ -284,7 +294,12 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
             JSON.stringify({
               indicadores: body.notas.map((n) => n.indicadorId),
               comAnexo: body.notas.some((n) => n.anexoId),
-              medida: m ? [m.pesoKg !== undefined ? "pesoKg" : null, m.alturaCm !== undefined ? "alturaCm" : null].filter(Boolean) : [],
+              medida: m
+                ? [
+                    m.pesoKg !== undefined ? "pesoKg" : null,
+                    m.alturaCm !== undefined ? "alturaCm" : null,
+                  ].filter(Boolean)
+                : [],
               cicloId,
             }),
             referencia,
@@ -318,7 +333,13 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
             justificativa: z.string().trim().max(500).optional(),
           })
           .strict(),
-        response: { 200: esquemaGates, 400: esquemaErro, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
+        response: {
+          200: esquemaGates,
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+        },
       },
     },
     async (req) => {
@@ -346,7 +367,11 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           [
             usuario.id,
             base.id,
-            JSON.stringify({ gate: body.gate, voltouAoAutomatico: status === null, comJustificativa: !!body.justificativa }),
+            JSON.stringify({
+              gate: body.gate,
+              voltouAoAutomatico: status === null,
+              comJustificativa: !!body.justificativa,
+            }),
             referencia,
           ],
         );

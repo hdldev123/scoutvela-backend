@@ -77,7 +77,13 @@ const config = lerConfig({
   FRONT_URL: ORIGENS[0]!,
 });
 
-const auth = await criarAuthLocal({ db, supabaseUrl: URL_AUTH, jwtSecret, origens: ORIGENS, serviceRoleKey });
+const auth = await criarAuthLocal({
+  db,
+  supabaseUrl: URL_AUTH,
+  jwtSecret,
+  origens: ORIGENS,
+  serviceRoleKey,
+});
 const app = await criarApp({
   db,
   config,

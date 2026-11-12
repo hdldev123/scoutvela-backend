@@ -59,10 +59,15 @@ export interface OpcoesTotp {
   digitos?: number;
 }
 
-const numeroDoPasso = (instanteMs: number, passo: number): number => Math.floor(instanteMs / 1000 / passo);
+const numeroDoPasso = (instanteMs: number, passo: number): number =>
+  Math.floor(instanteMs / 1000 / passo);
 
 /** TOTP (RFC 6238) no instante dado, em milissegundos Unix. */
-export function totp(segredo: Buffer, instanteMs: number, { passo = 30, digitos = 6 }: OpcoesTotp = {}): string {
+export function totp(
+  segredo: Buffer,
+  instanteMs: number,
+  { passo = 30, digitos = 6 }: OpcoesTotp = {},
+): string {
   return hotp(segredo, numeroDoPasso(instanteMs, passo), digitos);
 }
 

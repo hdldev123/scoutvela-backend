@@ -10,7 +10,9 @@ const esquemaFinanceiro = z.object({
   perfilSuporte: z.enum(["A", "B", "C", "D"]),
   mesesAssegurados: z.number().int().nullable(),
   patrocinioPrivado: z.enum(["sim", "em_negociacao", "nao"]).nullable(),
-  componentes: z.array(z.object({ id: z.string(), nome: z.string(), autonomia: z.string(), apoioCbvela: z.string() })),
+  componentes: z.array(
+    z.object({ id: z.string(), nome: z.string(), autonomia: z.string(), apoioCbvela: z.string() }),
+  ),
 });
 
 const esquemaResultado = z.object({
@@ -35,7 +37,9 @@ const esquemaCorpoResultado = z
     linkOficial: z
       .url()
       .max(500)
-      .refine((u) => u.toLowerCase().startsWith("https://"), { message: "O link deve começar com https://." }),
+      .refine((u) => u.toLowerCase().startsWith("https://"), {
+        message: "O link deve começar com https://.",
+      }),
   })
   .strict();
 
@@ -50,7 +54,8 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
       preHandler: [app.autenticar, exigirPapel("gestor")],
       schema: {
         tags: ["campanha"],
-        summary: "Informa o financeiro da campanha e o perfil de suporte (série histórica: só insere)",
+        summary:
+          "Informa o financeiro da campanha e o perfil de suporte (série histórica: só insere)",
         description:
           "Regra provisória P8: o perfil de suporte A a D é informado pelo gestor. Não entra no score; alimenta o gate G4 e o painel de investimento.",
         security: seguranca,
@@ -89,11 +94,16 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
       const ids = body.componentes.map((c) => c.componenteId);
-      if (new Set(ids).size !== ids.length) throw requisicaoInvalida("Componente repetido no envio.");
-      const validos = await app.db.query<{ id: string }>(`select id from componentes_custo where id = any($1::text[])`, [ids]);
+      if (new Set(ids).size !== ids.length)
+        throw requisicaoInvalida("Componente repetido no envio.");
+      const validos = await app.db.query<{ id: string }>(
+        `select id from componentes_custo where id = any($1::text[])`,
+        [ids],
+      );
       const conhecidos = new Set(validos.rows.map((r) => r.id));
       const desconhecido = ids.find((i) => !conhecidos.has(i));
-      if (desconhecido) throw requisicaoInvalida(`Componente de custo inexistente: ${desconhecido}.`);
+      if (desconhecido)
+        throw requisicaoInvalida(`Componente de custo inexistente: ${desconhecido}.`);
 
       return app.db.transacao(async (tx) => {
         // informado_em usa o relógio do banco (como o seed): o último lançamento é o atual.
@@ -114,9 +124,16 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
         await tx.query(
           `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
            values ($1, 'informar_financeiro', 'atleta', $2, $3::jsonb, $4)`,
-          [usuario.id, base.id, JSON.stringify({ financeiroId: String(finId), componentes: ids }), agora],
+          [
+            usuario.id,
+            base.id,
+            JSON.stringify({ financeiroId: String(finId), componentes: ids }),
+            agora,
+          ],
         );
-        const dados = (await carregarDadosAtletas(tx, [base.id], { componentesFinanceiro: true })).get(base.id);
+        const dados = (
+          await carregarDadosAtletas(tx, [base.id], { componentesFinanceiro: true })
+        ).get(base.id);
         const fin = dados?.financeiro;
         if (!fin) throw naoEncontrado("Financeiro não encontrado.");
         return fin;
@@ -149,8 +166,10 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const { usuario, body } = req;
       const agora = app.agora();
-      if (body.posicao > body.tamanhoFrota) throw requisicaoInvalida("A posição não pode passar do tamanho da frota.");
-      if (body.data > dataIso(agora)) throw requisicaoInvalida("A data do resultado não pode ser futura.");
+      if (body.posicao > body.tamanhoFrota)
+        throw requisicaoInvalida("A posição não pode passar do tamanho da frota.");
+      if (body.data > dataIso(agora))
+        throw requisicaoInvalida("A data do resultado não pode ser futura.");
       const base = await buscarAtletaVisivel(app.db, usuario, req.params.id);
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
@@ -159,12 +178,22 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
           `select 1 from resultados_regata where atleta_id = $1 and data = $2 and lower(evento) = lower($3)`,
           [base.id, body.data, body.evento],
         );
-        if (repetido.rows.length > 0) throw conflito("Este resultado já foi lançado para o atleta (mesmo evento e data).");
+        if (repetido.rows.length > 0)
+          throw conflito("Este resultado já foi lançado para o atleta (mesmo evento e data).");
         const r = await tx.query<{ id: string }>(
           `insert into resultados_regata
              (atleta_id, nivel, evento, data, posicao, tamanho_frota, internacional, pontos_cbvela, fonte, link_oficial, registrado_por)
            values ($1, $2, $3, $4, $5, $6, true, null, 'manual', $7, $8) returning id`,
-          [base.id, body.nivel, body.evento, body.data, body.posicao, body.tamanhoFrota, body.linkOficial, usuario.id],
+          [
+            base.id,
+            body.nivel,
+            body.evento,
+            body.data,
+            body.posicao,
+            body.tamanhoFrota,
+            body.linkOficial,
+            usuario.id,
+          ],
         );
         await tx.query(
           `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)

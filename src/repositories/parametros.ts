@@ -1,6 +1,14 @@
 import type { Db } from "../db/db.js";
 import { CODIGOS_REGRAS, ESQUEMAS_REGRAS, type CodigoRegra } from "./regras-esquemas.js";
-import type { Classe, FaixaScore, Parametros, Pilar, Regras, StatusGate, TipoIndicador } from "../domain/tipos.js";
+import type {
+  Classe,
+  FaixaScore,
+  Parametros,
+  Pilar,
+  Regras,
+  StatusGate,
+  TipoIndicador,
+} from "../domain/tipos.js";
 
 type ValorRegra = Record<string, unknown>;
 
@@ -35,12 +43,27 @@ export function regrasDoBanco(linhas: { codigo: string; valor: ValorRegra }[]): 
 
   return {
     p3: { limites: (p3.limites as unknown[]).map((n) => numero(n, "P3", "limites")) },
-    g1: { aptoAte: numero(g1.apto_ate, "G1", "apto_ate"), condicionalAte: numero(g1.condicional_ate, "G1", "condicional_ate") },
+    g1: {
+      aptoAte: numero(g1.apto_ate, "G1", "apto_ate"),
+      condicionalAte: numero(g1.condicional_ate, "G1", "condicional_ate"),
+    },
     g2: {
       mundialAptoAteFracao: numero(g2.mundial_apto_ate_fracao, "G2", "mundial_apto_ate_fracao"),
-      sulAmericanoCondicionalAtePosicao: numero(g2.sul_americano_condicional_ate_posicao, "G2", "sul_americano_condicional_ate_posicao"),
-      mundialCondicionalAteFracao: numero(g2.mundial_condicional_ate_fracao, "G2", "mundial_condicional_ate_fracao"),
-      brasileiroCondicionalAtePosicao: numero(g2.brasileiro_condicional_ate_posicao, "G2", "brasileiro_condicional_ate_posicao"),
+      sulAmericanoCondicionalAtePosicao: numero(
+        g2.sul_americano_condicional_ate_posicao,
+        "G2",
+        "sul_americano_condicional_ate_posicao",
+      ),
+      mundialCondicionalAteFracao: numero(
+        g2.mundial_condicional_ate_fracao,
+        "G2",
+        "mundial_condicional_ate_fracao",
+      ),
+      brasileiroCondicionalAtePosicao: numero(
+        g2.brasileiro_condicional_ate_posicao,
+        "G2",
+        "brasileiro_condicional_ate_posicao",
+      ),
     },
     g3: {
       aptoMinEventos: numero(g3.apto_min_eventos, "G3", "apto_min_eventos"),
@@ -55,14 +78,23 @@ export function regrasDoBanco(linhas: { codigo: string; valor: ValorRegra }[]): 
 /** Carrega do banco tudo o que o cálculo precisa: pilares, indicadores, faixas, classes e regras. */
 export async function carregarParametros(db: Db): Promise<Parametros> {
   const pilaresRows = (
-    await db.query<{ id: string; nome: string; nome_curto: string; peso: string; sensivel: boolean; evidencia_padrao: string }>(
-      "select id, nome, nome_curto, peso, sensivel, evidencia_padrao from pilares order by ordem",
-    )
+    await db.query<{
+      id: string;
+      nome: string;
+      nome_curto: string;
+      peso: string;
+      sensivel: boolean;
+      evidencia_padrao: string;
+    }>("select id, nome, nome_curto, peso, sensivel, evidencia_padrao from pilares order by ordem")
   ).rows;
   const indicadoresRows = (
-    await db.query<{ id: string; pilar_id: string; nome: string; tipo: TipoIndicador; calculado: boolean }>(
-      "select id, pilar_id, nome, tipo, calculado from indicadores order by pilar_id, ordem",
-    )
+    await db.query<{
+      id: string;
+      pilar_id: string;
+      nome: string;
+      tipo: TipoIndicador;
+      calculado: boolean;
+    }>("select id, pilar_id, nome, tipo, calculado from indicadores order by pilar_id, ordem")
   ).rows;
   const faixasRows = (
     await db.query<{ id: string; nome: string; nome_curto: string; score_min: string }>(
@@ -78,9 +110,13 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
       peso_min_kg: string;
       peso_medio_kg: string;
       peso_max_kg: string;
-    }>("select id, nome, evento, posicao, peso_min_kg, peso_medio_kg, peso_max_kg from classes order by ordem")
+    }>(
+      "select id, nome, evento, posicao, peso_min_kg, peso_medio_kg, peso_max_kg from classes order by ordem",
+    )
   ).rows;
-  const regrasRows = (await db.query<{ codigo: string; valor: ValorRegra }>("select codigo, valor from regras")).rows;
+  const regrasRows = (
+    await db.query<{ codigo: string; valor: ValorRegra }>("select codigo, valor from regras")
+  ).rows;
 
   const pilares: Pilar[] = pilaresRows.map((p) => ({
     id: p.id,
@@ -91,7 +127,13 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
     evidenciaPadrao: p.evidencia_padrao,
     indicadores: indicadoresRows
       .filter((i) => i.pilar_id === p.id)
-      .map((i) => ({ id: i.id, pilarId: i.pilar_id, nome: i.nome, tipo: i.tipo, calculado: i.calculado })),
+      .map((i) => ({
+        id: i.id,
+        pilarId: i.pilar_id,
+        nome: i.nome,
+        tipo: i.tipo,
+        calculado: i.calculado,
+      })),
   }));
   const faixas: FaixaScore[] = faixasRows.map((f) => ({
     id: f.id,
@@ -139,7 +181,11 @@ export async function carregarParametrosCompletos(db: Db): Promise<ParametrosCom
     pilares: base.pilares,
     faixas: base.faixas,
     classes: base.classes.map((c) => ({ ...c, ativa: ativaPorId.get(c.id) ?? true })),
-    rubricas: rubricas.rows.map((r) => ({ pilarId: r.pilar_id, nota: r.nota, descricao: r.descricao })),
+    rubricas: rubricas.rows.map((r) => ({
+      pilarId: r.pilar_id,
+      nota: r.nota,
+      descricao: r.descricao,
+    })),
     regras: regras.rows.map((r) => ({
       codigo: r.codigo,
       descricao: r.descricao,
@@ -173,12 +219,17 @@ export class ErroParametros extends Error {}
  * Atualiza pesos, faixas de score, rubricas, regras e classes numa transação e grava uma
  * linha de auditoria com antes e depois de cada bloco (valores de parametrização, não dado pessoal).
  */
-export async function atualizarParametros(db: Db, usuarioId: string, dados: AtualizacaoParametros): Promise<void> {
+export async function atualizarParametros(
+  db: Db,
+  usuarioId: string,
+  dados: AtualizacaoParametros,
+): Promise<void> {
   await db.transacao(async (tx) => {
     const detalhes: Record<string, unknown> = {};
 
     if (dados.pesos) {
-      const atuais = (await tx.query<{ id: string; peso: string }>("select id, peso from pilares")).rows;
+      const atuais = (await tx.query<{ id: string; peso: string }>("select id, peso from pilares"))
+        .rows;
       const antes: Record<string, number> = {};
       for (const p of atuais) antes[p.id] = Number(p.peso);
       const ids = Object.keys(antes).sort();
@@ -196,20 +247,34 @@ export async function atualizarParametros(db: Db, usuarioId: string, dados: Atua
     }
 
     if (dados.faixas) {
-      const atuais = (await tx.query<{ id: string; score_min: string }>("select id, score_min from faixas_score order by ordem")).rows;
+      const atuais = (
+        await tx.query<{ id: string; score_min: string }>(
+          "select id, score_min from faixas_score order by ordem",
+        )
+      ).rows;
       const enviadas = new Map(dados.faixas.map((f) => [f.id, f.scoreMin]));
-      if (enviadas.size !== dados.faixas.length || enviadas.size !== atuais.length || atuais.some((f) => !enviadas.has(f.id))) {
+      if (
+        enviadas.size !== dados.faixas.length ||
+        enviadas.size !== atuais.length ||
+        atuais.some((f) => !enviadas.has(f.id))
+      ) {
         throw new ErroParametros("Informe o score mínimo de todas as faixas, e só delas.");
       }
       const valores = atuais.map((f) => enviadas.get(f.id) as number);
       if (valores.some((v, i) => i > 0 && v >= (valores[i - 1] as number))) {
-        throw new ErroParametros("Os scores mínimos das faixas precisam ser estritamente decrescentes.");
+        throw new ErroParametros(
+          "Os scores mínimos das faixas precisam ser estritamente decrescentes.",
+        );
       }
-      if (valores[valores.length - 1] !== 0) throw new ErroParametros("A última faixa precisa começar em 0.");
+      if (valores[valores.length - 1] !== 0)
+        throw new ErroParametros("A última faixa precisa começar em 0.");
       const antes: Record<string, number> = {};
       for (const f of atuais) {
         antes[f.id] = Number(f.score_min);
-        await tx.query("update faixas_score set score_min = $1 where id = $2", [enviadas.get(f.id), f.id]);
+        await tx.query("update faixas_score set score_min = $1 where id = $2", [
+          enviadas.get(f.id),
+          f.id,
+        ]);
       }
       detalhes.faixas = { antes, depois: Object.fromEntries(enviadas) };
     }
@@ -219,26 +284,33 @@ export async function atualizarParametros(db: Db, usuarioId: string, dados: Atua
       const antes: { pilarId: string | null; nota: number; descricao: string | null }[] = [];
       for (const r of dados.rubricas) {
         const chave = `${r.pilarId ?? ""}|${r.nota}`;
-        if (chaves.has(chave)) throw new ErroParametros("Rubrica repetida para o mesmo pilar e nota.");
+        if (chaves.has(chave))
+          throw new ErroParametros("Rubrica repetida para o mesmo pilar e nota.");
         chaves.add(chave);
-        if (r.pilarId !== null && (await tx.query("select 1 from pilares where id = $1", [r.pilarId])).rows.length === 0) {
+        if (
+          r.pilarId !== null &&
+          (await tx.query("select 1 from pilares where id = $1", [r.pilarId])).rows.length === 0
+        ) {
           throw new ErroParametros(`Pilar desconhecido: ${r.pilarId}.`);
         }
         const atual = (
-          await tx.query<{ descricao: string }>("select descricao from rubricas where pilar_id is not distinct from $1 and nota = $2", [
-            r.pilarId,
-            r.nota,
-          ])
+          await tx.query<{ descricao: string }>(
+            "select descricao from rubricas where pilar_id is not distinct from $1 and nota = $2",
+            [r.pilarId, r.nota],
+          )
         ).rows[0];
         antes.push({ pilarId: r.pilarId, nota: r.nota, descricao: atual?.descricao ?? null });
         if (atual) {
-          await tx.query("update rubricas set descricao = $3 where pilar_id is not distinct from $1 and nota = $2", [
+          await tx.query(
+            "update rubricas set descricao = $3 where pilar_id is not distinct from $1 and nota = $2",
+            [r.pilarId, r.nota, r.descricao],
+          );
+        } else {
+          await tx.query("insert into rubricas (pilar_id, nota, descricao) values ($1, $2, $3)", [
             r.pilarId,
             r.nota,
             r.descricao,
           ]);
-        } else {
-          await tx.query("insert into rubricas (pilar_id, nota, descricao) values ($1, $2, $3)", [r.pilarId, r.nota, r.descricao]);
         }
       }
       detalhes.rubricas = { antes, depois: dados.rubricas };
@@ -248,22 +320,26 @@ export async function atualizarParametros(db: Db, usuarioId: string, dados: Atua
       const antes: Record<string, unknown> = {};
       const depois: Record<string, unknown> = {};
       for (const [codigo, valor] of Object.entries(dados.regras)) {
-        if (!(CODIGOS_REGRAS as string[]).includes(codigo)) throw new ErroParametros(`Regra desconhecida: ${codigo}.`);
+        if (!(CODIGOS_REGRAS as string[]).includes(codigo))
+          throw new ErroParametros(`Regra desconhecida: ${codigo}.`);
         const parsed = ESQUEMAS_REGRAS[codigo as CodigoRegra].safeParse(valor);
         if (!parsed.success) {
           const problema = parsed.error.issues[0];
           const onde = problema?.path.length ? ` (${problema.path.join(".")})` : "";
-          throw new ErroParametros(`Regra ${codigo} inválida${onde}: ${problema?.message ?? "valor incorreto"}.`);
+          throw new ErroParametros(
+            `Regra ${codigo} inválida${onde}: ${problema?.message ?? "valor incorreto"}.`,
+          );
         }
-        const atual = (await tx.query<{ valor: unknown }>("select valor from regras where codigo = $1", [codigo])).rows[0];
+        const atual = (
+          await tx.query<{ valor: unknown }>("select valor from regras where codigo = $1", [codigo])
+        ).rows[0];
         if (!atual) throw new ErroParametros(`Regra desconhecida: ${codigo}.`);
         antes[codigo] = atual.valor;
         depois[codigo] = parsed.data;
-        await tx.query("update regras set valor = $2::jsonb, atualizado_em = now(), atualizado_por = $3 where codigo = $1", [
-          codigo,
-          JSON.stringify(parsed.data),
-          usuarioId,
-        ]);
+        await tx.query(
+          "update regras set valor = $2::jsonb, atualizado_em = now(), atualizado_por = $3 where codigo = $1",
+          [codigo, JSON.stringify(parsed.data), usuarioId],
+        );
       }
       detalhes.regras = { antes, depois };
     }
@@ -278,35 +354,53 @@ export async function atualizarParametros(db: Db, usuarioId: string, dados: Atua
         if (!comFaixa && faixaInformada.some((v) => v !== undefined)) {
           throw new ErroParametros(`Classe ${c.id}: informe peso mínimo, médio e máximo juntos.`);
         }
-        if (!comFaixa && c.ativa === undefined) throw new ErroParametros(`Classe ${c.id}: nada para alterar.`);
+        if (!comFaixa && c.ativa === undefined)
+          throw new ErroParametros(`Classe ${c.id}: nada para alterar.`);
         if (comFaixa && !(min <= medio && medio <= max)) {
-          throw new ErroParametros("Em cada classe, o peso mínimo não pode passar da média, nem a média do máximo.");
+          throw new ErroParametros(
+            "Em cada classe, o peso mínimo não pode passar da média, nem a média do máximo.",
+          );
         }
         const atual = (
-          await tx.query<{ peso_min_kg: string; peso_medio_kg: string; peso_max_kg: string; ativa: boolean }>(
-            "select peso_min_kg, peso_medio_kg, peso_max_kg, ativa from classes where id = $1",
-            [c.id],
-          )
+          await tx.query<{
+            peso_min_kg: string;
+            peso_medio_kg: string;
+            peso_max_kg: string;
+            ativa: boolean;
+          }>("select peso_min_kg, peso_medio_kg, peso_max_kg, ativa from classes where id = $1", [
+            c.id,
+          ])
         ).rows[0];
         if (!atual) throw new ErroParametros(`Classe desconhecida: ${c.id}.`);
         if (c.ativa === false && atual.ativa) {
-          const emUso = await tx.query("select 1 from atletas where classe_id = $1 and ativo limit 1", [c.id]);
+          const emUso = await tx.query(
+            "select 1 from atletas where classe_id = $1 and ativo limit 1",
+            [c.id],
+          );
           if (emUso.rows.length > 0) {
-            throw new ErroParametros(`Não dá para desativar a classe ${c.id}: há atleta ativo nela. Mude o atleta de classe antes.`);
+            throw new ErroParametros(
+              `Não dá para desativar a classe ${c.id}: há atleta ativo nela. Mude o atleta de classe antes.`,
+            );
           }
         }
-        const pesoAtual = [Number(atual.peso_min_kg), Number(atual.peso_medio_kg), Number(atual.peso_max_kg)];
+        const pesoAtual = [
+          Number(atual.peso_min_kg),
+          Number(atual.peso_medio_kg),
+          Number(atual.peso_max_kg),
+        ];
         antes[c.id] = { pesoKg: pesoAtual, ativa: atual.ativa };
-        depois[c.id] = { pesoKg: comFaixa ? [min, medio, max] : pesoAtual, ativa: c.ativa ?? atual.ativa };
+        depois[c.id] = {
+          pesoKg: comFaixa ? [min, medio, max] : pesoAtual,
+          ativa: c.ativa ?? atual.ativa,
+        };
         if (comFaixa) {
-          await tx.query("update classes set peso_min_kg = $1, peso_medio_kg = $2, peso_max_kg = $3 where id = $4", [
-            min,
-            medio,
-            max,
-            c.id,
-          ]);
+          await tx.query(
+            "update classes set peso_min_kg = $1, peso_medio_kg = $2, peso_max_kg = $3 where id = $4",
+            [min, medio, max, c.id],
+          );
         }
-        if (c.ativa !== undefined) await tx.query("update classes set ativa = $1 where id = $2", [c.ativa, c.id]);
+        if (c.ativa !== undefined)
+          await tx.query("update classes set ativa = $1 where id = $2", [c.ativa, c.id]);
       }
       detalhes.classes = { antes, depois };
     }

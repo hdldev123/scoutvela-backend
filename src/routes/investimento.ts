@@ -23,7 +23,9 @@ const esquemaInvestimento = z.object({
     aptos: z.number().int().describe("Aptos nos 4 gates"),
     dependentesApoio: z.number().int().describe("Perfil de suporte C ou D"),
   }),
-  funil: z.array(z.object({ faixa: z.object({ id: z.string(), nome: z.string() }), n: z.number().int() })),
+  funil: z.array(
+    z.object({ faixa: z.object({ id: z.string(), nome: z.string() }), n: z.number().int() }),
+  ),
   gates: z.array(
     z.object({
       gate: z.number().int(),
@@ -38,18 +40,28 @@ const esquemaInvestimento = z.object({
   ),
   ondeInvestir: z.array(
     z.object({
-      atleta: z.object({ id: z.string(), nome: z.string(), classe: z.object({ nome: z.string() }) }),
+      atleta: z.object({
+        id: z.string(),
+        nome: z.string(),
+        classe: z.object({ nome: z.string() }),
+      }),
       score: z.number(),
       statusGates: z.enum(["apto", "condicional", "nao_prioritario"]),
       perfilSuporte: z.enum(["C", "D"]),
-      mesesAssegurados: z.number().int().nullable().describe("Nulo para o IBVAR (vê só o perfil A–D)"),
+      mesesAssegurados: z
+        .number()
+        .int()
+        .nullable()
+        .describe("Nulo para o IBVAR (vê só o perfil A–D)"),
     }),
   ),
   ocultosSemConsentimento: z
     .number()
     .int()
     .nullable()
-    .describe("Só para o IBVAR: atletas do recorte 'Onde investir' que ficaram fora da lista; nulo para o gestor"),
+    .describe(
+      "Só para o IBVAR: atletas do recorte 'Onde investir' que ficaram fora da lista; nulo para o gestor",
+    ),
 });
 
 export async function rotasInvestimento(app: FastifyInstance): Promise<void> {
@@ -69,7 +81,10 @@ export async function rotasInvestimento(app: FastifyInstance): Promise<void> {
     async (req) => {
       const ibvar = req.usuario.papel === "ibvar";
       const referencia = app.agora();
-      const [parametros, ciclo] = await Promise.all([carregarParametros(app.db), cicloAberto(app.db)]);
+      const [parametros, ciclo] = await Promise.all([
+        carregarParametros(app.db),
+        cicloAberto(app.db),
+      ]);
 
       // Base dos agregados: todo o piloto (o IBVAR só recebe números, nunca a linha de quem não consentiu).
       const todos = await listarAtletasVisiveis(
@@ -116,10 +131,24 @@ export async function rotasInvestimento(app: FastifyInstance): Promise<void> {
       const f2 = parametros.faixas.find((f) => f.id === "f2");
       const corte = f2 ? f2.scoreMin : Number.POSITIVE_INFINITY;
       const alvo = avaliados
-        .filter((x) => x.calculo.score >= corte && x.calculo.statusFinal !== "nao_prioritario" && dependeDeApoio(x))
-        .sort((a, b) => b.calculo.score - a.calculo.score || a.atleta.nome.localeCompare(b.atleta.nome, "pt-BR"));
+        .filter(
+          (x) =>
+            x.calculo.score >= corte &&
+            x.calculo.statusFinal !== "nao_prioritario" &&
+            dependeDeApoio(x),
+        )
+        .sort(
+          (a, b) =>
+            b.calculo.score - a.calculo.score ||
+            a.atleta.nome.localeCompare(b.atleta.nome, "pt-BR"),
+        );
 
-      const consentiram = ibvar ? await idsComConsentimentoIbvar(app.db, alvo.map((x) => x.atleta.id)) : null;
+      const consentiram = ibvar
+        ? await idsComConsentimentoIbvar(
+            app.db,
+            alvo.map((x) => x.atleta.id),
+          )
+        : null;
       const visiveis = consentiram ? alvo.filter((x) => consentiram.has(x.atleta.id)) : alvo;
 
       return {

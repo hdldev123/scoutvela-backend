@@ -1,11 +1,29 @@
 import { describe, expect, it } from "vitest";
-import { base32Codificar, base32Decodificar, hotp, novoSegredoTotp, totp, verificarTotp } from "../../dev/totp.js";
+import {
+  base32Codificar,
+  base32Decodificar,
+  hotp,
+  novoSegredoTotp,
+  totp,
+  verificarTotp,
+} from "../../dev/totp.js";
 
 const SEGREDO = Buffer.from("12345678901234567890", "ascii");
 
 describe("HOTP (RFC 4226)", () => {
   it("bate com os vetores do apêndice D", () => {
-    const esperado = ["755224", "287082", "359152", "969429", "338314", "254676", "287922", "162583", "399871", "520489"];
+    const esperado = [
+      "755224",
+      "287082",
+      "359152",
+      "969429",
+      "338314",
+      "254676",
+      "287922",
+      "162583",
+      "399871",
+      "520489",
+    ];
     esperado.forEach((codigo, i) => expect(hotp(SEGREDO, i)).toBe(codigo));
   });
 });

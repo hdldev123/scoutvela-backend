@@ -11,7 +11,8 @@ import { conflito, esquemaErro, naoEncontrado } from "../erros.js";
  * porque a série histórica só aceita inserção.
  */
 
-const iso = (v: unknown): string => (v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString());
+const iso = (v: unknown): string =>
+  v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString();
 
 const tiposPedido = ["acesso", "correcao", "exclusao", "revogacao"] as const;
 
@@ -32,13 +33,19 @@ const esquemaExportacao = z.object({
   geradoEm: z.string(),
   conta: z.object({ nome: z.string(), email: z.string(), papel: z.string() }),
   atleta: z.record(z.string(), z.unknown()),
-  consentimentos: registros.describe("Histórico de decisões (termo do piloto e compartilhamento com o IBVAR)"),
-  notas: registros.describe("Série histórica: valor, evidência, data e avaliador de cada lançamento"),
+  consentimentos: registros.describe(
+    "Histórico de decisões (termo do piloto e compartilhamento com o IBVAR)",
+  ),
+  notas: registros.describe(
+    "Série histórica: valor, evidência, data e avaliador de cada lançamento",
+  ),
   respostas: registros.describe("Respostas do questionário (série histórica)"),
   medidas: registros,
   resultados: registros,
   gates: registros.describe("Decisões do gestor sobre os gates"),
-  financeiro: registros.describe("Histórico do financeiro da campanha, com os componentes de cada lançamento"),
+  financeiro: registros.describe(
+    "Histórico do financeiro da campanha, com os componentes de cada lançamento",
+  ),
   pedidosRevisao: registros,
   pedidosTitular: registros,
 });
@@ -107,72 +114,83 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
       const id = usuario.atletaId;
       const q = <T>(sql: string) => app.db.query<T>(sql, [id]).then((r) => r.rows);
 
-      const [cadastro, consentimentos, notas, respostas, medidas, resultados, gates, financeiro, componentes, revisoes, pedidos] =
-        await Promise.all([
-          q<Record<string, unknown>>(
-            `select a.velaid_codigo as "velaid", a.nome, a.genero, a.data_nascimento::text as "dataNascimento",
+      const [
+        cadastro,
+        consentimentos,
+        notas,
+        respostas,
+        medidas,
+        resultados,
+        gates,
+        financeiro,
+        componentes,
+        revisoes,
+        pedidos,
+      ] = await Promise.all([
+        q<Record<string, unknown>>(
+          `select a.velaid_codigo as "velaid", a.nome, a.genero, a.data_nascimento::text as "dataNascimento",
                     c.nome as classe, c.evento as "classeEvento", a.clube, a.cidade, a.uf, a.numero_vela as "numeroVela",
                     a.ws_id as "wsId", a.email_contato as "emailContato", t.nome as treinador, a.ativo,
                     a.criado_em as "criadoEm"
                from atletas a join classes c on c.id = a.classe_id left join usuarios t on t.id = a.treinador_id
               where a.id = $1::uuid`,
-          ),
-          q<Record<string, unknown>>(
-            `select tipo, concedido, versao_termo as "versaoTermo", registrado_em as "registradoEm"
+        ),
+        q<Record<string, unknown>>(
+          `select tipo, concedido, versao_termo as "versaoTermo", registrado_em as "registradoEm"
                from consentimentos where atleta_id = $1::uuid order by registrado_em, id`,
-          ),
-          q<Record<string, unknown>>(
-            `select i.nome as indicador, n.valor, n.evidencia, n.origem, u.nome as avaliador,
+        ),
+        q<Record<string, unknown>>(
+          `select i.nome as indicador, n.valor, n.evidencia, n.origem, u.nome as avaliador,
                     ci.nome as ciclo, n.lancado_em as "lancadoEm"
                from avaliacoes n join indicadores i on i.id = n.indicador_id
                left join usuarios u on u.id = n.avaliador_id
                left join ciclos_avaliacao ci on ci.id = n.ciclo_id
               where n.atleta_id = $1::uuid order by n.lancado_em, n.id`,
-          ),
-          q<Record<string, unknown>>(
-            `select i.nome as indicador, r.resposta, r.respondido_em as "respondidoEm"
+        ),
+        q<Record<string, unknown>>(
+          `select i.nome as indicador, r.resposta, r.respondido_em as "respondidoEm"
                from respostas_atleta r join indicadores i on i.id = r.indicador_id
               where r.atleta_id = $1::uuid order by r.respondido_em, r.id`,
-          ),
-          q<Record<string, unknown>>(
-            `select m.peso_kg::float8 as "pesoKg", m.altura_cm::float8 as "alturaCm", m.medido_em as "medidoEm",
+        ),
+        q<Record<string, unknown>>(
+          `select m.peso_kg::float8 as "pesoKg", m.altura_cm::float8 as "alturaCm", m.medido_em as "medidoEm",
                     m.evidencia, u.nome as "registradoPor"
                from medidas_corporais m join usuarios u on u.id = m.registrado_por
               where m.atleta_id = $1::uuid order by m.medido_em, m.id`,
-          ),
-          q<Record<string, unknown>>(
-            `select data::text as data, nivel, evento, posicao, tamanho_frota as "tamanhoFrota", internacional,
+        ),
+        q<Record<string, unknown>>(
+          `select data::text as data, nivel, evento, posicao, tamanho_frota as "tamanhoFrota", internacional,
                     pontos_cbvela::float8 as "pontosCbvela", fonte, link_oficial as "linkOficial"
                from resultados_regata where atleta_id = $1::uuid order by data, id`,
-          ),
-          q<Record<string, unknown>>(
-            `select g.gate, g.status, g.justificativa, u.nome as "decididoPor", g.decidido_em as "decididoEm"
+        ),
+        q<Record<string, unknown>>(
+          `select g.gate, g.status, g.justificativa, u.nome as "decididoPor", g.decidido_em as "decididoEm"
                from gates_decisoes g join usuarios u on u.id = g.decidido_por
               where g.atleta_id = $1::uuid order by g.decidido_em, g.id`,
-          ),
-          q<Record<string, unknown> & { id: string }>(
-            `select f.id::text as id, f.perfil_suporte as "perfilSuporte", f.meses_assegurados as "mesesAssegurados",
+        ),
+        q<Record<string, unknown> & { id: string }>(
+          `select f.id::text as id, f.perfil_suporte as "perfilSuporte", f.meses_assegurados as "mesesAssegurados",
                     f.patrocinio_privado as "patrocinioPrivado", u.nome as "informadoPor", f.informado_em as "informadoEm"
                from financeiro_campanha f join usuarios u on u.id = f.informado_por
               where f.atleta_id = $1::uuid order by f.informado_em, f.id`,
-          ),
-          q<{ financeiro_id: string; nome: string; autonomia: string; apoio_cbvela: string }>(
-            `select fc.financeiro_id::text as financeiro_id, c.nome, fc.autonomia, fc.apoio_cbvela
+        ),
+        q<{ financeiro_id: string; nome: string; autonomia: string; apoio_cbvela: string }>(
+          `select fc.financeiro_id::text as financeiro_id, c.nome, fc.autonomia, fc.apoio_cbvela
                from financeiro_componentes fc
                join financeiro_campanha f on f.id = fc.financeiro_id
                join componentes_custo c on c.id = fc.componente_id
               where f.atleta_id = $1::uuid order by c.ordem`,
-          ),
-          q<Record<string, unknown>>(
-            `select r.pilar_id as "pilarId", r.indicador_id as "indicadorId", r.motivo, r.status, r.resposta,
+        ),
+        q<Record<string, unknown>>(
+          `select r.pilar_id as "pilarId", r.indicador_id as "indicadorId", r.motivo, r.status, r.resposta,
                     r.criado_em as "criadoEm", r.respondido_em as "respondidoEm"
                from pedidos_revisao r where r.atleta_id = $1::uuid order by r.criado_em, r.id`,
-          ),
-          q<Record<string, unknown>>(
-            `select tipo, descricao, status, resposta, criado_em as "criadoEm", respondido_em as "respondidoEm"
+        ),
+        q<Record<string, unknown>>(
+          `select tipo, descricao, status, resposta, criado_em as "criadoEm", respondido_em as "respondidoEm"
                from pedidos_titular where atleta_id = $1::uuid order by criado_em, id`,
-          ),
-        ]);
+        ),
+      ]);
       if (!cadastro[0]) throw naoEncontrado("Atleta não encontrado.");
 
       const financeiroComComponentes = financeiro.map(({ id: fid, ...resto }) => ({
@@ -213,7 +231,11 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         security: seguranca,
         body: z.object({
           tipo: z.enum(tiposPedido),
-          descricao: z.string().trim().min(10, "A descrição precisa ter ao menos 10 caracteres.").max(2000),
+          descricao: z
+            .string()
+            .trim()
+            .min(10, "A descrição precisa ter ao menos 10 caracteres.")
+            .max(2000),
         }),
         response: {
           201: z.object({ id: z.string(), status: z.literal("aberto") }),
@@ -279,7 +301,13 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           "Registra a resposta e fecha o pedido. A exclusão de dados NÃO é feita por esta rota: é procedimento manual do gestor, porque a série histórica (notas, respostas, medidas, gates, financeiro) só aceita inserção. Pedido já respondido devolve 409 (código requisicao_invalida).",
         security: seguranca,
         params: z.object({ id: z.string().regex(/^\d{1,18}$/, "Identificador inválido.") }),
-        body: z.object({ resposta: z.string().trim().min(3, "A resposta precisa ter ao menos 3 caracteres.").max(2000) }),
+        body: z.object({
+          resposta: z
+            .string()
+            .trim()
+            .min(3, "A resposta precisa ter ao menos 3 caracteres.")
+            .max(2000),
+        }),
         response: {
           200: esquemaPedido,
           400: esquemaErro,
@@ -302,7 +330,9 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           [id, req.body.resposta, usuario.id, app.agora()],
         );
         if (r.rows.length === 0) {
-          const existe = await tx.query(`select 1 from pedidos_titular where id = $1::bigint`, [id]);
+          const existe = await tx.query(`select 1 from pedidos_titular where id = $1::bigint`, [
+            id,
+          ]);
           if (existe.rows.length === 0) throw naoEncontrado("Pedido não encontrado.");
           throw conflito("Este pedido já foi respondido.");
         }

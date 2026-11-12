@@ -14,7 +14,10 @@ const fmtDelta = (d: number) => (d >= 0 ? "+" : "−") + fmt1(Math.abs(d)) + " k
 
 export function gatesAutomaticos(
   parametros: Parametros,
-  entrada: Pick<EntradaCalculo, "classe" | "pesoKg" | "resultados" | "perfilSuporte" | "referencia">,
+  entrada: Pick<
+    EntradaCalculo,
+    "classe" | "pesoKg" | "resultados" | "perfilSuporte" | "referencia"
+  >,
 ): SugestaoGate[] {
   const { g1: r1, g2: r2, g3: r3, g4: r4 } = parametros.regras;
 
@@ -24,10 +27,23 @@ export function gatesAutomaticos(
   } else {
     const { deltaKg, distanciaRelativa: rel } = distanciaClassFit(entrada.pesoKg, entrada.classe);
     if (rel <= r1.aptoAte)
-      g1 = { gate: 1, status: "apto", motivo: `Dentro da faixa da classe (${fmtDelta(deltaKg)} da média)` };
+      g1 = {
+        gate: 1,
+        status: "apto",
+        motivo: `Dentro da faixa da classe (${fmtDelta(deltaKg)} da média)`,
+      };
     else if (rel <= r1.condicionalAte)
-      g1 = { gate: 1, status: "condicional", motivo: `Leve desvio: ${fmtDelta(deltaKg)} da média da classe` };
-    else g1 = { gate: 1, status: "alerta", motivo: `Fora da faixa: ${fmtDelta(deltaKg)} da média da classe` };
+      g1 = {
+        gate: 1,
+        status: "condicional",
+        motivo: `Leve desvio: ${fmtDelta(deltaKg)} da média da classe`,
+      };
+    else
+      g1 = {
+        gate: 1,
+        status: "alerta",
+        motivo: `Fora da faixa: ${fmtDelta(deltaKg)} da média da classe`,
+      };
   }
 
   // Mais recente primeiro: find pega o resultado mais recente de cada nível.
@@ -38,32 +54,50 @@ export function gatesAutomaticos(
   const bras = ordenados.find((r) => r.nivel === "brasileiro");
   let g2: SugestaoGate;
   if (mund && mund.posicao / mund.tamanhoFrota <= r2.mundialAptoAteFracao)
-    g2 = { gate: 2, status: "apto", motivo: `${mund.posicao}º de ${mund.tamanhoFrota} no Mundial da classe` };
+    g2 = {
+      gate: 2,
+      status: "apto",
+      motivo: `${mund.posicao}º de ${mund.tamanhoFrota} no Mundial da classe`,
+    };
   else if (sul && sul.posicao <= r2.sulAmericanoCondicionalAtePosicao)
     g2 = { gate: 2, status: "condicional", motivo: `${sul.posicao}º no Sul-Americano` };
   else if (mund && mund.posicao / mund.tamanhoFrota <= r2.mundialCondicionalAteFracao)
-    g2 = { gate: 2, status: "condicional", motivo: `${mund.posicao}º de ${mund.tamanhoFrota} no Mundial` };
+    g2 = {
+      gate: 2,
+      status: "condicional",
+      motivo: `${mund.posicao}º de ${mund.tamanhoFrota} no Mundial`,
+    };
   else if (bras && bras.posicao <= r2.brasileiroCondicionalAtePosicao)
     g2 = {
       gate: 2,
       status: "condicional",
       motivo: `${bras.posicao}º no Brasileiro${internacionais.length ? ", com experiência internacional" : ""}`,
     };
-  else g2 = { gate: 2, status: "alerta", motivo: "Sem evidência relevante fora do circuito nacional" };
+  else
+    g2 = { gate: 2, status: "alerta", motivo: "Sem evidência relevante fora do circuito nacional" };
 
   const fim = dataIso(entrada.referencia);
   const inicio = menosMeses(fim, r3.janelaMeses);
   const n = internacionais.filter((r) => naJanela(r.data, inicio, fim)).length;
   let g3: SugestaoGate;
   if (n >= r3.aptoMinEventos)
-    g3 = { gate: 3, status: "apto", motivo: `${n} eventos internacionais em ${r3.janelaMeses} meses` };
+    g3 = {
+      gate: 3,
+      status: "apto",
+      motivo: `${n} eventos internacionais em ${r3.janelaMeses} meses`,
+    };
   else if (n >= r3.condicionalMinEventos)
     g3 = {
       gate: 3,
       status: "condicional",
       motivo: `${n} ${n > 1 ? "eventos internacionais" : "evento internacional"} em ${r3.janelaMeses} meses`,
     };
-  else g3 = { gate: 3, status: "alerta", motivo: `Nenhum evento internacional em ${r3.janelaMeses} meses` };
+  else
+    g3 = {
+      gate: 3,
+      status: "alerta",
+      motivo: `Nenhum evento internacional em ${r3.janelaMeses} meses`,
+    };
 
   const g4: SugestaoGate = entrada.perfilSuporte
     ? { gate: 4, ...r4[entrada.perfilSuporte] }

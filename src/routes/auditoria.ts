@@ -16,11 +16,20 @@ const esquemaConsulta = z.object({
   entidade: z.string().min(1).max(60).optional(),
   acao: z.string().min(1).max(60).optional(),
   usuarioId: z.uuid("usuarioId inválido.").optional(),
-  atletaId: z.string().min(1).max(64).optional().describe("Identificador da entidade afetada (entidade_id), em geral o atleta"),
+  atletaId: z
+    .string()
+    .min(1)
+    .max(64)
+    .optional()
+    .describe("Identificador da entidade afetada (entidade_id), em geral o atleta"),
   desde: dataIso.optional().describe("AAAA-MM-DD, a partir das 00:00 de Brasília"),
   ate: dataIso.optional().describe("AAAA-MM-DD, até o fim do dia em Brasília"),
   limite: z.coerce.number().int().min(1).max(200).default(50),
-  antesDe: z.string().regex(/^\d{1,18}$/, "Cursor inválido.").optional().describe("id do último item da página anterior"),
+  antesDe: z
+    .string()
+    .regex(/^\d{1,18}$/, "Cursor inválido.")
+    .optional()
+    .describe("id do último item da página anterior"),
 });
 
 const esquemaResposta = z.object({
@@ -62,7 +71,8 @@ export async function rotasAuditoria(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ["auditoria"],
         summary: "Trilha de auditoria (só gestor), do mais novo para o mais antigo",
-        description: "Filtros opcionais combinados com E. Paginação por cursor: use `proximo` em `antesDe`.",
+        description:
+          "Filtros opcionais combinados com E. Paginação por cursor: use `proximo` em `antesDe`.",
         security: [{ bearerAuth: [] }],
         querystring: esquemaConsulta,
         response: { 200: esquemaResposta, 400: esquemaErro, 401: esquemaErro, 403: esquemaErro },
@@ -100,7 +110,9 @@ export async function rotasAuditoria(app: FastifyInstance): Promise<void> {
         itens: pagina.map((l) => ({
           id: l.id,
           em: new Date(l.em).toISOString(),
-          usuario: l.usuario_id ? { id: l.usuario_id, nome: l.usuario_nome ?? "", papel: l.usuario_papel ?? "" } : null,
+          usuario: l.usuario_id
+            ? { id: l.usuario_id, nome: l.usuario_nome ?? "", papel: l.usuario_papel ?? "" }
+            : null,
           acao: l.acao,
           entidade: l.entidade,
           entidadeId: l.entidade_id,

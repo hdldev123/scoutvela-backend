@@ -73,7 +73,11 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
         params,
         body: z
           .object({
-            nomeArquivo: z.string().min(1).max(200).refine(nomeArquivoValido, "Nome de arquivo inválido."),
+            nomeArquivo: z
+              .string()
+              .min(1)
+              .max(200)
+              .refine(nomeArquivoValido, "Nome de arquivo inválido."),
             tipoMime: z.enum(["application/pdf", "image/jpeg", "image/png"]),
             conteudoBase64: z.string().min(4).max(BASE64_MAXIMO),
             indicadorId: z.string().min(1).max(64).optional(),
@@ -88,7 +92,10 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
       const base = await buscarAtletaVisivel(app.db, usuario, req.params.id);
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
-      if (!/^[A-Za-z0-9+/]+={0,2}$/.test(body.conteudoBase64) || body.conteudoBase64.length % 4 !== 0) {
+      if (
+        !/^[A-Za-z0-9+/]+={0,2}$/.test(body.conteudoBase64) ||
+        body.conteudoBase64.length % 4 !== 0
+      ) {
         throw requisicaoInvalida("Conteúdo do arquivo inválido.");
       }
       const bytes = Buffer.from(body.conteudoBase64, "base64");
@@ -100,8 +107,11 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
       }
 
       if (body.indicadorId) {
-        const ind = await app.db.query(`select 1 from indicadores where id = $1`, [body.indicadorId]);
-        if (ind.rows.length === 0) throw requisicaoInvalida(`Indicador inexistente: ${body.indicadorId}.`);
+        const ind = await app.db.query(`select 1 from indicadores where id = $1`, [
+          body.indicadorId,
+        ]);
+        if (ind.rows.length === 0)
+          throw requisicaoInvalida(`Indicador inexistente: ${body.indicadorId}.`);
       }
 
       const caminho = `${base.id}/${randomUUID()}.${tipo.ext}`;
@@ -119,7 +129,17 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
              (atleta_id, indicador_id, nome_arquivo, tipo_mime, tamanho_bytes, caminho, sha256, enviado_por, enviado_em)
            values ($1, $2, $3, $4, $5, $6, $7, $8, $9)
            returning ${COLUNAS}`,
-          [base.id, body.indicadorId ?? null, body.nomeArquivo, body.tipoMime, bytes.length, caminho, sha256, usuario.id, referencia],
+          [
+            base.id,
+            body.indicadorId ?? null,
+            body.nomeArquivo,
+            body.tipoMime,
+            bytes.length,
+            caminho,
+            sha256,
+            usuario.id,
+            referencia,
+          ],
         );
         const linha = r.rows[0]!;
         // Auditoria sem o nome do arquivo: só id, tipo e tamanho.
@@ -129,7 +149,12 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
           [
             usuario.id,
             base.id,
-            JSON.stringify({ anexoId: linha.id, tipoMime: body.tipoMime, tamanhoBytes: bytes.length, indicadorId: body.indicadorId ?? null }),
+            JSON.stringify({
+              anexoId: linha.id,
+              tipoMime: body.tipoMime,
+              tamanhoBytes: bytes.length,
+              indicadorId: body.indicadorId ?? null,
+            }),
             referencia,
           ],
         );
@@ -148,7 +173,8 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ["evidencias"],
         summary: "Lista as evidências anexadas ao atleta (mais recentes primeiro)",
-        description: "Gestor, treinador dos próprios atletas e o próprio atleta. IBVAR não tem acesso.",
+        description:
+          "Gestor, treinador dos próprios atletas e o próprio atleta. IBVAR não tem acesso.",
         security: [{ bearerAuth: [] }],
         params,
         response: { 200: z.object({ anexos: z.array(esquemaAnexo) }), ...respostasComuns },
@@ -172,7 +198,8 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ["evidencias"],
         summary: "Link temporário (5 minutos) para abrir a evidência",
-        description: "Mesmo acesso da listagem, pelo atleta do anexo. Cada geração de link fica na auditoria.",
+        description:
+          "Mesmo acesso da listagem, pelo atleta do anexo. Cada geração de link fica na auditoria.",
         security: [{ bearerAuth: [] }],
         params,
         response: {
@@ -184,7 +211,12 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
     },
     async (req) => {
       const { usuario } = req;
-      const r = await app.db.query<{ atleta_id: string; caminho: string; tipo_mime: string; nome_arquivo: string }>(
+      const r = await app.db.query<{
+        atleta_id: string;
+        caminho: string;
+        tipo_mime: string;
+        nome_arquivo: string;
+      }>(
         `select atleta_id, caminho, tipo_mime, nome_arquivo from evidencias_anexos where id = $1::uuid`,
         [req.params.id],
       );
@@ -195,7 +227,11 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
 
       let link;
       try {
-        link = await app.armazenamento.linkTemporario(anexo.caminho, anexo.tipo_mime, anexo.nome_arquivo);
+        link = await app.armazenamento.linkTemporario(
+          anexo.caminho,
+          anexo.tipo_mime,
+          anexo.nome_arquivo,
+        );
       } catch (e) {
         req.log.error({ err: e }, "falha ao gerar link de evidência");
         throw servicoIndisponivel("Não foi possível abrir o arquivo agora.");

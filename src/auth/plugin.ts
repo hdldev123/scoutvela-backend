@@ -1,4 +1,9 @@
-import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerAsyncHookHandler } from "fastify";
+import type {
+  FastifyInstance,
+  FastifyReply,
+  FastifyRequest,
+  preHandlerAsyncHookHandler,
+} from "fastify";
 import type { Db } from "../db/db.js";
 import type { Papel } from "../domain/tipos.js";
 import { mfaObrigatorio, naoAutenticado, semAcesso } from "../erros.js";
@@ -28,7 +33,11 @@ declare module "fastify" {
 }
 
 /** Log estruturado de acesso negado. Nunca registra token, cabeçalhos, e-mail nem corpo. */
-function logarAcessoNegado(req: FastifyRequest, motivo: string, usuario?: { id: string; papel: Papel }): void {
+function logarAcessoNegado(
+  req: FastifyRequest,
+  motivo: string,
+  usuario?: { id: string; papel: Papel },
+): void {
   req.log.warn(
     {
       evento: "acesso_negado",
@@ -42,7 +51,10 @@ function logarAcessoNegado(req: FastifyRequest, motivo: string, usuario?: { id: 
 }
 
 /** Registra `app.autenticar` e `request.usuario` (sem encapsulamento: vale para todas as rotas). */
-export function registrarAutenticacao(app: FastifyInstance, verificarToken: VerificadorToken): void {
+export function registrarAutenticacao(
+  app: FastifyInstance,
+  verificarToken: VerificadorToken,
+): void {
   app.decorateRequest("usuario");
 
   app.decorate("autenticar", async (req: FastifyRequest) => {
@@ -66,7 +78,11 @@ export function registrarAutenticacao(app: FastifyInstance, verificarToken: Veri
     if (!u && email) {
       // Primeiro login de uma conta convidada: amarra o login ao cadastro pelo e-mail do token.
       u = await vincularContaPorEmail(app.db, sub, email);
-      if (u) req.log.info({ evento: "conta_vinculada", usuarioId: u.id, papel: u.papel }, "conta vinculada no primeiro login");
+      if (u)
+        req.log.info(
+          { evento: "conta_vinculada", usuarioId: u.id, papel: u.papel },
+          "conta vinculada no primeiro login",
+        );
     }
     if (!u) {
       logarAcessoNegado(req, "sem_cadastro");

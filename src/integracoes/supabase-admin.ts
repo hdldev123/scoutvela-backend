@@ -39,13 +39,18 @@ export function criarAdminAuth(opcoes: {
       });
       if (!r.ok) {
         const texto = await r.text().catch(() => "");
-        if (r.status === 409 || r.status === 422 || /email_exists|already.*(registered|exists)/i.test(texto)) {
+        if (
+          r.status === 409 ||
+          r.status === 422 ||
+          /email_exists|already.*(registered|exists)/i.test(texto)
+        ) {
           throw new ContaJaExiste();
         }
         throw new Error(`Supabase Auth: falha ao convidar (HTTP ${r.status})`);
       }
       const corpo = (await r.json()) as { id?: unknown };
-      if (typeof corpo.id !== "string" || corpo.id === "") throw new Error("Supabase Auth: resposta do convite sem id");
+      if (typeof corpo.id !== "string" || corpo.id === "")
+        throw new Error("Supabase Auth: resposta do convite sem id");
       return { authUserId: corpo.id };
     },
   };

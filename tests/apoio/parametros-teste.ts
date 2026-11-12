@@ -13,45 +13,152 @@ type Ind = [id: string, nome: string, tipo: TipoIndicador];
 
 // Valores do protótipo (engine.js), metodologia de 29/09/2026.
 const PILARES_BASE: [string, string, string, number, boolean, string, Ind[]][] = [
-  ["perf", "Performance esportiva", "Performance", 20, false, "Histórico competitivo", [
-    ["perf_mundial", "Resultados em Mundial e Youth World", "T"], ["perf_continental", "Resultados continentais", "T"],
-    ["perf_nacional", "Resultados nacionais", "T"], ["perf_consistencia", "Consistência", "T"],
-    ["perf_nivel_frota", "Nível da classe e da frota", "T"]]],
-  ["cf", "Class Fit / perfil físico", "Class Fit", 20, true, "Avaliação física", [
-    ["cf_peso_kg", "Peso", "T"], ["cf_altura_cm", "Altura", "T"], ["cf_composicao", "Composição corporal", "T"],
-    ["cf_potencia", "Potência", "T"], ["cf_forca", "Força", "T"],
-    ["cf_compatibilidade", "Compatibilidade futura com classe e função", "T"]]],
-  ["tec", "Técnica", "Técnica", 15, false, "Vídeo de treino", [
-    ["tec_boat_handling", "Boat handling", "T"], ["tec_velocidade", "Velocidade", "T"], ["tec_trim", "Trim", "T"],
-    ["tec_manobras", "Manobras", "T"], ["tec_largada", "Largada", "T"], ["tec_adaptacao", "Adaptação a vento e onda", "T"]]],
-  ["tat", "Tática e decisão", "Tática", 10, false, "Observação em regata", [
-    ["tat_leitura_vento", "Leitura do vento", "T"], ["tat_estrategia", "Estratégia", "T"],
-    ["tat_posicionamento", "Posicionamento", "T"], ["tat_risco", "Gestão de risco", "T"],
-    ["tat_adaptacao", "Adaptação tática", "T"]]],
-  ["pot", "Potencial de desenvolvimento", "Potencial", 5, false, "Comparação com o ciclo anterior", [
-    ["pot_aprendizagem", "Taxa de aprendizagem", "T"], ["pot_feedback", "Resposta ao feedback", "T"],
-    ["pot_evolucao", "Evolução em 12 a 24 meses", "T"]]],
-  ["exp", "Experiência de alto rendimento", "Experiência", 5, false, "Histórico competitivo", [
-    ["exp_alto_rendimento", "Experiência de alto rendimento", "T"]]],
-  ["men", "Perfil mental / autonomia", "Mental", 10, true, "Observação em competição", [
-    ["men_resiliencia", "Resiliência", "T"], ["men_disciplina", "Disciplina", "T"], ["men_autonomia", "Autonomia", "T"],
-    ["men_competitividade", "Competitividade", "T"], ["men_controle_pressao", "Controle sob pressão", "T"]]],
-  ["amb", "Ambiente de desenvolvimento", "Ambiente", 10, true, "Questionário do atleta", [
-    ["amb_apoio_familiar", "Apoio familiar ao projeto", "A"], ["amb_disponibilidade", "Disponibilidade para viagens e camps", "A"],
-    ["amb_estabilidade", "Estabilidade de estudos ou trabalho", "A"], ["amb_autonomia", "Autonomia do atleta", "T"],
-    ["amb_logistica", "Organização logística", "A"],
-    ["amb_historico_familiar", "Histórico familiar de esporte de alto rendimento", "R"],
-    ["amb_acesso_estrutura", "Acesso a treinador e estrutura", "A"]]],
-  ["car", "Projeto de carreira", "Carreira", 5, false, "Conversa de planejamento", [
-    ["car_compromisso", "Compromisso", "T"], ["car_disponibilidade", "Horas disponíveis para a campanha", "A"],
-    ["car_equipe_tecnica", "Equipe técnica", "A"], ["car_horizonte", "Horizonte de 2 a 4 anos", "T"]]],
+  [
+    "perf",
+    "Performance esportiva",
+    "Performance",
+    20,
+    false,
+    "Histórico competitivo",
+    [
+      ["perf_mundial", "Resultados em Mundial e Youth World", "T"],
+      ["perf_continental", "Resultados continentais", "T"],
+      ["perf_nacional", "Resultados nacionais", "T"],
+      ["perf_consistencia", "Consistência", "T"],
+      ["perf_nivel_frota", "Nível da classe e da frota", "T"],
+    ],
+  ],
+  [
+    "cf",
+    "Class Fit / perfil físico",
+    "Class Fit",
+    20,
+    true,
+    "Avaliação física",
+    [
+      ["cf_peso_kg", "Peso", "T"],
+      ["cf_altura_cm", "Altura", "T"],
+      ["cf_composicao", "Composição corporal", "T"],
+      ["cf_potencia", "Potência", "T"],
+      ["cf_forca", "Força", "T"],
+      ["cf_compatibilidade", "Compatibilidade futura com classe e função", "T"],
+    ],
+  ],
+  [
+    "tec",
+    "Técnica",
+    "Técnica",
+    15,
+    false,
+    "Vídeo de treino",
+    [
+      ["tec_boat_handling", "Boat handling", "T"],
+      ["tec_velocidade", "Velocidade", "T"],
+      ["tec_trim", "Trim", "T"],
+      ["tec_manobras", "Manobras", "T"],
+      ["tec_largada", "Largada", "T"],
+      ["tec_adaptacao", "Adaptação a vento e onda", "T"],
+    ],
+  ],
+  [
+    "tat",
+    "Tática e decisão",
+    "Tática",
+    10,
+    false,
+    "Observação em regata",
+    [
+      ["tat_leitura_vento", "Leitura do vento", "T"],
+      ["tat_estrategia", "Estratégia", "T"],
+      ["tat_posicionamento", "Posicionamento", "T"],
+      ["tat_risco", "Gestão de risco", "T"],
+      ["tat_adaptacao", "Adaptação tática", "T"],
+    ],
+  ],
+  [
+    "pot",
+    "Potencial de desenvolvimento",
+    "Potencial",
+    5,
+    false,
+    "Comparação com o ciclo anterior",
+    [
+      ["pot_aprendizagem", "Taxa de aprendizagem", "T"],
+      ["pot_feedback", "Resposta ao feedback", "T"],
+      ["pot_evolucao", "Evolução em 12 a 24 meses", "T"],
+    ],
+  ],
+  [
+    "exp",
+    "Experiência de alto rendimento",
+    "Experiência",
+    5,
+    false,
+    "Histórico competitivo",
+    [["exp_alto_rendimento", "Experiência de alto rendimento", "T"]],
+  ],
+  [
+    "men",
+    "Perfil mental / autonomia",
+    "Mental",
+    10,
+    true,
+    "Observação em competição",
+    [
+      ["men_resiliencia", "Resiliência", "T"],
+      ["men_disciplina", "Disciplina", "T"],
+      ["men_autonomia", "Autonomia", "T"],
+      ["men_competitividade", "Competitividade", "T"],
+      ["men_controle_pressao", "Controle sob pressão", "T"],
+    ],
+  ],
+  [
+    "amb",
+    "Ambiente de desenvolvimento",
+    "Ambiente",
+    10,
+    true,
+    "Questionário do atleta",
+    [
+      ["amb_apoio_familiar", "Apoio familiar ao projeto", "A"],
+      ["amb_disponibilidade", "Disponibilidade para viagens e camps", "A"],
+      ["amb_estabilidade", "Estabilidade de estudos ou trabalho", "A"],
+      ["amb_autonomia", "Autonomia do atleta", "T"],
+      ["amb_logistica", "Organização logística", "A"],
+      ["amb_historico_familiar", "Histórico familiar de esporte de alto rendimento", "R"],
+      ["amb_acesso_estrutura", "Acesso a treinador e estrutura", "A"],
+    ],
+  ],
+  [
+    "car",
+    "Projeto de carreira",
+    "Carreira",
+    5,
+    false,
+    "Conversa de planejamento",
+    [
+      ["car_compromisso", "Compromisso", "T"],
+      ["car_disponibilidade", "Horas disponíveis para a campanha", "A"],
+      ["car_equipe_tecnica", "Equipe técnica", "A"],
+      ["car_horizonte", "Horizonte de 2 a 4 anos", "T"],
+    ],
+  ],
 ];
 
 export function pilaresDeTeste(): Pilar[] {
   return PILARES_BASE.map(([id, nome, nomeCurto, peso, sensivel, evidenciaPadrao, inds]) => ({
-    id, nome, nomeCurto, peso, sensivel, evidenciaPadrao,
+    id,
+    nome,
+    nomeCurto,
+    peso,
+    sensivel,
+    evidenciaPadrao,
     indicadores: inds.map(([iid, inome, tipo]) => ({
-      id: iid, pilarId: id, nome: inome, tipo, calculado: iid === "cf_peso_kg",
+      id: iid,
+      pilarId: id,
+      nome: inome,
+      tipo,
+      calculado: iid === "cf_peso_kg",
     })),
   }));
 }
@@ -75,7 +182,13 @@ const CLASSES_BASE: [string, string, string, PosicaoClasse, number, number, numb
 
 export const CLASSES_TESTE: Classe[] = CLASSES_BASE.map(
   ([id, nome, evento, posicao, pesoMinKg, pesoMedioKg, pesoMaxKg]) => ({
-    id, nome, evento, posicao, pesoMinKg, pesoMedioKg, pesoMaxKg,
+    id,
+    nome,
+    evento,
+    posicao,
+    pesoMinKg,
+    pesoMedioKg,
+    pesoMaxKg,
   }),
 );
 

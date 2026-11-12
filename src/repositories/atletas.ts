@@ -1,6 +1,13 @@
 import type { UsuarioAutenticado } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
-import type { Classe, Genero, NivelCompeticao, PerfilSuporte, PosicaoClasse, StatusGate } from "../domain/tipos.js";
+import type {
+  Classe,
+  Genero,
+  NivelCompeticao,
+  PerfilSuporte,
+  PosicaoClasse,
+  StatusGate,
+} from "../domain/tipos.js";
 
 type UsuarioDeAcesso = Pick<UsuarioAutenticado, "id" | "papel" | "atletaId">;
 
@@ -206,7 +213,11 @@ export async function listarAtletasVisiveis(
 }
 
 /** Um atleta ativo, se o usuário puder vê-lo (senão nulo, sem distinguir de inexistente). */
-export async function buscarAtletaVisivel(db: Db, usuario: UsuarioDeAcesso, id: string): Promise<AtletaBase | null> {
+export async function buscarAtletaVisivel(
+  db: Db,
+  usuario: UsuarioDeAcesso,
+  id: string,
+): Promise<AtletaBase | null> {
   const lista = await listarAtletasVisiveis(db, usuario, { atletaId: id });
   return lista[0] ?? null;
 }
@@ -230,7 +241,8 @@ export async function cicloAberto(db: Db): Promise<{ nome: string; prazo: string
   return r.rows[0] ?? null;
 }
 
-const iso = (v: unknown): string => (v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString());
+const iso = (v: unknown): string =>
+  v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString();
 
 /**
  * Carrega, numa ida por tabela, tudo o que o cálculo (e a ficha) precisa para o conjunto de atletas.
@@ -247,7 +259,13 @@ export async function carregarDadosAtletas(
       notas: [],
       respostas: {},
       sugestoesPendentes: {},
-      medida: { pesoKg: null, alturaCm: null, pesoMedidoEm: null, pesoEvidencia: null, pesoRegistradoPor: null },
+      medida: {
+        pesoKg: null,
+        alturaCm: null,
+        pesoMedidoEm: null,
+        pesoEvidencia: null,
+        pesoRegistradoPor: null,
+      },
       resultados: [],
       decisoesGates: [null, null, null, null],
       financeiro: null,
@@ -257,84 +275,85 @@ export async function carregarDadosAtletas(
   if (atletaIds.length === 0) return mapa;
   const p = [atletaIds];
 
-  const [notas, respostas, sugestoes, medidas, resultados, decisoes, financeiro] = await Promise.all([
-    db.query<{
-      atleta_id: string;
-      indicador_id: string;
-      valor: number;
-      evidencia: string;
-      origem: "avaliacao" | "resposta_confirmada";
-      avaliador_id: string | null;
-      avaliador_nome: string | null;
-      lancado_em: Date;
-      anexo_id: string | null;
-      anexo_nome: string | null;
-    }>(
-      `select n.atleta_id, n.indicador_id, n.valor, n.evidencia, n.origem, n.avaliador_id,
+  const [notas, respostas, sugestoes, medidas, resultados, decisoes, financeiro] =
+    await Promise.all([
+      db.query<{
+        atleta_id: string;
+        indicador_id: string;
+        valor: number;
+        evidencia: string;
+        origem: "avaliacao" | "resposta_confirmada";
+        avaliador_id: string | null;
+        avaliador_nome: string | null;
+        lancado_em: Date;
+        anexo_id: string | null;
+        anexo_nome: string | null;
+      }>(
+        `select n.atleta_id, n.indicador_id, n.valor, n.evidencia, n.origem, n.avaliador_id,
               u.nome as avaliador_nome, n.lancado_em, n.anexo_id, ea.nome_arquivo as anexo_nome
          from avaliacao_atual n
          left join usuarios u on u.id = n.avaliador_id
          left join evidencias_anexos ea on ea.id = n.anexo_id
         where n.atleta_id = any($1::uuid[])`,
-      p,
-    ),
-    db.query<{ atleta_id: string; indicador_id: string; resposta: string }>(
-      `select atleta_id, indicador_id, resposta from resposta_atual where atleta_id = any($1::uuid[])`,
-      p,
-    ),
-    db.query<{ atleta_id: string; indicador_id: string; valor: number; lancado_em: Date }>(
-      `select atleta_id, indicador_id, valor, lancado_em from sugestao_pendente where atleta_id = any($1::uuid[])`,
-      p,
-    ),
-    db.query<{
-      atleta_id: string;
-      peso_kg: string | null;
-      altura_cm: string | null;
-      medido_em: Date;
-      evidencia: string;
-      registrado_por: string;
-      registrador_nome: string;
-    }>(
-      `select m.atleta_id, m.peso_kg, m.altura_cm, m.medido_em, m.evidencia, m.registrado_por,
+        p,
+      ),
+      db.query<{ atleta_id: string; indicador_id: string; resposta: string }>(
+        `select atleta_id, indicador_id, resposta from resposta_atual where atleta_id = any($1::uuid[])`,
+        p,
+      ),
+      db.query<{ atleta_id: string; indicador_id: string; valor: number; lancado_em: Date }>(
+        `select atleta_id, indicador_id, valor, lancado_em from sugestao_pendente where atleta_id = any($1::uuid[])`,
+        p,
+      ),
+      db.query<{
+        atleta_id: string;
+        peso_kg: string | null;
+        altura_cm: string | null;
+        medido_em: Date;
+        evidencia: string;
+        registrado_por: string;
+        registrador_nome: string;
+      }>(
+        `select m.atleta_id, m.peso_kg, m.altura_cm, m.medido_em, m.evidencia, m.registrado_por,
               u.nome as registrador_nome
          from medidas_corporais m join usuarios u on u.id = m.registrado_por
         where m.atleta_id = any($1::uuid[])
         order by m.medido_em desc, m.id desc`,
-      p,
-    ),
-    db.query<{
-      atleta_id: string;
-      data: string;
-      nivel: NivelCompeticao;
-      evento: string;
-      posicao: number;
-      tamanho_frota: number;
-      internacional: boolean;
-      pontos_cbvela: string | null;
-      fonte: "ranking_cbvela" | "manual";
-      link_oficial: string | null;
-    }>(
-      `select atleta_id, data::text as data, nivel, evento, posicao, tamanho_frota, internacional,
+        p,
+      ),
+      db.query<{
+        atleta_id: string;
+        data: string;
+        nivel: NivelCompeticao;
+        evento: string;
+        posicao: number;
+        tamanho_frota: number;
+        internacional: boolean;
+        pontos_cbvela: string | null;
+        fonte: "ranking_cbvela" | "manual";
+        link_oficial: string | null;
+      }>(
+        `select atleta_id, data::text as data, nivel, evento, posicao, tamanho_frota, internacional,
               pontos_cbvela, fonte, link_oficial
          from resultados_regata where atleta_id = any($1::uuid[]) order by data desc, id desc`,
-      p,
-    ),
-    db.query<{ atleta_id: string; gate: number; status: StatusGate | null }>(
-      `select atleta_id, gate, status from gate_decisao_atual where atleta_id = any($1::uuid[])`,
-      p,
-    ),
-    db.query<{
-      id: string;
-      atleta_id: string;
-      perfil_suporte: PerfilSuporte;
-      meses_assegurados: number | null;
-      patrocinio_privado: "sim" | "em_negociacao" | "nao" | null;
-    }>(
-      `select id, atleta_id, perfil_suporte, meses_assegurados, patrocinio_privado
+        p,
+      ),
+      db.query<{ atleta_id: string; gate: number; status: StatusGate | null }>(
+        `select atleta_id, gate, status from gate_decisao_atual where atleta_id = any($1::uuid[])`,
+        p,
+      ),
+      db.query<{
+        id: string;
+        atleta_id: string;
+        perfil_suporte: PerfilSuporte;
+        meses_assegurados: number | null;
+        patrocinio_privado: "sim" | "em_negociacao" | "nao" | null;
+      }>(
+        `select id, atleta_id, perfil_suporte, meses_assegurados, patrocinio_privado
          from financeiro_atual where atleta_id = any($1::uuid[])`,
-      p,
-    ),
-  ]);
+        p,
+      ),
+    ]);
 
   const dado = (id: string): DadosAtleta => mapa.get(id)!;
 
@@ -351,7 +370,10 @@ export async function carregarDadosAtletas(
   }
   for (const l of respostas.rows) dado(l.atleta_id).respostas[l.indicador_id] = l.resposta;
   for (const l of sugestoes.rows) {
-    dado(l.atleta_id).sugestoesPendentes[l.indicador_id] = { valor: l.valor, lancadoEm: iso(l.lancado_em) };
+    dado(l.atleta_id).sugestoesPendentes[l.indicador_id] = {
+      valor: l.valor,
+      lancadoEm: iso(l.lancado_em),
+    };
   }
 
   // Medidas vêm da mais recente para a mais antiga: vale a primeira com peso e a primeira com altura.
@@ -393,7 +415,13 @@ export async function carregarDadosAtletas(
   }
 
   if (opcoes.componentesFinanceiro && finIds.length > 0) {
-    const comp = await db.query<{ atleta_id: string; id: string; nome: string; autonomia: string; apoio_cbvela: string }>(
+    const comp = await db.query<{
+      atleta_id: string;
+      id: string;
+      nome: string;
+      autonomia: string;
+      apoio_cbvela: string;
+    }>(
       `select f.atleta_id, c.id, c.nome, fc.autonomia, fc.apoio_cbvela
          from financeiro_componentes fc
          join financeiro_campanha f on f.id = fc.financeiro_id
@@ -420,7 +448,8 @@ export async function carregarDadosAtletas(
         order by c.inicio, c.id`,
       p,
     );
-    for (const l of h.rows) dado(l.atleta_id).historicoScore.push({ ciclo: l.ciclo, score: Number(l.score) });
+    for (const l of h.rows)
+      dado(l.atleta_id).historicoScore.push({ ciclo: l.ciclo, score: Number(l.score) });
   }
 
   return mapa;
