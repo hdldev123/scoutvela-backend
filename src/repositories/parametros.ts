@@ -200,6 +200,8 @@ export interface AtualizacaoParametros {
   pesos?: Record<string, number> | undefined;
   faixas?: { id: string; scoreMin: number }[] | undefined;
   rubricas?: { pilarId: string | null; nota: number; descricao: string }[] | undefined;
+  /** Ids de pilar cujas rubricas próprias são removidas. A escala geral (pilar nulo) não sai. */
+  rubricasRemover?: (string | null)[] | undefined;
   regras?: Record<string, unknown> | undefined;
   classes?:
     | {
@@ -314,6 +316,39 @@ export async function atualizarParametros(
         }
       }
       detalhes.rubricas = { antes, depois: dados.rubricas };
+    }
+
+    if (dados.rubricasRemover) {
+      const emEdicao = new Set((dados.rubricas ?? []).map((r) => r.pilarId));
+      const antes: { pilarId: string | null; nota: number; descricao: string }[] = [];
+      for (const pilarId of dados.rubricasRemover) {
+        // null e texto vazio: a escala geral nunca é removida.
+        if (!pilarId) {
+          throw new ErroParametros(
+            "A escala geral (pilar nulo) não pode ser removida: informe só ids de pilar.",
+          );
+        }
+        if ((await tx.query("select 1 from pilares where id = $1", [pilarId])).rows.length === 0) {
+          throw new ErroParametros(`Pilar desconhecido: ${pilarId}.`);
+        }
+        if (emEdicao.has(pilarId)) {
+          throw new ErroParametros(
+            `O pilar ${pilarId} está em rubricas e em rubricasRemover na mesma requisição.`,
+          );
+        }
+        const linhas = (
+          await tx.query<{ nota: number; descricao: string }>(
+            "select nota, descricao from rubricas where pilar_id = $1 order by nota",
+            [pilarId],
+          )
+        ).rows;
+        if (linhas.length === 0) {
+          throw new ErroParametros(`O pilar ${pilarId} não tem rubrica própria para remover.`);
+        }
+        await tx.query("delete from rubricas where pilar_id = $1", [pilarId]);
+        for (const l of linhas) antes.push({ pilarId, nota: l.nota, descricao: l.descricao });
+      }
+      detalhes.rubricasRemovidas = { antes, depois: [] };
     }
 
     if (dados.regras) {
