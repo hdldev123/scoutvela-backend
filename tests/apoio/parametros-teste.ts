@@ -215,6 +215,7 @@ export const REGRAS_TESTE: Regras = {
     D: { status: "alerta", motivo: "Sem estrutura para campanha internacional" },
   },
   rankingCbvela: { janelaSemanas: 52 },
+  perfPontos: { ativa: false, faixas: [] },
 };
 
 export function parametrosDeTeste(): Parametros {

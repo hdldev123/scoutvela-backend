@@ -5,6 +5,7 @@ import { exigirPapel } from "../auth/plugin.js";
 import { idadeEm } from "../domain/index.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { ContaJaExiste } from "../integracoes/supabase-admin.js";
+import { listarAtletasGestao } from "../repositories/atletas.js";
 import { buscarTermoVigente, termoSql } from "../repositories/termo.js";
 import { ArquivoRejeitado, importarCsv } from "../importacao/index.js";
 
@@ -374,6 +375,58 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
   );
 
   // Rota estática: o Fastify a prefere a GET /atletas/:id (em atletas.ts) para o texto "pendentes".
+  r.get(
+    "/atletas",
+    {
+      preHandler: soGestor,
+      schema: {
+        tags: ["cadastro"],
+        summary: "Todos os atletas do piloto, para gestão do cadastro",
+        description:
+          "Inclui inativos e quem não aceitou o termo. Sem dado sensível nem e-mail. termoAceito segue a regra do ranking (TERMO_EXIGE_REACEITE). contaVinculada: já existe conta de atleta ligada a ele. busca procura no nome e no código VelaID.",
+        security: seguranca,
+        querystring: z.object({
+          ativo: z.enum(["true", "false"]).optional(),
+          termoAceito: z.enum(["true", "false"]).optional(),
+          classeId: z.string().min(1).max(40).optional(),
+          treinadorId: z.uuid().optional(),
+          busca: z.string().trim().max(80).optional().describe("Parte do nome ou do VelaID"),
+        }),
+        response: {
+          200: z.array(
+            z.object({
+              id: z.string(),
+              nome: z.string(),
+              velaid: z.string(),
+              classe: z.object({ id: z.string(), nome: z.string() }),
+              treinador: z.object({ id: z.string(), nome: z.string() }).nullable(),
+              numeroVela: z.string().nullable(),
+              ativo: z.boolean(),
+              termoAceito: z.boolean(),
+              contaVinculada: z.boolean(),
+            }),
+          ),
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+        },
+      },
+    },
+    async (req) => {
+      const q = req.query;
+      const comoBool = (v: "true" | "false" | undefined) =>
+        v === undefined ? undefined : v === "true";
+      return listarAtletasGestao(app.db, {
+        agora: app.agora(),
+        ativo: comoBool(q.ativo),
+        termoAceito: comoBool(q.termoAceito),
+        classeId: q.classeId,
+        treinadorId: q.treinadorId,
+        busca: q.busca,
+      });
+    },
+  );
+
   r.get(
     "/atletas/pendentes",
     {

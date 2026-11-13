@@ -1,8 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { funcaoNaClasse, idadeEm, sugerirPlano } from "../domain/index.js";
-import { esquemaErro, naoEncontrado } from "../erros.js";
+import {
+  INDICADOR_PONTOS_RANKING,
+  distanciaClassFit,
+  funcaoNaClasse,
+  idadeEm,
+  notaPeso,
+  notaSugeridaPorPontos,
+  sugerirPlano,
+} from "../domain/index.js";
+import { esquemaErro, naoEncontrado, semAcesso } from "../erros.js";
+import { historicoDeNotas, historicoDePesagens } from "../repositories/historico.js";
 import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { buscarPlanoAtual } from "../repositories/plano.js";
@@ -19,6 +28,11 @@ const NOMES_GATES: Record<number, string> = {
 const statusGate = z.enum(["apto", "condicional", "alerta"]);
 const pessoa = z.object({ id: z.string(), nome: z.string() });
 
+export const esquemaSugestaoPontos = z.object({
+  nota: z.number().int(),
+  pontos: z.number().describe("Pontos do Ranking CBVela na janela"),
+});
+
 const esquemaIndicador = z.object({
   id: z.string(),
   nome: z.string(),
@@ -31,6 +45,11 @@ const esquemaIndicador = z.object({
   lancadoEm: z.string().nullable().describe("Instante ISO"),
   resposta: z.string().nullable(),
   sugestaoPendente: z.object({ valor: z.number().int(), lancadoEm: z.string() }).nullable(),
+  sugestaoPontos: esquemaSugestaoPontos
+    .nullable()
+    .describe(
+      "Nota sugerida pelos pontos do Ranking CBVela (regra PERF_PONTOS). Só em perf_nacional e com a regra ativa; não entra no score até o avaliador lançar a nota.",
+    ),
   anexo: z.object({ id: z.string(), nomeArquivo: z.string() }).nullable(),
 });
 
@@ -181,6 +200,11 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
       const ibvar = usuario.papel === "ibvar";
       const notaPorIndicador = new Map(dados.notas.map((n) => [n.indicadorId, n]));
       const pilaresCalc = new Map(calculo.pilares.map((p) => [p.pilarId, p]));
+      // Só sugestão: não entra no score até o avaliador lançar a nota.
+      const sugestaoPontos = notaSugeridaPorPontos(
+        calculo.pontosCbvela,
+        parametros.regras.perfPontos,
+      );
 
       const pilares = parametros.pilares.map((p) => {
         const c = pilaresCalc.get(p.id)!;
@@ -204,6 +228,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                   lancadoEm: nota == null ? null : m.pesoMedidoEm,
                   resposta: dados.respostas[i.id] ?? null,
                   sugestaoPendente: null,
+                  sugestaoPontos: null,
                   anexo: null,
                 };
               }
@@ -217,6 +242,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                 lancadoEm: lancada?.lancadoEm ?? null,
                 resposta: ibvar ? null : (dados.respostas[i.id] ?? null),
                 sugestaoPendente: ibvar ? null : sug,
+                sugestaoPontos: i.id === INDICADOR_PONTOS_RANKING ? sugestaoPontos : null,
                 // O IBVAR não vê evidências anexadas.
                 anexo: ibvar ? null : (lancada?.anexo ?? null),
               };
@@ -331,6 +357,94 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         plano,
         sugestaoPlano,
       };
+    },
+  );
+
+  app.withTypeProvider<ZodTypeProvider>().get(
+    "/atletas/:id/indicadores/:indicadorId/historico",
+    {
+      preHandler: [app.autenticar],
+      schema: {
+        tags: ["atletas"],
+        summary: "Histórico de lançamentos de um indicador, do mais novo para o mais antigo",
+        description:
+          "Mesma matriz de acesso da ficha: gestor vê todos, treinador só os próprios atletas, atleta só a si. Inclui a sugestão do atleta ainda pendente (pendente: true, origem resposta_sugerida). cf_peso_kg (calculado) traz as pesagens, com a nota pela regra P3 atual. IBVAR: pilar sensível dá 403; nos demais, sem evidência, avaliador, anexo nem sugestão pendente. Atleta fora do acesso ou indicador inexistente: 404.",
+        security: [{ bearerAuth: [] }],
+        params: z.object({ id: z.uuid(), indicadorId: z.string().min(1).max(64) }),
+        response: {
+          200: z.array(
+            z.object({
+              valor: z.number().describe("Nota de 0 a 5"),
+              pesoKg: z.number().nullable().describe("Só em cf_peso_kg: o peso da pesagem"),
+              evidencia: z.string().nullable(),
+              origem: z.enum([
+                "avaliacao",
+                "resposta_confirmada",
+                "resposta_sugerida",
+                "calculado",
+              ]),
+              pendente: z.boolean().describe("Sugestão do atleta aguardando o avaliador"),
+              avaliador: pessoa.nullable(),
+              cicloNome: z.string().nullable(),
+              lancadoEm: z.string().describe("Instante ISO"),
+              anexo: z.object({ id: z.string(), nomeArquivo: z.string() }).nullable(),
+            }),
+          ),
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+        },
+      },
+    },
+    async (req) => {
+      const { usuario } = req;
+      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
+      if (!base) throw naoEncontrado("Atleta não encontrado.");
+      const parametros = await carregarParametros(app.db);
+      const pilar = parametros.pilares.find((p) =>
+        p.indicadores.some((i) => i.id === req.params.indicadorId),
+      );
+      const indicador = pilar?.indicadores.find((i) => i.id === req.params.indicadorId);
+      if (!pilar || !indicador) throw naoEncontrado("Indicador não encontrado.");
+
+      const ibvar = usuario.papel === "ibvar";
+      if (ibvar && pilar.sensivel) throw semAcesso("O IBVAR não vê o detalhe deste pilar.");
+
+      if (indicador.calculado) {
+        if (indicador.id !== "cf_peso_kg") return [];
+        const pesagens = await historicoDePesagens(app.db, base.id);
+        return pesagens.map((m) => ({
+          valor: notaPeso(
+            distanciaClassFit(m.pesoKg, base.classe).distanciaRelativa,
+            parametros.regras.p3.limites,
+          ),
+          pesoKg: m.pesoKg,
+          evidencia: m.evidencia,
+          origem: "calculado" as const,
+          pendente: false,
+          avaliador: m.registradoPor,
+          cicloNome: null,
+          lancadoEm: m.medidoEm,
+          anexo: null,
+        }));
+      }
+
+      const notas = await historicoDeNotas(app.db, base.id, indicador.id);
+      return notas
+        .filter((n) => !(ibvar && n.origem === "resposta_sugerida"))
+        .map((n) => ({
+          valor: n.valor,
+          pesoKg: null,
+          // IBVAR: sem evidência, sem quem avaliou e sem anexo (como na ficha).
+          evidencia: ibvar ? null : n.evidencia,
+          origem: n.origem,
+          pendente: n.origem === "resposta_sugerida",
+          avaliador: ibvar ? null : n.avaliador,
+          cicloNome: n.cicloNome,
+          lancadoEm: n.lancadoEm,
+          anexo: ibvar ? null : n.anexo,
+        }));
     },
   );
 }

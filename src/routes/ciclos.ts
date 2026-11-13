@@ -6,6 +6,7 @@ import type { Db } from "../db/db.js";
 import { conflito, esquemaErro, naoEncontrado, requisicaoInvalida } from "../erros.js";
 import { listarAtletasVisiveis } from "../repositories/atletas.js";
 import { carregarParametros } from "../repositories/parametros.js";
+import { diasParaPrazo, pendenciasDoCiclo } from "../repositories/pendencias.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 
 const dataIso = z.iso.date().describe("AAAA-MM-DD");
@@ -209,6 +210,76 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
         );
         return { ciclo: (await buscarCiclo(tx, atual.id))!, atletas: avaliados.length };
       });
+    },
+  );
+
+  rota.get(
+    "/ciclos/:id/pendencias",
+    {
+      preHandler: acesso,
+      schema: {
+        tags: ["ciclos"],
+        summary: "Quem está atrasado no ciclo aberto: treinadores e atletas com pendência",
+        description:
+          "Mesma regra do job de lembretes. Só atletas ativos com o termo do piloto aceito. Treinador: atletas sem nota no ciclo em algum indicador T (faltam = indicadores sem nota). Atleta: perguntas do questionário sem resposta. diasParaPrazo é negativo depois do prazo. Ciclo fechado: 409.",
+        security: seguranca,
+        params,
+        response: {
+          200: z.object({
+            treinadores: z.array(
+              z.object({
+                id: z.string(),
+                nome: z.string(),
+                atletasPendentes: z.array(
+                  z.object({ id: z.string(), nome: z.string(), faltam: z.number().int() }),
+                ),
+              }),
+            ),
+            atletas: z.array(
+              z.object({
+                id: z.string(),
+                nome: z.string(),
+                perguntasSemResposta: z.number().int(),
+              }),
+            ),
+            totais: z.object({
+              treinadoresComPendencia: z.number().int(),
+              atletasComPendencia: z.number().int(),
+              diasParaPrazo: z.number().int(),
+            }),
+          }),
+          ...erros,
+          404: esquemaErro,
+          409: esquemaErro,
+        },
+      },
+    },
+    async (req) => {
+      const agora = app.agora();
+      const ciclo = await buscarCiclo(app.db, req.params.id);
+      if (!ciclo) throw naoEncontrado("Ciclo não encontrado.");
+      if (ciclo.status !== "aberto") {
+        throw conflito("O ciclo está fechado: as pendências só valem para o ciclo aberto.");
+      }
+      const p = await pendenciasDoCiclo(app.db, ciclo.id, agora);
+      // Sem e-mail na resposta: a tela só precisa de quem e quanto falta.
+      return {
+        treinadores: p.treinadores.map((t) => ({
+          id: t.id,
+          nome: t.nome,
+          atletasPendentes: t.atletasPendentes,
+        })),
+        atletas: p.atletas.map((a) => ({
+          id: a.id,
+          nome: a.nome,
+          perguntasSemResposta: a.perguntasSemResposta,
+        })),
+        totais: {
+          treinadoresComPendencia: p.treinadores.length,
+          atletasComPendencia: p.atletas.length,
+          diasParaPrazo: diasParaPrazo(ciclo.prazo, agora),
+        },
+      };
     },
   );
 }
