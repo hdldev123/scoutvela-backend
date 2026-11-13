@@ -34,21 +34,76 @@ O banco fica em `.dados-locais/` (fora do git), com as migrations, o seed fictí
 
 Contas e dados são fictícios. As senhas existem só no seed de desenvolvimento e homologação.
 
-## Rodar com um projeto Supabase (homologação)
-
-1. Copie `.env.example` para `.env` e preencha `DATABASE_URL`, `DATABASE_CA_CERT`, `SUPABASE_URL` e, se o projeto usar a chave JWT legada, `SUPABASE_JWT_SECRET`.
-2. `npm run db:migrate` aplica as migrations. O esquema só muda por migration; nada é criado à mão no painel.
-3. `npm run db:seed` carrega os dados fictícios. Recusa `APP_ENV=producao` e recusa rodar duas vezes.
-4. `SUPABASE_SERVICE_ROLE_KEY=... npm run seed:auth` cria as 4 contas de teste no Supabase Auth e vincula ao papel.
-5. `npm run dev`.
-
-No painel do Supabase:
-- desligue o cadastro público (Authentication > Sign In / Providers > "Allow new users to sign up"); contas são criadas pela CBVela em `POST /usuarios`;
-- mantenha a confirmação de e-mail ligada (o vínculo da conta no primeiro login usa o e-mail do token);
-- ative o MFA por TOTP (Authentication > Multi-Factor) e use `EXIGIR_MFA=true`;
-- em URL Configuration, cadastre `FRONT_URL/redefinir-senha` como redirect permitido (convite e redefinição de senha).
-
 No modo local, os links de convite e de redefinição de senha aparecem no terminal, em linhas `[auth-local]`. As senhas de contas convidadas ficam só em memória e somem quando o `dev:local` reinicia.
+
+## Banco (Supabase)
+
+Dois projetos na organização da instituição (nunca em conta pessoal). A região prevista era São Paulo (`sa-east-1`), mas ela não estava disponível na criação: o projeto de produção está em US East, Ohio (`us-east-2`). A região não muda depois de criado o projeto; mudar exige recriar e migrar os dados.
+
+| Projeto | Plano | Dados |
+| --- | --- | --- |
+| `scoutvela-homologacao` | gratuito | seed fictício e 4 contas de teste |
+| `scoutvela-producao` | gratuito (ver aviso abaixo) | sem seed; primeiro gestor por `gestor:criar` |
+
+O esquema só muda por migration: nada é criado à mão no painel. As senhas do banco ficam no cofre de senhas do time.
+
+> **Produção no plano gratuito (decisão do piloto).** Os riscos ficam assumidos até a CBVela/IBVAR decidir o upgrade, que deve vir antes de entrarem dados reais em volume:
+> - sem backup diário nem PITR pelo painel;
+> - o projeto pausa após cerca de uma semana sem atividade (reative em Project Settings > General);
+> - limites de 500 MB de banco e 1 GB de Storage.
+>
+> Até o upgrade, o backup é o dump lógico descrito em "Backup e restauração".
+
+### Montar um ambiente
+
+1. **Projeto.** Crie no painel com senha forte gerada e guarde-a no cofre.
+2. **Auth** (Authentication):
+   - desligue o cadastro público (Sign In / Providers > "Allow new users to sign up"); contas são criadas pela CBVela em `POST /usuarios`;
+   - mantenha a confirmação de e-mail ligada (o vínculo da conta no primeiro login usa o e-mail do token);
+   - ative o MFA por TOTP (Multi-Factor) e use `EXIGIR_MFA=true`;
+   - em URL Configuration, Site URL = domínio do front e redirect permitido `FRONT_URL/redefinir-senha` (convite e redefinição de senha). Em homologação, inclua também o preview da Vercel e `http://localhost:8080/redefinir-senha`;
+   - anote se o projeto usa chave JWT nova (JWKS, deixe `SUPABASE_JWT_SECRET` vazio) ou legada (HS256, guarde o segredo).
+3. **`.env` local** apontando para o ambiente (`APP_ENV=homologacao` ou `producao`):
+   - `DATABASE_URL`: Connect > Session pooler (porta 5432). A conexão direta é só IPv6 e o Render sai por IPv4;
+   - `DATABASE_CA_CERT`: certificado em Database > SSL Configuration (TLS obrigatório);
+   - `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY` (chave secreta) e `SUPABASE_ANON_KEY` (chave pública, só para a verificação).
+4. **Esquema:** `npm run db:migrate`.
+5. **Verificação:** `npm run db:verificar` precisa terminar sem `FALHA`. Ele confere:
+   - toda migration da pasta registrada em `schema_migrations`;
+   - RLS em toda tabela do schema `public`;
+   - bucket `evidencias` privado, 5 MB, só PDF, JPG e PNG (criado pela `0007`);
+   - a chave pública, pela API REST (`/rest/v1/<tabela>`), não lê nenhuma tabela nem view.
+6. **Dados:**
+   - homologação: `npm run db:seed` (recusa `APP_ENV=producao` e recusa rodar duas vezes) e `npm run seed:auth` (4 contas de teste);
+   - produção: `npm run gestor:criar -- --email <e-mail> --nome "<nome>"`. Cria o primeiro gestor e envia o convite; ninguém conhece a senha. Recusa se já houver gestor ativo. Os demais usuários entram pelo convite em Contas.
+7. **Teste:** `npm run dev` com o front local e abra ranking, ficha e login com as contas de teste.
+
+### Segredos
+
+| Valor | Onde fica |
+| --- | --- |
+| senha do banco, `DATABASE_URL`, `DATABASE_CA_CERT`, `SUPABASE_SERVICE_ROLE_KEY`, `SUPABASE_JWT_SECRET` | cofre e Render (nunca no front) |
+| `SUPABASE_URL` e chave pública | cofre, Render e Vercel |
+
+Nada disso entra no git: o `.env` está no `.gitignore`.
+
+### Migration nova
+
+1. Crie `migrations/NNNN_descricao.sql` com o próximo número. Nunca edite uma migration já aplicada; corrija com outra.
+2. Homologação: o pre-deploy do serviço de homologação no Render roda `db:migrate:prod` a cada deploy da `staging`. Sem o serviço no ar, rode `npm run db:migrate` com o `.env` de homologação. Confira com `npm run db:verificar`.
+3. Produção: só depois de validada em homologação, pelo deploy da `main` (mesmo pre-deploy). Confira com `db:verificar`.
+
+### Backup e restauração
+
+- **Produção:** enquanto estiver no plano gratuito, o único backup é o dump lógico abaixo, guardado fora do Supabase. Depois do upgrade, os backups diários e o PITR ficam em Database > Backups. A restauração pelo painel substitui o banco inteiro: combine uma janela e avise os usuários antes.
+- **Teste de restauração** (feito uma vez em homologação): gere um dump lógico e restaure num banco descartável:
+
+  ```bash
+  pg_dump "$DATABASE_URL" --schema=public --no-owner --format=custom --file=homologacao.dump
+  pg_restore --no-owner --dbname="$URL_DESTINO" homologacao.dump
+  ```
+
+  Depois rode `npm run db:verificar` contra o destino (migrations e RLS precisam passar; o bucket só existe se o destino for um projeto Supabase) e compare a contagem de linhas de `atletas`, `avaliacoes` e `usuarios`. O dump do schema `public` não leva as contas do Supabase Auth nem os arquivos do Storage.
 
 ### MFA no modo local
 
@@ -65,7 +120,9 @@ No modo local, os links de convite e de redefinição de senha aparecem no termi
 | `lint` | ESLint (typescript-eslint com regras que usam tipos) |
 | `format` / `format:check` | Prettier: formata ou só confere (o CI roda `format:check`) |
 | `db:migrate` / `db:migrate:prod` | aplica migrations (dev com tsx; produção a partir do `dist/`) |
+| `db:verificar` | confere migrations, RLS, bucket e que a chave pública não lê nada (ver Banco) |
 | `db:seed` / `seed:auth` | dados fictícios e contas de teste (nunca em produção) |
+| `gestor:criar` | primeiro gestor de um ambiente novo, por convite (produção) |
 | `openapi` | gera o `openapi.yaml`, o contrato com o front (o CI falha se estiver desatualizado) |
 | `job:lembretes` / `job:lembretes:prod` | lembretes do ciclo por e-mail (Cron Job do Render) |
 

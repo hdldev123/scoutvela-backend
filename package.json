@@ -17,6 +17,8 @@
     "test:watch": "vitest",
     "db:migrate": "tsx src/db/cli-migrar.ts",
     "db:migrate:prod": "node dist/src/db/cli-migrar.js",
+    "db:verificar": "tsx src/admin/cli-verificar-banco.ts",
+    "gestor:criar": "tsx src/admin/cli-primeiro-gestor.ts",
     "job:lembretes": "tsx src/jobs/cli-lembretes.ts",
     "job:lembretes:prod": "node dist/src/jobs/cli-lembretes.js",
     "db:seed": "tsx seed/cli-seed.ts",
