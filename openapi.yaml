@@ -3672,6 +3672,173 @@ paths:
                   - erro
                   - mensagem
                 additionalProperties: false
+  /revisoes/{id}/lancamentos:
+    get:
+      summary: Lista os lançamentos que podem ser ligados ao pedido de revisão
+      tags:
+        - revisoes
+      description: Só os lançamentos que o PUT /revisoes/:id aceitaria em avaliacaoId
+        (mesmo atleta, indicador do pedido ou de um indicador do pilar, e
+        lançados depois do pedido), do mais novo para o mais antigo. Vale para
+        pedido aberto ou respondido. Sem evidência.
+      parameters:
+        - schema:
+            type: string
+            pattern: ^\d{1,18}$
+          in: path
+          name: id
+          required: true
+      security: *a2
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lancamentos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        indicadorId:
+                          type: string
+                        indicadorNome:
+                          type: string
+                        valor:
+                          type: number
+                        lancadoEm:
+                          type: string
+                          description: Instante ISO do lançamento
+                        origem:
+                          type: string
+                        avaliador:
+                          nullable: true
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                          required:
+                            - id
+                            - nome
+                          additionalProperties: false
+                      required:
+                        - id
+                        - indicadorId
+                        - indicadorNome
+                        - valor
+                        - lancadoEm
+                        - origem
+                        - avaliador
+                      additionalProperties: false
+                required:
+                  - lancamentos
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
   /revisoes/{id}:
     put:
       summary: Responde um pedido de revisão
