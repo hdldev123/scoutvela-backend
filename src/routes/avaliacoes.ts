@@ -3,7 +3,8 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
-import type { Parametros, ResultadoCalculo, StatusGate } from "../domain/index.js";
+import { INDICADOR_PONTOS_RANKING, notaSugeridaPorPontos } from "../domain/index.js";
+import type { Parametros, ResultadoCalculo, StatusGate, SugestaoPontos } from "../domain/index.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
 import type { AtletaBase, DadosAtleta } from "../repositories/atletas.js";
@@ -140,6 +141,9 @@ async function avaliarUm(db: Db, parametros: Parametros, atleta: AtletaBase, ref
   return avaliado;
 }
 
+const sugestaoComIndicador = (s: SugestaoPontos | null) =>
+  s ? { indicadorId: INDICADOR_PONTOS_RANKING, ...s } : null;
+
 export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
   const rota = app.withTypeProvider<ZodTypeProvider>();
   const acessoAvaliador = [app.autenticar, exigirPapel("gestor", "treinador")];
@@ -167,6 +171,16 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
               pilares: z.array(z.object({ id: z.string(), nota: z.number().nullable() })),
               statusGates: statusFinal,
             }),
+            sugestaoPontos: z
+              .object({
+                indicadorId: z.string(),
+                nota: z.number().int(),
+                pontos: z.number().describe("Pontos do Ranking CBVela na janela"),
+              })
+              .nullable()
+              .describe(
+                "Nota sugerida para perf_nacional pelos pontos do Ranking CBVela (regra PERF_PONTOS). Nula com a regra desligada. Não entra na prévia nem no score: o avaliador confirma lançando a nota.",
+              ),
           }),
           400: esquemaErro,
           401: esquemaErro,
@@ -199,6 +213,9 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           pilares: pilares(depois.calculo),
           statusGates: depois.calculo.statusFinal,
         },
+        sugestaoPontos: sugestaoComIndicador(
+          notaSugeridaPorPontos(antes.calculo.pontosCbvela, parametros.regras.perfPontos),
+        ),
       };
     },
   );

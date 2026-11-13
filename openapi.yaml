@@ -669,6 +669,24 @@ paths:
                                   - valor
                                   - lancadoEm
                                 additionalProperties: false
+                              sugestaoPontos:
+                                nullable: true
+                                description: Nota sugerida pelos pontos do Ranking CBVela (regra PERF_PONTOS).
+                                  Só em perf_nacional e com a regra ativa; não
+                                  entra no score até o avaliador lançar a nota.
+                                type: object
+                                properties:
+                                  nota:
+                                    type: integer
+                                    minimum: -9007199254740991
+                                    maximum: 9007199254740991
+                                  pontos:
+                                    type: number
+                                    description: Pontos do Ranking CBVela na janela
+                                required:
+                                  - nota
+                                  - pontos
+                                additionalProperties: false
                               anexo:
                                 nullable: true
                                 type: object
@@ -693,6 +711,7 @@ paths:
                               - lancadoEm
                               - resposta
                               - sugestaoPendente
+                              - sugestaoPontos
                               - anexo
                             additionalProperties: false
                       required:
@@ -1228,6 +1247,205 @@ paths:
                   - erro
                   - mensagem
                 additionalProperties: false
+  /atletas/{id}/indicadores/{indicadorId}/historico:
+    get:
+      summary: Histórico de lançamentos de um indicador, do mais novo para o mais antigo
+      tags:
+        - atletas
+      description: "Mesma matriz de acesso da ficha: gestor vê todos, treinador só os
+        próprios atletas, atleta só a si. Inclui a sugestão do atleta ainda
+        pendente (pendente: true, origem resposta_sugerida). cf_peso_kg
+        (calculado) traz as pesagens, com a nota pela regra P3 atual. IBVAR:
+        pilar sensível dá 403; nos demais, sem evidência, avaliador, anexo nem
+        sugestão pendente. Atleta fora do acesso ou indicador inexistente: 404."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+          in: path
+          name: indicadorId
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    valor:
+                      type: number
+                      description: Nota de 0 a 5
+                    pesoKg:
+                      nullable: true
+                      description: "Só em cf_peso_kg: o peso da pesagem"
+                      type: number
+                    evidencia:
+                      nullable: true
+                      type: string
+                    origem:
+                      type: string
+                      enum:
+                        - avaliacao
+                        - resposta_confirmada
+                        - resposta_sugerida
+                        - calculado
+                    pendente:
+                      type: boolean
+                      description: Sugestão do atleta aguardando o avaliador
+                    avaliador:
+                      nullable: true
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                      required:
+                        - id
+                        - nome
+                      additionalProperties: false
+                    cicloNome:
+                      nullable: true
+                      type: string
+                    lancadoEm:
+                      type: string
+                      description: Instante ISO
+                    anexo:
+                      nullable: true
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nomeArquivo:
+                          type: string
+                      required:
+                        - id
+                        - nomeArquivo
+                      additionalProperties: false
+                  required:
+                    - valor
+                    - pesoKg
+                    - evidencia
+                    - origem
+                    - pendente
+                    - avaliador
+                    - cicloNome
+                    - lancadoEm
+                    - anexo
+                  additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
   /atletas/{id}/avaliacoes/previa:
     post:
       summary: "Prévia do lançamento: score antes e depois, sem gravar"
@@ -1386,9 +1604,32 @@ paths:
                       - pilares
                       - statusGates
                     additionalProperties: false
+                  sugestaoPontos:
+                    nullable: true
+                    description: "Nota sugerida para perf_nacional pelos pontos do Ranking CBVela
+                      (regra PERF_PONTOS). Nula com a regra desligada. Não entra
+                      na prévia nem no score: o avaliador confirma lançando a
+                      nota."
+                    type: object
+                    properties:
+                      indicadorId:
+                        type: string
+                      nota:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                      pontos:
+                        type: number
+                        description: Pontos do Ranking CBVela na janela
+                    required:
+                      - indicadorId
+                      - nota
+                      - pontos
+                    additionalProperties: false
                 required:
                   - antes
                   - depois
+                  - sugestaoPontos
                 additionalProperties: false
         "400":
           description: Default Response
@@ -2352,6 +2593,187 @@ paths:
                   - mensagem
                 additionalProperties: false
         "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    get:
+      summary: Todos os atletas do piloto, para gestão do cadastro
+      tags:
+        - cadastro
+      description: "Inclui inativos e quem não aceitou o termo. Sem dado sensível nem
+        e-mail. termoAceito segue a regra do ranking (TERMO_EXIGE_REACEITE).
+        contaVinculada: já existe conta de atleta ligada a ele. busca procura no
+        nome e no código VelaID."
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          in: query
+          name: ativo
+          required: false
+        - schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          in: query
+          name: termoAceito
+          required: false
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 40
+          in: query
+          name: classeId
+          required: false
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: query
+          name: treinadorId
+          required: false
+        - schema:
+            type: string
+            maxLength: 80
+          in: query
+          name: busca
+          required: false
+          description: Parte do nome ou do VelaID
+      security: *a1
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    nome:
+                      type: string
+                    velaid:
+                      type: string
+                    classe:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                      required:
+                        - id
+                        - nome
+                      additionalProperties: false
+                    treinador:
+                      nullable: true
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                      required:
+                        - id
+                        - nome
+                      additionalProperties: false
+                    numeroVela:
+                      nullable: true
+                      type: string
+                    ativo:
+                      type: boolean
+                    termoAceito:
+                      type: boolean
+                    contaVinculada:
+                      type: boolean
+                  required:
+                    - id
+                    - nome
+                    - velaid
+                    - classe
+                    - treinador
+                    - numeroVela
+                    - ativo
+                    - termoAceito
+                    - contaVinculada
+                  additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
           description: Default Response
           content:
             application/json:
@@ -4645,8 +5067,10 @@ paths:
                     maxLength: 40
                 regras:
                   description: "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4,
-                    RANKING_CBVELA, TERMO_EXIGE_REACEITE. O valor segue o
-                    formato lido em GET /parametros"
+                    RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_PONTOS. O valor
+                    segue o formato lido em GET /parametros. PERF_PONTOS: {
+                    ativa, faixas: [{ ate, nota }] }, ate crescente e nota de 0
+                    a 5 que não diminui"
                   type: object
                   additionalProperties: {}
                 classes:
@@ -5498,6 +5922,232 @@ paths:
                 required:
                   - ciclo
                   - atletas
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /ciclos/{id}/pendencias:
+    get:
+      summary: "Quem está atrasado no ciclo aberto: treinadores e atletas com pendência"
+      tags:
+        - ciclos
+      description: "Mesma regra do job de lembretes. Só atletas ativos com o termo do
+        piloto aceito. Treinador: atletas sem nota no ciclo em algum indicador T
+        (faltam = indicadores sem nota). Atleta: perguntas do questionário sem
+        resposta. diasParaPrazo é negativo depois do prazo. Ciclo fechado: 409."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: *a3
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  treinadores:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                        atletasPendentes:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              nome:
+                                type: string
+                              faltam:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                            required:
+                              - id
+                              - nome
+                              - faltam
+                            additionalProperties: false
+                      required:
+                        - id
+                        - nome
+                        - atletasPendentes
+                      additionalProperties: false
+                  atletas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                        perguntasSemResposta:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                      required:
+                        - id
+                        - nome
+                        - perguntasSemResposta
+                      additionalProperties: false
+                  totais:
+                    type: object
+                    properties:
+                      treinadoresComPendencia:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                      atletasComPendencia:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                      diasParaPrazo:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                    required:
+                      - treinadoresComPendencia
+                      - atletasComPendencia
+                      - diasParaPrazo
+                    additionalProperties: false
+                required:
+                  - treinadores
+                  - atletas
+                  - totais
                 additionalProperties: false
         "400":
           description: Default Response

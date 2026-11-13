@@ -72,6 +72,22 @@ export function regrasDoBanco(linhas: { codigo: string; valor: ValorRegra }[]): 
     },
     g4: { A: perfil("A"), B: perfil("B"), C: perfil("C"), D: perfil("D") },
     rankingCbvela: { janelaSemanas: numero(rk.janela_semanas, "RANKING_CBVELA", "janela_semanas") },
+    perfPontos: perfPontosDoBanco(porCodigo.get("PERF_PONTOS")),
+  };
+}
+
+/** PERF_PONTOS (migration 0012). Ausente ou desligada: sem nota sugerida. */
+function perfPontosDoBanco(valor: ValorRegra | undefined): Regras["perfPontos"] {
+  if (!valor) return { ativa: false, faixas: [] };
+  const faixas = Array.isArray(valor.faixas) ? (valor.faixas as Record<string, unknown>[]) : [];
+  return {
+    ativa: valor.ativa === true,
+    faixas: faixas
+      .map((f) => ({
+        ate: numero(f.ate, "PERF_PONTOS", "faixas.ate"),
+        nota: numero(f.nota, "PERF_PONTOS", "faixas.nota"),
+      }))
+      .sort((a, b) => a.ate - b.ate),
   };
 }
 

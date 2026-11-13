@@ -5,3 +5,4 @@ export * from "./score.js";
 export * from "./gates.js";
 export * from "./calculo.js";
 export * from "./plano.js";
+export * from "./pontos.js";

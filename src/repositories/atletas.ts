@@ -237,6 +237,93 @@ export async function contarSemConsentimentoIbvar(db: Db, agora: Date): Promise<
   return Number(r.rows[0]?.n ?? 0);
 }
 
+/** Linha da lista de gestão (GET /atletas): sem dado sensível nem e-mail. */
+export interface AtletaGestao {
+  id: string;
+  nome: string;
+  velaid: string;
+  classe: { id: string; nome: string };
+  treinador: { id: string; nome: string } | null;
+  numeroVela: string | null;
+  ativo: boolean;
+  termoAceito: boolean;
+  /** Já existe conta (usuário de papel atleta) ligada a este atleta. */
+  contaVinculada: boolean;
+}
+
+export interface FiltrosGestao {
+  agora: Date;
+  ativo?: boolean | undefined;
+  termoAceito?: boolean | undefined;
+  classeId?: string | undefined;
+  treinadorId?: string | undefined;
+  /** Parte do nome ou do código VelaID, sem diferenciar maiúsculas. */
+  busca?: string | undefined;
+}
+
+const escaparLike = (texto: string) => texto.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+/**
+ * Todos os atletas do piloto para o gestor, inclusive inativos e sem o termo aceito.
+ * Termo aceito segue a mesma regra do ranking (TERMO_EXIGE_REACEITE).
+ */
+export async function listarAtletasGestao(db: Db, filtros: FiltrosGestao): Promise<AtletaGestao[]> {
+  const params: unknown[] = [];
+  const param = (v: unknown) => {
+    params.push(v);
+    return `$${params.length}`;
+  };
+  const termoAceito = termoSql.aceitoNoPiloto("a.id", param(filtros.agora));
+  const condicoes: string[] = [];
+  if (filtros.ativo !== undefined) condicoes.push(`a.ativo = ${param(filtros.ativo)}`);
+  if (filtros.termoAceito !== undefined) {
+    condicoes.push(filtros.termoAceito ? termoAceito : `not ${termoAceito}`);
+  }
+  if (filtros.classeId) condicoes.push(`a.classe_id = ${param(filtros.classeId)}`);
+  if (filtros.treinadorId) condicoes.push(`a.treinador_id = ${param(filtros.treinadorId)}::uuid`);
+  const busca = filtros.busca?.trim();
+  if (busca) {
+    const p = param(`%${escaparLike(busca)}%`);
+    condicoes.push(`(a.nome ilike ${p} escape '\\' or a.velaid_codigo ilike ${p} escape '\\')`);
+  }
+
+  const r = await db.query<{
+    id: string;
+    nome: string;
+    velaid_codigo: string;
+    classe_id: string;
+    classe_nome: string;
+    treinador_id: string | null;
+    treinador_nome: string | null;
+    numero_vela: string | null;
+    ativo: boolean;
+    termo_aceito: boolean;
+    conta_vinculada: boolean;
+  }>(
+    `select a.id, a.nome, a.velaid_codigo, c.id as classe_id, c.nome as classe_nome,
+            a.treinador_id, t.nome as treinador_nome, a.numero_vela, a.ativo,
+            ${termoAceito} as termo_aceito,
+            exists (select 1 from usuarios u where u.atleta_id = a.id) as conta_vinculada
+       from atletas a
+       join classes c on c.id = a.classe_id
+       left join usuarios t on t.id = a.treinador_id
+      ${condicoes.length ? `where ${condicoes.join(" and ")}` : ""}
+      order by a.nome, a.id`,
+    params,
+  );
+  return r.rows.map((l) => ({
+    id: l.id,
+    nome: l.nome,
+    velaid: l.velaid_codigo,
+    classe: { id: l.classe_id, nome: l.classe_nome },
+    treinador: l.treinador_id ? { id: l.treinador_id, nome: l.treinador_nome ?? "" } : null,
+    numeroVela: l.numero_vela,
+    ativo: l.ativo,
+    termoAceito: l.termo_aceito,
+    contaVinculada: l.conta_vinculada,
+  }));
+}
+
 export async function cicloAberto(db: Db): Promise<{ nome: string; prazo: string } | null> {
   const r = await db.query<{ nome: string; prazo: string }>(
     `select nome, prazo::text as prazo from ciclos_avaliacao where status = 'aberto' limit 1`,

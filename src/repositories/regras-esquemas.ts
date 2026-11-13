@@ -47,6 +47,30 @@ export const ESQUEMAS_REGRAS = {
   G4: z.strictObject({ A: perfilG4, B: perfilG4, C: perfilG4, D: perfilG4 }),
   RANKING_CBVELA: z.strictObject({ janela_semanas: z.number().int().min(1).max(104) }),
   TERMO_EXIGE_REACEITE: z.strictObject({ ativa: z.boolean() }),
+  PERF_PONTOS: z
+    .strictObject({
+      ativa: z.boolean(),
+      faixas: z
+        .array(
+          z.strictObject({
+            ate: z.number().min(0).max(100_000),
+            nota: z.number().int().min(0).max(5),
+          }),
+        )
+        .max(20)
+        .refine(
+          (f) => f.every((x, i) => i === 0 || x.ate > (f[i - 1] as { ate: number }).ate),
+          'Em PERF_PONTOS, o "ate" das faixas precisa ser crescente.',
+        )
+        .refine(
+          (f) => f.every((x, i) => i === 0 || x.nota >= (f[i - 1] as { nota: number }).nota),
+          "Em PERF_PONTOS, mais pontos não podem dar nota menor.",
+        ),
+    })
+    .refine(
+      (v) => !v.ativa || v.faixas.length > 0,
+      "Para ativar PERF_PONTOS, informe ao menos uma faixa.",
+    ),
 } as const;
 
 export type CodigoRegra = keyof typeof ESQUEMAS_REGRAS;
