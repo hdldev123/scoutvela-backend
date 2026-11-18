@@ -1,5 +1,11 @@
 import type { Db } from "../src/db/db.js";
-import { ATLETAS_PROTOTIPO, MESES_ASSEGURADOS, PATROCINIO, VELAID_EXTRAS, autonomiaComponente } from "./prototipo.js";
+import {
+  ATLETAS_PROTOTIPO,
+  MESES_ASSEGURADOS,
+  PATROCINIO,
+  VELAID_EXTRAS,
+  autonomiaComponente,
+} from "./prototipo.js";
 
 const NIVEIS: Record<string, string> = {
   Mundial: "mundial",
@@ -16,8 +22,15 @@ const CICLOS = [
   { nome: "Novembro de 2026", inicio: "2026-11-01", prazo: "2026-11-30", status: "aberto" },
 ] as const;
 
-const CICLO_DO_MES: Record<string, string> = { "09": "Setembro de 2026", "10": "Outubro de 2026", "11": "Novembro de 2026" };
-const CICLO_DO_HISTORICO: Record<string, string> = { Set: "Setembro de 2026", Out: "Outubro de 2026" };
+const CICLO_DO_MES: Record<string, string> = {
+  "09": "Setembro de 2026",
+  "10": "Outubro de 2026",
+  "11": "Novembro de 2026",
+};
+const CICLO_DO_HISTORICO: Record<string, string> = {
+  Set: "Setembro de 2026",
+  Out: "Outubro de 2026",
+};
 
 /** 'DD/MM/AAAA' do protótipo -> timestamptz ao meio-dia em Brasília. */
 function aoMeioDia(dataBr: string): string {
@@ -64,10 +77,22 @@ export async function semear(db: Db): Promise<void> {
       throw new Error("O banco já tem atletas; o seed só roda em banco sem atletas.");
     }
 
-    const gestorId = await inserirUsuario(tx, { email: "gestor@scoutvela.dev", nome: "Gestor CBVela", papel: "gestor" });
+    const gestorId = await inserirUsuario(tx, {
+      email: "gestor@scoutvela.dev",
+      nome: "Gestor CBVela",
+      papel: "gestor",
+    });
     const treinadores: Record<string, string> = {
-      "Ana Ribeiro": await inserirUsuario(tx, { email: "treinadora@scoutvela.dev", nome: "Ana Ribeiro", papel: "treinador" }),
-      "Marcos Pires": await inserirUsuario(tx, { email: "marcos.pires@scoutvela.dev", nome: "Marcos Pires", papel: "treinador" }),
+      "Ana Ribeiro": await inserirUsuario(tx, {
+        email: "treinadora@scoutvela.dev",
+        nome: "Ana Ribeiro",
+        papel: "treinador",
+      }),
+      "Marcos Pires": await inserirUsuario(tx, {
+        email: "marcos.pires@scoutvela.dev",
+        nome: "Marcos Pires",
+        papel: "treinador",
+      }),
     };
     await inserirUsuario(tx, { email: "ibvar@scoutvela.dev", nome: "IBVAR", papel: "ibvar" });
 
@@ -88,7 +113,9 @@ export async function semear(db: Db): Promise<void> {
       );
     }
 
-    const componentes = (await tx.query<{ id: string }>("select id from componentes_custo order by ordem")).rows;
+    const componentes = (
+      await tx.query<{ id: string }>("select id from componentes_custo order by ordem")
+    ).rows;
 
     for (const a of ATLETAS_PROTOTIPO) {
       const treinadorId = treinadores[a.treinador];
@@ -98,7 +125,20 @@ export async function semear(db: Db): Promise<void> {
         `insert into atletas (velaid_codigo, nome, genero, data_nascimento, classe_id, clube, cidade, uf, numero_vela,
                               treinador_id, email_contato, criado_por)
          values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning id`,
-        [a.velaId, a.nome, a.genero, a.nascimento, a.classeId, a.clube, a.cidade, a.uf, a.numeroVela, treinadorId, a.emailContato, gestorId],
+        [
+          a.velaId,
+          a.nome,
+          a.genero,
+          a.nascimento,
+          a.classeId,
+          a.clube,
+          a.cidade,
+          a.uf,
+          a.numeroVela,
+          treinadorId,
+          a.emailContato,
+          gestorId,
+        ],
       );
       const atletaId = rows[0]!.id;
 
@@ -109,7 +149,12 @@ export async function semear(db: Db): Promise<void> {
       );
 
       if (a.velaId === "SP-T07") {
-        await inserirUsuario(tx, { email: "atleta@scoutvela.dev", nome: a.nome, papel: "atleta", atletaId });
+        await inserirUsuario(tx, {
+          email: "atleta@scoutvela.dev",
+          nome: a.nome,
+          papel: "atleta",
+          atletaId,
+        });
       }
 
       await tx.query(
@@ -134,7 +179,16 @@ export async function semear(db: Db): Promise<void> {
           await tx.query(
             `insert into avaliacoes (atleta_id, indicador_id, ciclo_id, valor, evidencia, origem, avaliador_id, lancado_em)
              values ($1, $2, $3, $4, $5, $6, $7, $8)`,
-            [atletaId, indicadorId, cicloId, n.valor, n.evidencia, n.tipo === "A" ? "resposta_confirmada" : "avaliacao", treinadorId, aoMeioDia(n.data)],
+            [
+              atletaId,
+              indicadorId,
+              cicloId,
+              n.valor,
+              n.evidencia,
+              n.tipo === "A" ? "resposta_confirmada" : "avaliacao",
+              treinadorId,
+              aoMeioDia(n.data),
+            ],
           );
         }
         const resposta = a.respostas[indicadorId];
@@ -155,7 +209,13 @@ export async function semear(db: Db): Promise<void> {
                                           pontos_cbvela, fonte, link_oficial, registrado_por)
            values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
           [
-            atletaId, nivel, r.evento, r.data, r.posicao, r.tamanhoFrota, r.internacional,
+            atletaId,
+            nivel,
+            r.evento,
+            r.data,
+            r.posicao,
+            r.tamanhoFrota,
+            r.internacional,
             r.internacional ? null : r.pontos,
             r.internacional ? "manual" : "ranking_cbvela",
             r.internacional ? `https://resultados.exemplo.invalid/${slug(r.evento)}` : null,
@@ -167,7 +227,13 @@ export async function semear(db: Db): Promise<void> {
       const fin = await tx.query<{ id: string }>(
         `insert into financeiro_campanha (atleta_id, perfil_suporte, meses_assegurados, patrocinio_privado, informado_por)
          values ($1, $2, $3, $4, $5) returning id`,
-        [atletaId, a.perfilSuporte, MESES_ASSEGURADOS[a.perfilSuporte], PATROCINIO[a.perfilSuporte], gestorId],
+        [
+          atletaId,
+          a.perfilSuporte,
+          MESES_ASSEGURADOS[a.perfilSuporte],
+          PATROCINIO[a.perfilSuporte],
+          gestorId,
+        ],
       );
       for (const [i, comp] of componentes.entries()) {
         const x = autonomiaComponente(a.perfilSuporte, i);
@@ -182,12 +248,10 @@ export async function semear(db: Db): Promise<void> {
           "select id from faixas_score where score_min <= $1 order by score_min desc limit 1",
           [h.score],
         );
-        await tx.query("insert into scores_ciclo (atleta_id, ciclo_id, score, faixa_id) values ($1, $2, $3, $4)", [
-          atletaId,
-          ciclos[CICLO_DO_HISTORICO[h.ciclo]!],
-          h.score,
-          faixa.rows[0]!.id,
-        ]);
+        await tx.query(
+          "insert into scores_ciclo (atleta_id, ciclo_id, score, faixa_id) values ($1, $2, $3, $4)",
+          [atletaId, ciclos[CICLO_DO_HISTORICO[h.ciclo]!], h.score, faixa.rows[0]!.id],
+        );
       }
     }
   });

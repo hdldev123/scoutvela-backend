@@ -5,6 +5,13 @@ import type { Db } from "./db.js";
 /** Pasta das migrations. No Render e no dev, o processo roda na raiz do vela-back. */
 export const PASTA_MIGRATIONS = process.env.MIGRATIONS_DIR ?? join(process.cwd(), "migrations");
 
+/** Arquivos de migration da pasta (`0001_nome.sql`), em ordem de aplicação. */
+export function listarMigrations(pasta = PASTA_MIGRATIONS): string[] {
+  return readdirSync(pasta)
+    .filter((f) => /^\d{4}_.+\.sql$/.test(f))
+    .sort();
+}
+
 /**
  * Aplica, em ordem, as migrations SQL ainda não aplicadas. Cada arquivo roda
  * numa transação própria e fica registrado em schema_migrations.
@@ -20,9 +27,7 @@ export async function migrar(db: Db, pasta = PASTA_MIGRATIONS): Promise<string[]
   `);
   const { rows } = await db.query<{ nome: string }>("select nome from schema_migrations");
   const aplicadas = new Set(rows.map((r) => r.nome));
-  const arquivos = readdirSync(pasta)
-    .filter((f) => /^\d{4}_.+\.sql$/.test(f))
-    .sort();
+  const arquivos = listarMigrations(pasta);
 
   const novas: string[] = [];
   for (const arquivo of arquivos) {

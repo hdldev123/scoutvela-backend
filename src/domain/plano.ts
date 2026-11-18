@@ -45,7 +45,9 @@ export function sugerirPlano(e: EntradaSugestaoPlano): TextosPlano {
         ? "Aguardando mais avaliações"
         : menores.map((p) => p.nome).join(", ");
 
-  const meta12m = e.temResultadoMundial ? "Top 10 no Mundial da classe" : "Primeiro Mundial da classe, top 50%";
+  const meta12m = e.temResultadoMundial
+    ? "Top 10 no Mundial da classe"
+    : "Primeiro Mundial da classe, top 50%";
   const meta24m =
     e.statusFinal === "apto"
       ? "Campanha completa no circuito internacional"

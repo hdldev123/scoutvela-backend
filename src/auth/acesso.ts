@@ -8,7 +8,17 @@ export interface AcessoDoPapel {
 /** Telas liberadas por papel e tela em que a pessoa entra. O front só espelha isto. */
 const ACESSO: Partial<Record<Papel, AcessoDoPapel>> = {
   gestor: {
-    telas: ["ranking", "avaliar", "cadastro", "ciclos", "revisoes", "investimento", "usuarios", "parametros", "auditoria"],
+    telas: [
+      "ranking",
+      "avaliar",
+      "cadastro",
+      "ciclos",
+      "revisoes",
+      "investimento",
+      "usuarios",
+      "parametros",
+      "auditoria",
+    ],
     telaInicial: "ranking",
   },
   // No front, "ranking" do treinador aparece como "Meus atletas". Revisões: só leitura dos próprios atletas.

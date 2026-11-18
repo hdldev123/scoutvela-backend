@@ -1,6 +1,14 @@
+import { termoSql } from "./termo.js";
 import type { UsuarioAutenticado } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
-import type { Classe, Genero, NivelCompeticao, PerfilSuporte, PosicaoClasse, StatusGate } from "../domain/tipos.js";
+import type {
+  Classe,
+  Genero,
+  NivelCompeticao,
+  PerfilSuporte,
+  PosicaoClasse,
+  StatusGate,
+} from "../domain/tipos.js";
 
 type UsuarioDeAcesso = Pick<UsuarioAutenticado, "id" | "papel" | "atletaId">;
 
@@ -83,9 +91,6 @@ export interface OpcoesCarga {
   historico?: boolean;
 }
 
-const TERMO_ACEITO_SQL = `exists (select 1 from consentimento_atual ct
-                                   where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido)`;
-
 /**
  * WHERE da matriz de acesso ("Score, pilares e gates"). Os parâmetros são posicionais,
  * a partir de `proximoIndiceParam`. Atleta sem consentimento nunca sai do banco para o IBVAR.
@@ -139,7 +144,9 @@ interface LinhaBase {
 }
 
 export interface FiltrosListagem {
-  /** Só atletas com o termo do piloto aceito (ranking e listas do piloto). */
+  /** Instante de referência (`app.agora()`): decide qual termo é o vigente. */
+  agora: Date;
+  /** Só atletas com o termo do piloto aceito (ranking e listas do piloto; segue TERMO_EXIGE_REACEITE). */
   somenteTermoAceito?: boolean;
   /** Evento da classe (ex.: "ILCA 7"). */
   classeEvento?: string;
@@ -152,7 +159,7 @@ export interface FiltrosListagem {
 export async function listarAtletasVisiveis(
   db: Db,
   usuario: UsuarioDeAcesso,
-  filtros: FiltrosListagem = {},
+  filtros: FiltrosListagem,
 ): Promise<AtletaBase[]> {
   const vis = filtroVisibilidade(usuario, "a", 1);
   const params: unknown[] = [...vis.params];
@@ -161,7 +168,8 @@ export async function listarAtletasVisiveis(
     params.push(v);
     return `$${params.length}`;
   };
-  if (filtros.somenteTermoAceito) condicoes.push(TERMO_ACEITO_SQL);
+  const termoAceito = termoSql.aceitoNoPiloto("a.id", param(filtros.agora));
+  if (filtros.somenteTermoAceito) condicoes.push(termoAceito);
   if (filtros.classeEvento) condicoes.push(`c.evento = ${param(filtros.classeEvento)}`);
   if (filtros.genero) condicoes.push(`a.genero = ${param(filtros.genero)}`);
   if (filtros.atletaId) condicoes.push(`a.id = ${param(filtros.atletaId)}::uuid`);
@@ -170,7 +178,7 @@ export async function listarAtletasVisiveis(
     `select a.id, a.velaid_codigo, a.nome, a.genero, a.data_nascimento::text as data_nascimento,
             a.clube, a.cidade, a.uf, a.numero_vela, a.email_contato,
             a.treinador_id, t.nome as treinador_nome,
-            ${TERMO_ACEITO_SQL} as termo_aceito,
+            ${termoAceito} as termo_aceito,
             c.id as classe_id, c.nome as classe_nome, c.evento as classe_evento, c.posicao as classe_posicao,
             c.peso_min_kg, c.peso_medio_kg, c.peso_max_kg
        from atletas a
@@ -206,21 +214,114 @@ export async function listarAtletasVisiveis(
 }
 
 /** Um atleta ativo, se o usuário puder vê-lo (senão nulo, sem distinguir de inexistente). */
-export async function buscarAtletaVisivel(db: Db, usuario: UsuarioDeAcesso, id: string): Promise<AtletaBase | null> {
-  const lista = await listarAtletasVisiveis(db, usuario, { atletaId: id });
+export async function buscarAtletaVisivel(
+  db: Db,
+  usuario: UsuarioDeAcesso,
+  id: string,
+  agora: Date,
+): Promise<AtletaBase | null> {
+  const lista = await listarAtletasVisiveis(db, usuario, { atletaId: id, agora });
   return lista[0] ?? null;
 }
 
 /** Atletas ativos do piloto (termo aceito) sem consentimento de compartilhamento com o IBVAR. */
-export async function contarSemConsentimentoIbvar(db: Db): Promise<number> {
+export async function contarSemConsentimentoIbvar(db: Db, agora: Date): Promise<number> {
   const r = await db.query<{ n: string }>(
     `select count(*)::text as n
        from atletas a
-      where a.ativo and ${TERMO_ACEITO_SQL}
+      where a.ativo and ${termoSql.aceitoNoPiloto("a.id", "$1")}
         and not exists (select 1 from consentimento_atual ci
                          where ci.atleta_id = a.id and ci.tipo = 'compartilhar_ibvar' and ci.concedido)`,
+    [agora],
   );
   return Number(r.rows[0]?.n ?? 0);
+}
+
+/** Linha da lista de gestão (GET /atletas): sem dado sensível nem e-mail. */
+export interface AtletaGestao {
+  id: string;
+  nome: string;
+  velaid: string;
+  classe: { id: string; nome: string };
+  treinador: { id: string; nome: string } | null;
+  numeroVela: string | null;
+  ativo: boolean;
+  termoAceito: boolean;
+  /** Já existe conta (usuário de papel atleta) ligada a este atleta. */
+  contaVinculada: boolean;
+}
+
+export interface FiltrosGestao {
+  agora: Date;
+  ativo?: boolean | undefined;
+  termoAceito?: boolean | undefined;
+  classeId?: string | undefined;
+  treinadorId?: string | undefined;
+  /** Parte do nome ou do código VelaID, sem diferenciar maiúsculas. */
+  busca?: string | undefined;
+}
+
+const escaparLike = (texto: string) => texto.replace(/[\\%_]/g, (c) => `\\${c}`);
+
+/**
+ * Todos os atletas do piloto para o gestor, inclusive inativos e sem o termo aceito.
+ * Termo aceito segue a mesma regra do ranking (TERMO_EXIGE_REACEITE).
+ */
+export async function listarAtletasGestao(db: Db, filtros: FiltrosGestao): Promise<AtletaGestao[]> {
+  const params: unknown[] = [];
+  const param = (v: unknown) => {
+    params.push(v);
+    return `$${params.length}`;
+  };
+  const termoAceito = termoSql.aceitoNoPiloto("a.id", param(filtros.agora));
+  const condicoes: string[] = [];
+  if (filtros.ativo !== undefined) condicoes.push(`a.ativo = ${param(filtros.ativo)}`);
+  if (filtros.termoAceito !== undefined) {
+    condicoes.push(filtros.termoAceito ? termoAceito : `not ${termoAceito}`);
+  }
+  if (filtros.classeId) condicoes.push(`a.classe_id = ${param(filtros.classeId)}`);
+  if (filtros.treinadorId) condicoes.push(`a.treinador_id = ${param(filtros.treinadorId)}::uuid`);
+  const busca = filtros.busca?.trim();
+  if (busca) {
+    const p = param(`%${escaparLike(busca)}%`);
+    condicoes.push(`(a.nome ilike ${p} escape '\\' or a.velaid_codigo ilike ${p} escape '\\')`);
+  }
+
+  const r = await db.query<{
+    id: string;
+    nome: string;
+    velaid_codigo: string;
+    classe_id: string;
+    classe_nome: string;
+    treinador_id: string | null;
+    treinador_nome: string | null;
+    numero_vela: string | null;
+    ativo: boolean;
+    termo_aceito: boolean;
+    conta_vinculada: boolean;
+  }>(
+    `select a.id, a.nome, a.velaid_codigo, c.id as classe_id, c.nome as classe_nome,
+            a.treinador_id, t.nome as treinador_nome, a.numero_vela, a.ativo,
+            ${termoAceito} as termo_aceito,
+            exists (select 1 from usuarios u where u.atleta_id = a.id) as conta_vinculada
+       from atletas a
+       join classes c on c.id = a.classe_id
+       left join usuarios t on t.id = a.treinador_id
+      ${condicoes.length ? `where ${condicoes.join(" and ")}` : ""}
+      order by a.nome, a.id`,
+    params,
+  );
+  return r.rows.map((l) => ({
+    id: l.id,
+    nome: l.nome,
+    velaid: l.velaid_codigo,
+    classe: { id: l.classe_id, nome: l.classe_nome },
+    treinador: l.treinador_id ? { id: l.treinador_id, nome: l.treinador_nome ?? "" } : null,
+    numeroVela: l.numero_vela,
+    ativo: l.ativo,
+    termoAceito: l.termo_aceito,
+    contaVinculada: l.conta_vinculada,
+  }));
 }
 
 export async function cicloAberto(db: Db): Promise<{ nome: string; prazo: string } | null> {
@@ -230,7 +331,8 @@ export async function cicloAberto(db: Db): Promise<{ nome: string; prazo: string
   return r.rows[0] ?? null;
 }
 
-const iso = (v: unknown): string => (v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString());
+const iso = (v: unknown): string =>
+  v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString();
 
 /**
  * Carrega, numa ida por tabela, tudo o que o cálculo (e a ficha) precisa para o conjunto de atletas.
@@ -247,7 +349,13 @@ export async function carregarDadosAtletas(
       notas: [],
       respostas: {},
       sugestoesPendentes: {},
-      medida: { pesoKg: null, alturaCm: null, pesoMedidoEm: null, pesoEvidencia: null, pesoRegistradoPor: null },
+      medida: {
+        pesoKg: null,
+        alturaCm: null,
+        pesoMedidoEm: null,
+        pesoEvidencia: null,
+        pesoRegistradoPor: null,
+      },
       resultados: [],
       decisoesGates: [null, null, null, null],
       financeiro: null,
@@ -257,84 +365,85 @@ export async function carregarDadosAtletas(
   if (atletaIds.length === 0) return mapa;
   const p = [atletaIds];
 
-  const [notas, respostas, sugestoes, medidas, resultados, decisoes, financeiro] = await Promise.all([
-    db.query<{
-      atleta_id: string;
-      indicador_id: string;
-      valor: number;
-      evidencia: string;
-      origem: "avaliacao" | "resposta_confirmada";
-      avaliador_id: string | null;
-      avaliador_nome: string | null;
-      lancado_em: Date;
-      anexo_id: string | null;
-      anexo_nome: string | null;
-    }>(
-      `select n.atleta_id, n.indicador_id, n.valor, n.evidencia, n.origem, n.avaliador_id,
+  const [notas, respostas, sugestoes, medidas, resultados, decisoes, financeiro] =
+    await Promise.all([
+      db.query<{
+        atleta_id: string;
+        indicador_id: string;
+        valor: number;
+        evidencia: string;
+        origem: "avaliacao" | "resposta_confirmada";
+        avaliador_id: string | null;
+        avaliador_nome: string | null;
+        lancado_em: Date;
+        anexo_id: string | null;
+        anexo_nome: string | null;
+      }>(
+        `select n.atleta_id, n.indicador_id, n.valor, n.evidencia, n.origem, n.avaliador_id,
               u.nome as avaliador_nome, n.lancado_em, n.anexo_id, ea.nome_arquivo as anexo_nome
          from avaliacao_atual n
          left join usuarios u on u.id = n.avaliador_id
          left join evidencias_anexos ea on ea.id = n.anexo_id
         where n.atleta_id = any($1::uuid[])`,
-      p,
-    ),
-    db.query<{ atleta_id: string; indicador_id: string; resposta: string }>(
-      `select atleta_id, indicador_id, resposta from resposta_atual where atleta_id = any($1::uuid[])`,
-      p,
-    ),
-    db.query<{ atleta_id: string; indicador_id: string; valor: number; lancado_em: Date }>(
-      `select atleta_id, indicador_id, valor, lancado_em from sugestao_pendente where atleta_id = any($1::uuid[])`,
-      p,
-    ),
-    db.query<{
-      atleta_id: string;
-      peso_kg: string | null;
-      altura_cm: string | null;
-      medido_em: Date;
-      evidencia: string;
-      registrado_por: string;
-      registrador_nome: string;
-    }>(
-      `select m.atleta_id, m.peso_kg, m.altura_cm, m.medido_em, m.evidencia, m.registrado_por,
+        p,
+      ),
+      db.query<{ atleta_id: string; indicador_id: string; resposta: string }>(
+        `select atleta_id, indicador_id, resposta from resposta_atual where atleta_id = any($1::uuid[])`,
+        p,
+      ),
+      db.query<{ atleta_id: string; indicador_id: string; valor: number; lancado_em: Date }>(
+        `select atleta_id, indicador_id, valor, lancado_em from sugestao_pendente where atleta_id = any($1::uuid[])`,
+        p,
+      ),
+      db.query<{
+        atleta_id: string;
+        peso_kg: string | null;
+        altura_cm: string | null;
+        medido_em: Date;
+        evidencia: string;
+        registrado_por: string;
+        registrador_nome: string;
+      }>(
+        `select m.atleta_id, m.peso_kg, m.altura_cm, m.medido_em, m.evidencia, m.registrado_por,
               u.nome as registrador_nome
          from medidas_corporais m join usuarios u on u.id = m.registrado_por
         where m.atleta_id = any($1::uuid[])
         order by m.medido_em desc, m.id desc`,
-      p,
-    ),
-    db.query<{
-      atleta_id: string;
-      data: string;
-      nivel: NivelCompeticao;
-      evento: string;
-      posicao: number;
-      tamanho_frota: number;
-      internacional: boolean;
-      pontos_cbvela: string | null;
-      fonte: "ranking_cbvela" | "manual";
-      link_oficial: string | null;
-    }>(
-      `select atleta_id, data::text as data, nivel, evento, posicao, tamanho_frota, internacional,
+        p,
+      ),
+      db.query<{
+        atleta_id: string;
+        data: string;
+        nivel: NivelCompeticao;
+        evento: string;
+        posicao: number;
+        tamanho_frota: number;
+        internacional: boolean;
+        pontos_cbvela: string | null;
+        fonte: "ranking_cbvela" | "manual";
+        link_oficial: string | null;
+      }>(
+        `select atleta_id, data::text as data, nivel, evento, posicao, tamanho_frota, internacional,
               pontos_cbvela, fonte, link_oficial
          from resultados_regata where atleta_id = any($1::uuid[]) order by data desc, id desc`,
-      p,
-    ),
-    db.query<{ atleta_id: string; gate: number; status: StatusGate | null }>(
-      `select atleta_id, gate, status from gate_decisao_atual where atleta_id = any($1::uuid[])`,
-      p,
-    ),
-    db.query<{
-      id: string;
-      atleta_id: string;
-      perfil_suporte: PerfilSuporte;
-      meses_assegurados: number | null;
-      patrocinio_privado: "sim" | "em_negociacao" | "nao" | null;
-    }>(
-      `select id, atleta_id, perfil_suporte, meses_assegurados, patrocinio_privado
+        p,
+      ),
+      db.query<{ atleta_id: string; gate: number; status: StatusGate | null }>(
+        `select atleta_id, gate, status from gate_decisao_atual where atleta_id = any($1::uuid[])`,
+        p,
+      ),
+      db.query<{
+        id: string;
+        atleta_id: string;
+        perfil_suporte: PerfilSuporte;
+        meses_assegurados: number | null;
+        patrocinio_privado: "sim" | "em_negociacao" | "nao" | null;
+      }>(
+        `select id, atleta_id, perfil_suporte, meses_assegurados, patrocinio_privado
          from financeiro_atual where atleta_id = any($1::uuid[])`,
-      p,
-    ),
-  ]);
+        p,
+      ),
+    ]);
 
   const dado = (id: string): DadosAtleta => mapa.get(id)!;
 
@@ -351,7 +460,10 @@ export async function carregarDadosAtletas(
   }
   for (const l of respostas.rows) dado(l.atleta_id).respostas[l.indicador_id] = l.resposta;
   for (const l of sugestoes.rows) {
-    dado(l.atleta_id).sugestoesPendentes[l.indicador_id] = { valor: l.valor, lancadoEm: iso(l.lancado_em) };
+    dado(l.atleta_id).sugestoesPendentes[l.indicador_id] = {
+      valor: l.valor,
+      lancadoEm: iso(l.lancado_em),
+    };
   }
 
   // Medidas vêm da mais recente para a mais antiga: vale a primeira com peso e a primeira com altura.
@@ -393,7 +505,13 @@ export async function carregarDadosAtletas(
   }
 
   if (opcoes.componentesFinanceiro && finIds.length > 0) {
-    const comp = await db.query<{ atleta_id: string; id: string; nome: string; autonomia: string; apoio_cbvela: string }>(
+    const comp = await db.query<{
+      atleta_id: string;
+      id: string;
+      nome: string;
+      autonomia: string;
+      apoio_cbvela: string;
+    }>(
       `select f.atleta_id, c.id, c.nome, fc.autonomia, fc.apoio_cbvela
          from financeiro_componentes fc
          join financeiro_campanha f on f.id = fc.financeiro_id
@@ -420,7 +538,8 @@ export async function carregarDadosAtletas(
         order by c.inicio, c.id`,
       p,
     );
-    for (const l of h.rows) dado(l.atleta_id).historicoScore.push({ ciclo: l.ciclo, score: Number(l.score) });
+    for (const l of h.rows)
+      dado(l.atleta_id).historicoScore.push({ ciclo: l.ciclo, score: Number(l.score) });
   }
 
   return mapa;

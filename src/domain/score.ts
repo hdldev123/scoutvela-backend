@@ -53,7 +53,9 @@ export function calcularScore(pilares: Pilar[], notas: NotasAtuais): number {
 /** Primeira faixa (maior scoreMin primeiro) com score ≥ scoreMin. */
 export function faixaDoScore(score: number, faixas: FaixaScore[]): FaixaScore {
   const ordenadas = [...faixas].sort((a, b) => b.scoreMin - a.scoreMin);
-  return ordenadas.find((f) => score >= f.scoreMin) ?? (ordenadas[ordenadas.length - 1] as FaixaScore);
+  return (
+    ordenadas.find((f) => score >= f.scoreMin) ?? (ordenadas[ordenadas.length - 1] as FaixaScore)
+  );
 }
 
 /** Soma dos pontos CBVela dos resultados nacionais com data em (referencia − janela, referencia]. */

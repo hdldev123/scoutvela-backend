@@ -3,7 +3,8 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
-import type { Parametros, ResultadoCalculo, StatusGate } from "../domain/index.js";
+import { INDICADOR_PONTOS_RANKING, notaSugeridaPorPontos } from "../domain/index.js";
+import type { Parametros, ResultadoCalculo, StatusGate, SugestaoPontos } from "../domain/index.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
 import type { AtletaBase, DadosAtleta } from "../repositories/atletas.js";
@@ -71,22 +72,28 @@ const esquemaParams = z.object({ id: z.uuid() });
 
 const requisicaoInvalida = (m: string) => new ErroApi(400, "requisicao_invalida", m);
 
-const fmtDecimal = (v: number) => v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const fmtDecimal = (v: number) =>
+  v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 /** Rejeita indicador inexistente, calculado, tipo R ou repetido. */
 function validarNotas(parametros: Parametros, corpo: Corpo): void {
-  const indicadores = new Map(parametros.pilares.flatMap((p) => p.indicadores).map((i) => [i.id, i]));
+  const indicadores = new Map(
+    parametros.pilares.flatMap((p) => p.indicadores).map((i) => [i.id, i]),
+  );
   const vistos = new Set<string>();
   for (const n of corpo.notas) {
     const ind = indicadores.get(n.indicadorId);
     if (!ind) throw requisicaoInvalida(`Indicador inexistente: ${n.indicadorId}.`);
     if (ind.calculado) {
-      throw requisicaoInvalida(`O indicador ${n.indicadorId} é calculado pelo sistema: informe o peso na medida.`);
+      throw requisicaoInvalida(
+        `O indicador ${n.indicadorId} é calculado pelo sistema: informe o peso na medida.`,
+      );
     }
     if (ind.tipo === "R") {
       throw requisicaoInvalida(`O indicador ${n.indicadorId} é só registro e não recebe nota.`);
     }
-    if (vistos.has(n.indicadorId)) throw requisicaoInvalida(`Indicador repetido no envio: ${n.indicadorId}.`);
+    if (vistos.has(n.indicadorId))
+      throw requisicaoInvalida(`Indicador repetido no envio: ${n.indicadorId}.`);
     vistos.add(n.indicadorId);
   }
 }
@@ -134,6 +141,9 @@ async function avaliarUm(db: Db, parametros: Parametros, atleta: AtletaBase, ref
   return avaliado;
 }
 
+const sugestaoComIndicador = (s: SugestaoPontos | null) =>
+  s ? { indicadorId: INDICADOR_PONTOS_RANKING, ...s } : null;
+
 export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
   const rota = app.withTypeProvider<ZodTypeProvider>();
   const acessoAvaliador = [app.autenticar, exigirPapel("gestor", "treinador")];
@@ -161,6 +171,16 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
               pilares: z.array(z.object({ id: z.string(), nota: z.number().nullable() })),
               statusGates: statusFinal,
             }),
+            sugestaoPontos: z
+              .object({
+                indicadorId: z.string(),
+                nota: z.number().int(),
+                pontos: z.number().describe("Pontos do Ranking CBVela na janela"),
+              })
+              .nullable()
+              .describe(
+                "Nota sugerida para perf_nacional pelos pontos do Ranking CBVela (regra PERF_PONTOS). Nula com a regra desligada. Não entra na prévia nem no score: o avaliador confirma lançando a nota.",
+              ),
           }),
           400: esquemaErro,
           401: esquemaErro,
@@ -171,7 +191,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
     },
     async (req) => {
       const referencia = app.agora();
-      const base = await buscarAtletaVisivel(app.db, req.usuario, req.params.id);
+      const base = await buscarAtletaVisivel(app.db, req.usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
       validarNotas(parametros, req.body);
@@ -184,7 +204,8 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
         referencia,
       );
       if (!depois) throw naoEncontrado("Atleta não encontrado.");
-      const pilares = (c: ResultadoCalculo) => c.pilares.map((p) => ({ id: p.pilarId, nota: p.nota }));
+      const pilares = (c: ResultadoCalculo) =>
+        c.pilares.map((p) => ({ id: p.pilarId, nota: p.nota }));
       return {
         antes: { ...resumo(antes.calculo), pilares: pilares(antes.calculo) },
         depois: {
@@ -192,6 +213,9 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           pilares: pilares(depois.calculo),
           statusGates: depois.calculo.statusFinal,
         },
+        sugestaoPontos: sugestaoComIndicador(
+          notaSugeridaPorPontos(antes.calculo.pontosCbvela, parametros.regras.perfPontos),
+        ),
       };
     },
   );
@@ -223,7 +247,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const referencia = app.agora();
       const { usuario, body } = req;
-      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id);
+      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
       validarNotas(parametros, body);
@@ -234,7 +258,8 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           `select id from evidencias_anexos where atleta_id = $1::uuid and id = any($2::uuid[])`,
           [base.id, anexoIds],
         );
-        if (ok.rows.length !== anexoIds.length) throw requisicaoInvalida("Anexo inexistente ou de outro atleta.");
+        if (ok.rows.length !== anexoIds.length)
+          throw requisicaoInvalida("Anexo inexistente ou de outro atleta.");
       }
 
       const resultado = await app.db.transacao(async (tx) => {
@@ -266,7 +291,9 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
         if (m) {
           const evidencia =
             m.evidencia ??
-            (m.pesoKg !== undefined ? `Pesagem: ${fmtDecimal(m.pesoKg)} kg` : `Altura: ${fmtDecimal(m.alturaCm ?? 0)} cm`);
+            (m.pesoKg !== undefined
+              ? `Pesagem: ${fmtDecimal(m.pesoKg)} kg`
+              : `Altura: ${fmtDecimal(m.alturaCm ?? 0)} cm`);
           await tx.query(
             `insert into medidas_corporais (atleta_id, peso_kg, altura_cm, medido_em, evidencia, registrado_por)
              values ($1, $2, $3, $4, $5, $6)`,
@@ -284,7 +311,12 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
             JSON.stringify({
               indicadores: body.notas.map((n) => n.indicadorId),
               comAnexo: body.notas.some((n) => n.anexoId),
-              medida: m ? [m.pesoKg !== undefined ? "pesoKg" : null, m.alturaCm !== undefined ? "alturaCm" : null].filter(Boolean) : [],
+              medida: m
+                ? [
+                    m.pesoKg !== undefined ? "pesoKg" : null,
+                    m.alturaCm !== undefined ? "alturaCm" : null,
+                  ].filter(Boolean)
+                : [],
               cicloId,
             }),
             referencia,
@@ -318,13 +350,19 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
             justificativa: z.string().trim().max(500).optional(),
           })
           .strict(),
-        response: { 200: esquemaGates, 400: esquemaErro, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
+        response: {
+          200: esquemaGates,
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+        },
       },
     },
     async (req) => {
       const referencia = app.agora();
       const { usuario, body } = req;
-      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id);
+      const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
 
@@ -346,7 +384,11 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           [
             usuario.id,
             base.id,
-            JSON.stringify({ gate: body.gate, voltouAoAutomatico: status === null, comJustificativa: !!body.justificativa }),
+            JSON.stringify({
+              gate: body.gate,
+              voltouAoAutomatico: status === null,
+              comJustificativa: !!body.justificativa,
+            }),
             referencia,
           ],
         );

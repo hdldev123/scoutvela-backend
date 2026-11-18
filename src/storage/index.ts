@@ -1,4 +1,4 @@
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, normalize, resolve, sep } from "node:path";
 import type { Config } from "../config.js";
 
@@ -12,6 +12,8 @@ export interface LinkTemporario {
 export interface ArmazenamentoEvidencias {
   salvar(caminho: string, bytes: Uint8Array, tipoMime: string): Promise<void>;
   linkTemporario(caminho: string, tipoMime: string, nomeArquivo: string): Promise<LinkTemporario>;
+  /** Apaga o arquivo. Idempotente: arquivo que não existe não é erro. */
+  remover(caminho: string): Promise<void>;
 }
 
 export const VALIDADE_LINK_SEGUNDOS = 300;
@@ -48,6 +50,13 @@ export function criarArmazenamentoLocal(dir: string): ArmazenamentoEvidencias {
         expiraEm: new Date(Date.now() + VALIDADE_LINK_SEGUNDOS * 1000).toISOString(),
       };
     },
+    async remover(caminho) {
+      try {
+        await unlink(arquivo(caminho));
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code !== "ENOENT") throw e;
+      }
+    },
   };
 }
 
@@ -69,19 +78,34 @@ export function criarArmazenamentoSupabase(o: OpcoesSupabase): ArmazenamentoEvid
 
   return {
     async salvar(caminho, bytes, tipoMime) {
-      const r = await f(`${base}/storage/v1/object/${encodeURIComponent(o.bucket)}/${caminhoUrl(caminho)}`, {
-        method: "POST",
-        headers: { ...cabecalho, "Content-Type": tipoMime, "x-upsert": "false" },
-        body: bytes as unknown as ArrayBuffer,
-      });
+      const r = await f(
+        `${base}/storage/v1/object/${encodeURIComponent(o.bucket)}/${caminhoUrl(caminho)}`,
+        {
+          method: "POST",
+          headers: { ...cabecalho, "Content-Type": tipoMime, "x-upsert": "false" },
+          body: bytes as unknown as ArrayBuffer,
+        },
+      );
       if (!r.ok) throw new ErroArmazenamento(`Storage recusou o envio (HTTP ${r.status}).`);
     },
-    async linkTemporario(caminho) {
-      const r = await f(`${base}/storage/v1/object/sign/${encodeURIComponent(o.bucket)}/${caminhoUrl(caminho)}`, {
-        method: "POST",
+    async remover(caminho) {
+      // Objeto inexistente volta como 200 com lista vazia: também não é erro.
+      const r = await f(`${base}/storage/v1/object/${encodeURIComponent(o.bucket)}`, {
+        method: "DELETE",
         headers: { ...cabecalho, "Content-Type": "application/json" },
-        body: JSON.stringify({ expiresIn: VALIDADE_LINK_SEGUNDOS }),
+        body: JSON.stringify({ prefixes: [caminhoSeguro(caminho)] }),
       });
+      if (!r.ok) throw new ErroArmazenamento(`Storage recusou a remoção (HTTP ${r.status}).`);
+    },
+    async linkTemporario(caminho) {
+      const r = await f(
+        `${base}/storage/v1/object/sign/${encodeURIComponent(o.bucket)}/${caminhoUrl(caminho)}`,
+        {
+          method: "POST",
+          headers: { ...cabecalho, "Content-Type": "application/json" },
+          body: JSON.stringify({ expiresIn: VALIDADE_LINK_SEGUNDOS }),
+        },
+      );
       if (!r.ok) throw new ErroArmazenamento(`Storage recusou o link (HTTP ${r.status}).`);
       const corpo = (await r.json()) as { signedURL?: string };
       if (!corpo.signedURL) throw new ErroArmazenamento("Resposta do Storage sem link.");
@@ -90,14 +114,18 @@ export function criarArmazenamentoSupabase(o: OpcoesSupabase): ArmazenamentoEvid
       const url = /^https?:\/\//.test(corpo.signedURL)
         ? corpo.signedURL
         : `${base}/storage/v1${rel.startsWith("/storage/v1") ? rel.slice("/storage/v1".length) : rel}`;
-      return { url, expiraEm: new Date(agora().getTime() + VALIDADE_LINK_SEGUNDOS * 1000).toISOString() };
+      return {
+        url,
+        expiraEm: new Date(agora().getTime() + VALIDADE_LINK_SEGUNDOS * 1000).toISOString(),
+      };
     },
   };
 }
 
 export function criarArmazenamentoDaConfig(config: Config): ArmazenamentoEvidencias {
   if (config.STORAGE_PROVEDOR === "supabase") {
-    if (!config.SUPABASE_SERVICE_ROLE_KEY) throw new Error("SUPABASE_SERVICE_ROLE_KEY é obrigatória com STORAGE_PROVEDOR=supabase.");
+    if (!config.SUPABASE_SERVICE_ROLE_KEY)
+      throw new Error("SUPABASE_SERVICE_ROLE_KEY é obrigatória com STORAGE_PROVEDOR=supabase.");
     return criarArmazenamentoSupabase({
       supabaseUrl: config.SUPABASE_URL,
       chaveServico: config.SUPABASE_SERVICE_ROLE_KEY,

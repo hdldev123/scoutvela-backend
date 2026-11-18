@@ -13,7 +13,10 @@ export interface CsvLido {
 /** Colunas que o Scout Vela se recusa a armazenar (LGPD). Comparadas após `normalizarColuna`. */
 export const COLUNAS_PROIBIDAS = ["cpf", "rg", "documento", "endereco", "renda"] as const;
 
-const MARCAS_DE_ACENTO = new RegExp(`[${String.fromCharCode(0x300)}-${String.fromCharCode(0x36f)}]`, "g");
+const MARCAS_DE_ACENTO = new RegExp(
+  `[${String.fromCharCode(0x300)}-${String.fromCharCode(0x36f)}]`,
+  "g",
+);
 
 export function normalizarColuna(nome: string): string {
   return nome
@@ -98,7 +101,8 @@ export function lerCsv(conteudo: string): CsvLido {
   if (!primeiro) throw new ErroCsv("O arquivo está vazio.");
   const cabecalho = primeiro.map(normalizarColuna);
   if (cabecalho.some((c) => c === "")) throw new ErroCsv("O cabeçalho tem coluna sem nome.");
-  if (new Set(cabecalho).size !== cabecalho.length) throw new ErroCsv("O cabeçalho tem colunas repetidas.");
+  if (new Set(cabecalho).size !== cabecalho.length)
+    throw new ErroCsv("O cabeçalho tem colunas repetidas.");
   return { separador, cabecalho, linhas };
 }
 

@@ -53,21 +53,31 @@ export async function vincularContasDemo(opcoes: OpcoesVinculo): Promise<string[
       authId = ((await criar.json()) as UsuarioAuth).id;
     } else {
       const texto = await criar.text();
-      const jaExiste = criar.status === 409 || criar.status === 422 || /already.*(registered|exists)|email_exists/i.test(texto);
-      if (!jaExiste) throw new Error(`Supabase Auth: falha ao criar ${email} (HTTP ${criar.status})`);
+      const jaExiste =
+        criar.status === 409 ||
+        criar.status === 422 ||
+        /already.*(registered|exists)|email_exists/i.test(texto);
+      if (!jaExiste)
+        throw new Error(`Supabase Auth: falha ao criar ${email} (HTTP ${criar.status})`);
       const existente = await buscarPorEmail(email);
-      if (!existente) throw new Error(`Supabase Auth: ${email} já existe mas não foi encontrado na listagem`);
+      if (!existente)
+        throw new Error(`Supabase Auth: ${email} já existe mas não foi encontrado na listagem`);
       const atualizar = await f(`${base}/${existente.id}`, {
         method: "PUT",
         headers: cabecalhos,
         body: JSON.stringify({ password: conta.senha, email_confirm: true }),
       });
-      if (!atualizar.ok) throw new Error(`Supabase Auth: falha ao atualizar ${email} (HTTP ${atualizar.status})`);
+      if (!atualizar.ok)
+        throw new Error(`Supabase Auth: falha ao atualizar ${email} (HTTP ${atualizar.status})`);
       authId = existente.id;
     }
 
-    const r = await opcoes.db.query("update usuarios set auth_user_id = $1 where email = $2 returning id", [authId, email]);
-    if (r.rows.length === 0) throw new Error(`Usuário ${email} não existe em usuarios; rode o seed antes`);
+    const r = await opcoes.db.query(
+      "update usuarios set auth_user_id = $1 where email = $2 returning id",
+      [authId, email],
+    );
+    if (r.rows.length === 0)
+      throw new Error(`Usuário ${email} não existe em usuarios; rode o seed antes`);
     vinculadas.push(email);
   }
   return vinculadas;

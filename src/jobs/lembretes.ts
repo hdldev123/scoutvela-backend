@@ -1,4 +1,5 @@
 import type { Db } from "../db/db.js";
+import { diaEmBrasilia, diasParaPrazo, pendenciasDoCiclo } from "../repositories/pendencias.js";
 import type { MensagemEmail, ProvedorEmail } from "../email/index.js";
 
 export interface OpcoesLembretes {
@@ -19,15 +20,6 @@ export interface ResultadoLembretes {
   ignorados: number;
 }
 
-const FUSO = "America/Sao_Paulo";
-const MS_DIA = 86_400_000;
-
-/** Data civil (AAAA-MM-DD) de um instante no fuso de Brasília. */
-function diaEmBrasilia(d: Date): string {
-  return new Intl.DateTimeFormat("en-CA", { timeZone: FUSO, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
-}
-
-const dias = (iso: string) => Date.parse(`${iso}T00:00:00Z`) / MS_DIA;
 const dataBr = (iso: string) => iso.split("-").reverse().join("/");
 
 interface Pendente {
@@ -36,42 +28,34 @@ interface Pendente {
   quantidade: number;
 }
 
-/** Treinadores ativos com atletas ativos (termo aceito) sem nota nos indicadores T do ciclo atual. */
-async function pendenciasDosTreinadores(db: Db, cicloId: string): Promise<Pendente[]> {
-  const r = await db.query<{ usuario_id: string; email: string; quantidade: string }>(
-    `select u.id as usuario_id, u.email, count(distinct a.id)::text as quantidade
-       from usuarios u
-       join atletas a on a.treinador_id = u.id and a.ativo
-      where u.papel = 'treinador' and u.ativo
-        and exists (select 1 from consentimento_atual ct
-                     where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido)
-        and exists (select 1 from indicadores i
-                     where i.tipo = 'T' and not i.calculado
-                       and not exists (select 1 from avaliacoes n
-                                        where n.atleta_id = a.id and n.indicador_id = i.id
-                                          and n.ciclo_id = $1::uuid and n.origem <> 'resposta_sugerida'))
-      group by u.id, u.email`,
-    [cicloId],
-  );
-  return r.rows.map((l) => ({ usuarioId: l.usuario_id, email: l.email, quantidade: Number(l.quantidade) }));
-}
-
-/** Usuários atleta ativos (termo aceito) com perguntas ainda sem resposta. */
-async function pendenciasDosAtletas(db: Db): Promise<Pendente[]> {
-  const r = await db.query<{ usuario_id: string; email: string; quantidade: string }>(
-    `select u.id as usuario_id, u.email,
-            (select count(*) from perguntas_atleta q
-              where not exists (select 1 from resposta_atual ra
-                                 where ra.atleta_id = a.id and ra.indicador_id = q.indicador_id))::text as quantidade
-       from usuarios u
-       join atletas a on a.id = u.atleta_id and a.ativo
-      where u.papel = 'atleta' and u.ativo
-        and exists (select 1 from consentimento_atual ct
-                     where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido)`,
-  );
-  return r.rows
-    .map((l) => ({ usuarioId: l.usuario_id, email: l.email, quantidade: Number(l.quantidade) }))
-    .filter((p) => p.quantidade > 0);
+/**
+ * Quem recebe lembrete, pela regra compartilhada (repositories/pendencias): o treinador recebe a
+ * contagem de atletas pendentes; o atleta, a de perguntas sem resposta, se tiver conta ativa.
+ */
+async function destinatarios(
+  db: Db,
+  cicloId: string,
+  agora: Date,
+): Promise<{ treinadores: Pendente[]; atletas: Pendente[] }> {
+  const p = await pendenciasDoCiclo(db, cicloId, agora);
+  return {
+    treinadores: p.treinadores.map((t) => ({
+      usuarioId: t.id,
+      email: t.email,
+      quantidade: t.atletasPendentes.length,
+    })),
+    atletas: p.atletas.flatMap((a) =>
+      a.conta
+        ? [
+            {
+              usuarioId: a.conta.usuarioId,
+              email: a.conta.email,
+              quantidade: a.perguntasSemResposta,
+            },
+          ]
+        : [],
+    ),
+  };
 }
 
 function frasePrazo(prazo: string, restam: number): string {
@@ -80,11 +64,21 @@ function frasePrazo(prazo: string, restam: number): string {
   return `O prazo termina em ${dataBr(prazo)}.`;
 }
 
-type Montar = (para: string, ciclo: string, prazo: string, restam: number, n: number, url: string) => MensagemEmail;
+type Montar = (
+  para: string,
+  ciclo: string,
+  prazo: string,
+  restam: number,
+  n: number,
+  url: string,
+) => MensagemEmail;
 
 const mensagemTreinador: Montar = (para, ciclo, prazo, restam, n, url) => ({
   para,
-  assunto: restam < 0 ? `Scout Vela: avaliações do ciclo ${ciclo} em atraso` : `Scout Vela: avaliações do ciclo ${ciclo} pendentes`,
+  assunto:
+    restam < 0
+      ? `Scout Vela: avaliações do ciclo ${ciclo} em atraso`
+      : `Scout Vela: avaliações do ciclo ${ciclo} pendentes`,
   texto:
     `Olá,\n\nNo ciclo ${ciclo} você tem ${n === 1 ? "1 atleta" : `${n} atletas`} com avaliação incompleta. ` +
     `${frasePrazo(prazo, restam)}\n\nLance as notas em: ${url}/avaliar\n\nScout Vela`,
@@ -92,7 +86,10 @@ const mensagemTreinador: Montar = (para, ciclo, prazo, restam, n, url) => ({
 
 const mensagemAtleta: Montar = (para, ciclo, prazo, restam, n, url) => ({
   para,
-  assunto: restam < 0 ? `Scout Vela: questionário do ciclo ${ciclo} em atraso` : `Scout Vela: questionário do ciclo ${ciclo} pendente`,
+  assunto:
+    restam < 0
+      ? `Scout Vela: questionário do ciclo ${ciclo} em atraso`
+      : `Scout Vela: questionário do ciclo ${ciclo} pendente`,
   texto:
     `Olá,\n\nNo ciclo ${ciclo} você tem ${n === 1 ? "1 pergunta" : `${n} perguntas`} sem resposta. ` +
     `${frasePrazo(prazo, restam)}\n\nResponda em: ${url}/painel\n\nScout Vela`,
@@ -115,13 +112,14 @@ export async function executarLembretes(opcoes: OpcoesLembretes): Promise<Result
   if (!ciclo) return resultado;
 
   const hoje = diaEmBrasilia(opcoes.agora);
-  const restam = dias(ciclo.prazo) - dias(hoje);
+  const restam = diasParaPrazo(ciclo.prazo, opcoes.agora);
   if (restam >= 0 && !diasAntes.includes(restam)) return resultado;
 
   const url = frontUrl.replace(/\/+$/, "");
+  const pendentes = await destinatarios(db, ciclo.id, opcoes.agora);
   const grupos = [
-    { tipo: "treinador" as const, pendentes: await pendenciasDosTreinadores(db, ciclo.id), montar: mensagemTreinador },
-    { tipo: "atleta" as const, pendentes: await pendenciasDosAtletas(db), montar: mensagemAtleta },
+    { tipo: "treinador" as const, pendentes: pendentes.treinadores, montar: mensagemTreinador },
+    { tipo: "atleta" as const, pendentes: pendentes.atletas, montar: mensagemAtleta },
   ];
 
   for (const g of grupos) {
@@ -147,10 +145,16 @@ export async function executarLembretes(opcoes: OpcoesLembretes): Promise<Result
           [ciclo.id, p.usuarioId, g.tipo, hoje],
         );
         resultado.ignorados++;
-        log?.info({ evento: "lembrete_falhou", tipo: g.tipo, usuarioId: p.usuarioId }, "falha ao enviar lembrete");
+        log?.info(
+          { evento: "lembrete_falhou", tipo: g.tipo, usuarioId: p.usuarioId },
+          "falha ao enviar lembrete",
+        );
       }
     }
   }
-  log?.info({ evento: "lembretes_concluidos", cicloId: ciclo.id, diasParaOPrazo: restam, ...resultado }, "lembretes concluídos");
+  log?.info(
+    { evento: "lembretes_concluidos", cicloId: ciclo.id, diasParaOPrazo: restam, ...resultado },
+    "lembretes concluídos",
+  );
   return resultado;
 }

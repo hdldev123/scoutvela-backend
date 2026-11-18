@@ -11,7 +11,11 @@ export interface AtletaAvaliado {
 }
 
 /** Monta a entrada do domínio a partir do que foi carregado do banco. */
-export function montarEntradaCalculo(atleta: AtletaBase, dados: DadosAtleta, referencia: Date): EntradaCalculo {
+export function montarEntradaCalculo(
+  atleta: AtletaBase,
+  dados: DadosAtleta,
+  referencia: Date,
+): EntradaCalculo {
   const notas: Record<string, number> = {};
   for (const n of dados.notas) notas[n.indicadorId] = n.valor;
   return {
@@ -43,7 +47,11 @@ export function avaliarAtletas(
   return atletas.map((atleta) => {
     const d = dados.get(atleta.id);
     if (!d) throw new Error(`Dados do atleta ${atleta.id} não carregados`);
-    return { atleta, dados: d, calculo: calcularAtleta(parametros, montarEntradaCalculo(atleta, d, referencia)) };
+    return {
+      atleta,
+      dados: d,
+      calculo: calcularAtleta(parametros, montarEntradaCalculo(atleta, d, referencia)),
+    };
   });
 }
 

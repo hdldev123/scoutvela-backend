@@ -89,6 +89,9 @@ export interface Regras {
   g4: Record<PerfilSuporte, { status: StatusGate; motivo: string }>;
   /** Janela do Ranking CBVela para somar pontos. */
   rankingCbvela: { janelaSemanas: number };
+  /** Pontos do Ranking CBVela → nota sugerida de perf_nacional. Faixas em ordem crescente de `ate`;
+   *  cada uma vale até `ate` pontos (inclusive) e, acima da última, vale a nota dela. Não entra no score. */
+  perfPontos: { ativa: boolean; faixas: { ate: number; nota: number }[] };
 }
 
 export interface Parametros {

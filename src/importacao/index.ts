@@ -31,7 +31,13 @@ export class ArquivoRejeitado extends Error {}
  */
 export async function importarCsv(
   db: Db,
-  p: { tipo: TipoImportacao; arquivoNome: string | null; conteudo: string; usuarioId: string; agora: Date },
+  p: {
+    tipo: TipoImportacao;
+    arquivoNome: string | null;
+    conteudo: string;
+    usuarioId: string;
+    agora: Date;
+  },
 ): Promise<ResultadoImportacao> {
   let csv;
   try {
@@ -47,14 +53,17 @@ export async function importarCsv(
       `O arquivo tem coluna que o Scout Vela não armazena (${proibidas.join(", ")}). Remova a coluna e envie de novo; nada foi importado.`,
     );
   }
-  const obrigatorias = p.tipo === "velaid" ? COLUNAS_VELAID_OBRIGATORIAS : COLUNAS_RANKING_OBRIGATORIAS;
+  const obrigatorias =
+    p.tipo === "velaid" ? COLUNAS_VELAID_OBRIGATORIAS : COLUNAS_RANKING_OBRIGATORIAS;
   const faltando = faltandoColunas(csv.cabecalho, obrigatorias);
   if (faltando.length > 0) {
     throw new ArquivoRejeitado(`Faltam colunas no cabeçalho: ${faltando.join(", ")}.`);
   }
   if (csv.linhas.length === 0) throw new ArquivoRejeitado("O arquivo não tem linhas de dados.");
   if (csv.linhas.length > MAX_LINHAS_IMPORTACAO) {
-    throw new ArquivoRejeitado(`O arquivo passa de ${MAX_LINHAS_IMPORTACAO} linhas. Divida em arquivos menores.`);
+    throw new ArquivoRejeitado(
+      `O arquivo passa de ${MAX_LINHAS_IMPORTACAO} linhas. Divida em arquivos menores.`,
+    );
   }
 
   const hoje = dataIso(p.agora);
@@ -72,7 +81,11 @@ export async function importarCsv(
     const id = Number(ins.rows[0]!.id);
     await tx.query(
       `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes) values ($1, 'importar_csv', 'importacoes', $2, $3::jsonb)`,
-      [p.usuarioId, String(id), JSON.stringify({ tipo: p.tipo, linhasOk: r.linhasOk, linhasErro: r.erros.length })],
+      [
+        p.usuarioId,
+        String(id),
+        JSON.stringify({ tipo: p.tipo, linhasOk: r.linhasOk, linhasErro: r.erros.length }),
+      ],
     );
     return { id, linhasOk: r.linhasOk, linhasErro: r.erros.length, erros };
   });

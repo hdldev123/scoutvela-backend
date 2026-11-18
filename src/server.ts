@@ -26,7 +26,10 @@ const app = await criarApp({
   email: criarProvedorEmail(config, loggerConsole),
   armazenamento: criarArmazenamentoDaConfig(config),
   adminAuth: config.SUPABASE_SERVICE_ROLE_KEY
-    ? criarAdminAuth({ supabaseUrl: config.SUPABASE_URL, serviceRoleKey: config.SUPABASE_SERVICE_ROLE_KEY })
+    ? criarAdminAuth({
+        supabaseUrl: config.SUPABASE_URL,
+        serviceRoleKey: config.SUPABASE_SERVICE_ROLE_KEY,
+      })
     : null,
   verificarToken: criarVerificadorSupabase({
     supabaseUrl: config.SUPABASE_URL,

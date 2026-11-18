@@ -4,7 +4,11 @@ import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
 import Fastify, { type FastifyInstance } from "fastify";
-import { jsonSchemaTransform, serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
+import {
+  jsonSchemaTransform,
+  serializerCompiler,
+  validatorCompiler,
+} from "fastify-type-provider-zod";
 import pacote from "../package.json" with { type: "json" };
 import type { VerificadorToken } from "./auth/jwt.js";
 import { registrarAutenticacao } from "./auth/plugin.js";
@@ -14,6 +18,7 @@ import { criarProvedorEmailLog, type ProvedorEmail } from "./email/index.js";
 import { registrarTratamentoDeErros } from "./erros.js";
 import type { AdminAuth } from "./integracoes/supabase-admin.js";
 import { rotasHealth } from "./routes/health.js";
+import { rotasAnonimizacao } from "./routes/anonimizacao.js";
 import { rotasAtletas } from "./routes/atletas.js";
 import { rotasAuditoria } from "./routes/auditoria.js";
 import { rotasAvaliacoes } from "./routes/avaliacoes.js";
@@ -81,6 +86,7 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasCampanha,
   rotasAuditoria,
   rotasTitular,
+  rotasAnonimizacao,
   rotasPlano,
   rotasEvidencias,
   rotasUsuarios,
@@ -109,7 +115,10 @@ export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
   app.decorate("db", deps.db);
   app.decorate("config", config);
   app.decorate("email", deps.email ?? criarProvedorEmailLog(app.log));
-  app.decorate("armazenamento", deps.armazenamento ?? criarArmazenamentoLocal(config.STORAGE_DIR_LOCAL));
+  app.decorate(
+    "armazenamento",
+    deps.armazenamento ?? criarArmazenamentoLocal(config.STORAGE_DIR_LOCAL),
+  );
   app.decorate("adminAuth", deps.adminAuth ?? null);
   app.decorate("agora", deps.agora ?? (() => new Date()));
   registrarAutenticacao(app, deps.verificarToken);

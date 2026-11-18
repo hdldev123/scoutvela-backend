@@ -24,7 +24,10 @@ export interface Piloto {
 }
 
 /** Banco de teste com o seed do protótipo e as contas do seed vinculadas a UUIDs de login. */
-export async function criarPiloto(agora?: () => Date, extras: OpcoesAppDeTeste = {}): Promise<Piloto> {
+export async function criarPiloto(
+  agora?: () => Date,
+  extras: OpcoesAppDeTeste = {},
+): Promise<Piloto> {
   const db = await criarBancoDeTeste();
   await semear(db);
   const auth = new Map<string, string>();
@@ -43,7 +46,9 @@ export async function criarPiloto(agora?: () => Date, extras: OpcoesAppDeTeste =
       return cabecalhoAuth(await tokenPara(auth.get(email)!));
     },
     async idDe(velaid) {
-      const r = await db.query<{ id: string }>("select id from atletas where velaid_codigo = $1", [velaid]);
+      const r = await db.query<{ id: string }>("select id from atletas where velaid_codigo = $1", [
+        velaid,
+      ]);
       return r.rows[0]!.id;
     },
     async encerrar() {

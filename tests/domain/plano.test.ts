@@ -24,7 +24,9 @@ describe("sugerirPlano", () => {
   });
 
   it("meta de 12 meses depende de resultado de nível 'mundial'", () => {
-    expect(sugerirPlano({ ...base, temResultadoMundial: true }).meta12m).toBe("Top 10 no Mundial da classe");
+    expect(sugerirPlano({ ...base, temResultadoMundial: true }).meta12m).toBe(
+      "Top 10 no Mundial da classe",
+    );
     expect(sugerirPlano(base).meta12m).toBe("Primeiro Mundial da classe, top 50%");
   });
 
@@ -40,7 +42,9 @@ describe("sugerirPlano", () => {
     expect(sugerirPlano({ ...base, perfilSuporte: "C" }).recomendacao).toBe(
       "Alto potencial, com apoio para viagens e equipamento",
     );
-    expect(sugerirPlano({ ...base, perfilSuporte: "D" }).recomendacao).toContain("com apoio para viagens");
+    expect(sugerirPlano({ ...base, perfilSuporte: "D" }).recomendacao).toContain(
+      "com apoio para viagens",
+    );
     expect(sugerirPlano({ ...base, perfilSuporte: null }).recomendacao).toBe("Alto potencial");
   });
 
@@ -51,7 +55,14 @@ describe("sugerirPlano", () => {
   });
 
   it("poucas notas: lacunas não repetem as forças", () => {
-    const p = sugerirPlano({ ...base, pilares: [{ nome: "A", nota: 3 }, { nome: "B", nota: 4 }, { nome: "C", nota: null }] });
+    const p = sugerirPlano({
+      ...base,
+      pilares: [
+        { nome: "A", nota: 3 },
+        { nome: "B", nota: 4 },
+        { nome: "C", nota: null },
+      ],
+    });
     expect(p.forcas).toBe("B, A");
     expect(p.lacunas).toBe("Aguardando mais avaliações");
   });

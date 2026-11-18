@@ -5,7 +5,8 @@ import { exigirPapel } from "../auth/plugin.js";
 import { idadeEm } from "../domain/index.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { ContaJaExiste } from "../integracoes/supabase-admin.js";
-import { buscarTermoVigente } from "../repositories/termo.js";
+import { listarAtletasGestao } from "../repositories/atletas.js";
+import { buscarTermoVigente, termoSql } from "../repositories/termo.js";
 import { ArquivoRejeitado, importarCsv } from "../importacao/index.js";
 
 const IDADE_MINIMA_PILOTO = 18;
@@ -39,10 +40,14 @@ interface LinhaVelaId {
   email: string | null;
 }
 
-const COLUNAS_VELAID_SQL = "codigo, nome, genero, data_nascimento::text as data_nascimento, clube, cidade, uf, ws_id, email";
+const COLUNAS_VELAID_SQL =
+  "codigo, nome, genero, data_nascimento::text as data_nascimento, clube, cidade, uf, ws_id, email";
 
 const esquemaBusca = z.object({
-  codigo: z.string().max(40).describe("Código VelaID (ex.: MG-T15); espaços e minúsculas são normalizados"),
+  codigo: z
+    .string()
+    .max(40)
+    .describe("Código VelaID (ex.: MG-T15); espaços e minúsculas são normalizados"),
 });
 
 const esquemaRespostaBusca = z.object({
@@ -64,20 +69,31 @@ const esquemaCadastro = z.object({
   velaidCodigo: z.string().max(40),
   classeId: z.string().min(1).max(40),
   treinadorId: z.uuid(),
-  criarConta: z.boolean().default(true).describe("Cria a conta do atleta (papel atleta) e envia o convite, se houver e-mail no VelaID"),
+  criarConta: z
+    .boolean()
+    .default(true)
+    .describe(
+      "Cria a conta do atleta (papel atleta) e envia o convite, se houver e-mail no VelaID",
+    ),
 });
 
 const esquemaImportacao = z.object({
   tipo: z.enum(["velaid", "ranking_cbvela"]),
   arquivoNome: z.string().max(200).optional(),
-  conteudo: z.string().min(1).max(512 * 1024).describe("CSV em texto (UTF-8), até 512 KB"),
+  conteudo: z
+    .string()
+    .min(1)
+    .max(512 * 1024)
+    .describe("CSV em texto (UTF-8), até 512 KB"),
 });
 
 const esquemaRespostaImportacao = z.object({
   id: z.number().int(),
   linhasOk: z.number().int(),
   linhasErro: z.number().int(),
-  erros: z.array(z.object({ linha: z.number().int(), mensagem: z.string() })).describe("Até 200 erros; linhasErro traz a contagem total"),
+  erros: z
+    .array(z.object({ linha: z.number().int(), mensagem: z.string() }))
+    .describe("Até 200 erros; linhasErro traz a contagem total"),
 });
 
 export async function rotasCadastro(app: FastifyInstance): Promise<void> {
@@ -92,20 +108,32 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ["cadastro"],
         summary: "Busca um atleta no VelaID pelo código",
-        description: "Não devolve e-mail. Menor de 18 anos e atleta já cadastrado vêm com elegivel=false e o motivo.",
+        description:
+          "Não devolve e-mail. Menor de 18 anos e atleta já cadastrado vêm com elegivel=false e o motivo.",
         security: seguranca,
         body: esquemaBusca,
-        response: { 200: esquemaRespostaBusca, 400: esquemaErro, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
+        response: {
+          200: esquemaRespostaBusca,
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+        },
       },
     },
     async (req) => {
       const codigo = normalizarCodigo(req.body.codigo);
-      const { rows } = await app.db.query<LinhaVelaId>(`select ${COLUNAS_VELAID_SQL} from velaid_registros where codigo = $1`, [codigo]);
+      const { rows } = await app.db.query<LinhaVelaId>(
+        `select ${COLUNAS_VELAID_SQL} from velaid_registros where codigo = $1`,
+        [codigo],
+      );
       const v = rows[0];
       if (!v) throw naoEncontrado(`Nenhum atleta com o código ${codigo} no VelaID.`);
 
       const idade = idadeEm(v.data_nascimento, app.agora());
-      const existente = await app.db.query("select 1 from atletas where velaid_codigo = $1", [codigo]);
+      const existente = await app.db.query("select 1 from atletas where velaid_codigo = $1", [
+        codigo,
+      ]);
       const jaNoPiloto = existente.rows.length > 0;
       let motivo: string | null = null;
       if (jaNoPiloto) motivo = `O código ${codigo} já está no piloto.`;
@@ -136,7 +164,11 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         tags: ["cadastro"],
         summary: "Treinadores ativos (para escolher o responsável no cadastro)",
         security: seguranca,
-        response: { 200: z.array(z.object({ id: z.string(), nome: z.string() })), 401: esquemaErro, 403: esquemaErro },
+        response: {
+          200: z.array(z.object({ id: z.string(), nome: z.string() })),
+          401: esquemaErro,
+          403: esquemaErro,
+        },
       },
     },
     async () => {
@@ -182,28 +214,55 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       const { classeId, treinadorId, criarConta } = req.body;
       const usuarioId = req.usuario.id;
       const referencia = app.agora();
-      const termo = await buscarTermoVigente(app.db);
+      const termo = await buscarTermoVigente(app.db, referencia);
 
       const criado = await app.db
         .transacao(async (tx) => {
-          const v = (await tx.query<LinhaVelaId>(`select ${COLUNAS_VELAID_SQL} from velaid_registros where codigo = $1`, [codigo])).rows[0];
+          const v = (
+            await tx.query<LinhaVelaId>(
+              `select ${COLUNAS_VELAID_SQL} from velaid_registros where codigo = $1`,
+              [codigo],
+            )
+          ).rows[0];
           if (!v) throw naoEncontrado(`Nenhum atleta com o código ${codigo} no VelaID.`);
           const idade = idadeEm(v.data_nascimento, referencia);
           if (idade < IDADE_MINIMA_PILOTO) throw requisicaoInvalida(motivoMenor(v.nome, idade));
-          if ((await tx.query("select 1 from atletas where velaid_codigo = $1", [codigo])).rows.length > 0) {
+          if (
+            (await tx.query("select 1 from atletas where velaid_codigo = $1", [codigo])).rows
+              .length > 0
+          ) {
             throw conflito(`O código ${codigo} já está no piloto.`);
           }
-          if ((await tx.query("select 1 from classes where id = $1 and ativa", [classeId])).rows.length === 0) {
+          if (
+            (await tx.query("select 1 from classes where id = $1 and ativa", [classeId])).rows
+              .length === 0
+          ) {
             throw requisicaoInvalida("Classe inválida ou inativa.");
           }
-          const trein = await tx.query("select 1 from usuarios where id = $1 and papel = 'treinador' and ativo", [treinadorId]);
+          const trein = await tx.query(
+            "select 1 from usuarios where id = $1 and papel = 'treinador' and ativo",
+            [treinadorId],
+          );
           if (trein.rows.length === 0) throw requisicaoInvalida("Treinador inválido ou inativo.");
 
           const ins = await tx.query<{ id: string }>(
             `insert into atletas (velaid_codigo, nome, genero, data_nascimento, classe_id, clube, cidade, uf, ws_id,
                                   treinador_id, email_contato, criado_por)
              values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning id`,
-            [v.codigo, v.nome, v.genero, v.data_nascimento, classeId, v.clube, v.cidade, v.uf, v.ws_id, treinadorId, v.email, usuarioId],
+            [
+              v.codigo,
+              v.nome,
+              v.genero,
+              v.data_nascimento,
+              classeId,
+              v.clube,
+              v.cidade,
+              v.uf,
+              v.ws_id,
+              treinadorId,
+              v.email,
+              usuarioId,
+            ],
           );
           const id = ins.rows[0]!.id;
           const detalhes = JSON.stringify({ velaid: codigo, classeId, versaoTermo: termo.versao });
@@ -235,7 +294,8 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         })
         .catch((e: unknown) => {
           // Cadastro simultâneo do mesmo código: a restrição única do banco decide.
-          if ((e as { code?: string }).code === "23505") throw conflito(`O código ${codigo} já está no piloto.`);
+          if ((e as { code?: string }).code === "23505")
+            throw conflito(`O código ${codigo} já está no piloto.`);
           throw e;
         });
 
@@ -245,13 +305,15 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         conta = "indisponivel";
         if (app.adminAuth) {
           try {
-            const { authUserId } = await app.adminAuth.convidar(criado.email, `${front}/redefinir-senha`);
+            const { authUserId } = await app.adminAuth.convidar(
+              criado.email,
+              `${front}/redefinir-senha`,
+            );
             await app.db.transacao(async (tx) => {
-              await tx.query("update usuarios set auth_user_id = coalesce(auth_user_id, $2), convidado_em = $3 where id = $1", [
-                criado.contaUsuarioId,
-                authUserId,
-                app.agora(),
-              ]);
+              await tx.query(
+                "update usuarios set auth_user_id = coalesce(auth_user_id, $2), convidado_em = $3 where id = $1",
+                [criado.contaUsuarioId, authUserId, app.agora()],
+              );
               await tx.query(
                 `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
                  values ($1, 'convidar_usuario', 'usuarios', $2, '{}'::jsonb)`,
@@ -261,7 +323,14 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
             conta = "convite_enviado";
           } catch (e) {
             if (!(e instanceof ContaJaExiste)) {
-              req.log.error({ evento: "convite_falhou", usuarioId: criado.contaUsuarioId, err: e instanceof Error ? e.message : "erro" }, "falha ao convidar");
+              req.log.error(
+                {
+                  evento: "convite_falhou",
+                  usuarioId: criado.contaUsuarioId,
+                  err: e instanceof Error ? e.message : "erro",
+                },
+                "falha ao convidar",
+              );
             }
           }
         }
@@ -281,11 +350,21 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
             ].join("\n\n"),
           });
         } catch (e) {
-          req.log.error({ evento: "email_termo_falhou", atletaId: criado.id, err: e instanceof Error ? e.message : "erro" }, "falha ao enviar o termo");
+          req.log.error(
+            {
+              evento: "email_termo_falhou",
+              atletaId: criado.id,
+              err: e instanceof Error ? e.message : "erro",
+            },
+            "falha ao enviar o termo",
+          );
         }
       }
 
-      req.log.info({ evento: "termo_enviado", atletaId: criado.id, versao: termo.versao }, "termo do piloto enviado");
+      req.log.info(
+        { evento: "termo_enviado", atletaId: criado.id, versao: termo.versao },
+        "termo do piloto enviado",
+      );
       return reply.code(201).send({
         id: criado.id,
         nome: criado.nome,
@@ -297,12 +376,66 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
 
   // Rota estática: o Fastify a prefere a GET /atletas/:id (em atletas.ts) para o texto "pendentes".
   r.get(
+    "/atletas",
+    {
+      preHandler: soGestor,
+      schema: {
+        tags: ["cadastro"],
+        summary: "Todos os atletas do piloto, para gestão do cadastro",
+        description:
+          "Inclui inativos e quem não aceitou o termo. Sem dado sensível nem e-mail. termoAceito segue a regra do ranking (TERMO_EXIGE_REACEITE). contaVinculada: já existe conta de atleta ligada a ele. busca procura no nome e no código VelaID.",
+        security: seguranca,
+        querystring: z.object({
+          ativo: z.enum(["true", "false"]).optional(),
+          termoAceito: z.enum(["true", "false"]).optional(),
+          classeId: z.string().min(1).max(40).optional(),
+          treinadorId: z.uuid().optional(),
+          busca: z.string().trim().max(80).optional().describe("Parte do nome ou do VelaID"),
+        }),
+        response: {
+          200: z.array(
+            z.object({
+              id: z.string(),
+              nome: z.string(),
+              velaid: z.string(),
+              classe: z.object({ id: z.string(), nome: z.string() }),
+              treinador: z.object({ id: z.string(), nome: z.string() }).nullable(),
+              numeroVela: z.string().nullable(),
+              ativo: z.boolean(),
+              termoAceito: z.boolean(),
+              contaVinculada: z.boolean(),
+            }),
+          ),
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+        },
+      },
+    },
+    async (req) => {
+      const q = req.query;
+      const comoBool = (v: "true" | "false" | undefined) =>
+        v === undefined ? undefined : v === "true";
+      return listarAtletasGestao(app.db, {
+        agora: app.agora(),
+        ativo: comoBool(q.ativo),
+        termoAceito: comoBool(q.termoAceito),
+        classeId: q.classeId,
+        treinadorId: q.treinadorId,
+        busca: q.busca,
+      });
+    },
+  );
+
+  r.get(
     "/atletas/pendentes",
     {
       preHandler: soGestor,
       schema: {
         tags: ["cadastro"],
-        summary: "Atletas cadastrados que ainda não aceitaram o termo do piloto",
+        summary: "Atletas com aceite do termo do piloto pendente",
+        description:
+          "Quem nunca aceitou (termoAceitoVersao nulo) e quem aceitou só uma versão anterior à vigente (termoAceitoVersao preenchido).",
         security: seguranca,
         response: {
           200: z.array(
@@ -312,6 +445,10 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
               velaid: z.string(),
               classe: z.object({ id: z.string(), nome: z.string() }),
               criadoEm: z.string().describe("Instante ISO"),
+              termoAceitoVersao: z
+                .string()
+                .nullable()
+                .describe("Última versão aceita; nulo = nunca aceitou"),
             }),
           ),
           401: esquemaErro,
@@ -320,13 +457,23 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       },
     },
     async () => {
-      const { rows } = await app.db.query<{ id: string; nome: string; velaid: string; classe_id: string; classe_nome: string; criado_em: Date }>(
-        `select a.id, a.nome, a.velaid_codigo as velaid, c.id as classe_id, c.nome as classe_nome, a.criado_em
+      const agora = app.agora();
+      const { rows } = await app.db.query<{
+        id: string;
+        nome: string;
+        velaid: string;
+        classe_id: string;
+        classe_nome: string;
+        criado_em: Date;
+        termo_aceito_versao: string | null;
+      }>(
+        `select a.id, a.nome, a.velaid_codigo as velaid, c.id as classe_id, c.nome as classe_nome, a.criado_em,
+                (select ct.versao_termo from consentimento_atual ct
+                  where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido) as termo_aceito_versao
            from atletas a join classes c on c.id = a.classe_id
-          where a.ativo
-            and not exists (select 1 from consentimento_atual ct
-                             where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido)
+          where a.ativo and not ${termoSql.aceitoVigente("a.id", "$1")}
           order by a.criado_em, a.nome`,
+        [agora],
       );
       return rows.map((l) => ({
         id: l.id,
@@ -334,6 +481,7 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         velaid: l.velaid,
         classe: { id: l.classe_id, nome: l.classe_nome },
         criadoEm: new Date(l.criado_em).toISOString(),
+        termoAceitoVersao: l.termo_aceito_versao,
       }));
     },
   );
@@ -350,26 +498,36 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         security: seguranca,
         params: z.object({ id: z.uuid() }),
         body: z.object({ versao: z.string().min(1).max(100) }),
-        response: { 200: z.object({ ok: z.literal(true) }), 400: esquemaErro, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro, 409: esquemaErro },
+        response: {
+          200: z.object({ ok: z.literal(true) }),
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+          409: esquemaErro,
+        },
       },
     },
     async (req) => {
       const { id } = req.params;
       const usuarioId = req.usuario.id;
       await app.db.transacao(async (tx) => {
-        const vigente = await buscarTermoVigente(tx);
-        if (req.body.versao !== vigente.versao) throw requisicaoInvalida("A versão do termo não é a vigente.");
+        const agora = app.agora();
+        const vigente = await buscarTermoVigente(tx, agora);
+        if (req.body.versao !== vigente.versao)
+          throw requisicaoInvalida("A versão do termo não é a vigente.");
         const a = await tx.query("select 1 from atletas where id = $1 and ativo for update", [id]);
         if (a.rows.length === 0) throw naoEncontrado("Atleta não encontrado.");
         const aceito = await tx.query(
-          "select 1 from consentimento_atual where atleta_id = $1 and tipo = 'termo_piloto' and concedido",
-          [id],
+          `select 1 from consentimento_atual where atleta_id = $1 and tipo = 'termo_piloto' and concedido and versao_termo = $2`,
+          [id, vigente.versao],
         );
-        if (aceito.rows.length > 0) throw conflito("O termo deste atleta já foi aceito.");
+        if (aceito.rows.length > 0)
+          throw conflito("Esta versão do termo já foi aceita por este atleta.");
         await tx.query(
           `insert into consentimentos (atleta_id, tipo, concedido, versao_termo, registrado_em, registrado_por)
            values ($1, 'termo_piloto', true, $2, $3, $4)`,
-          [id, req.body.versao, app.agora(), usuarioId],
+          [id, req.body.versao, agora, usuarioId],
         );
         await tx.query(
           `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
@@ -395,7 +553,12 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
           "Colunas cpf, rg, documento, endereço e renda rejeitam o arquivo inteiro. Linha inválida vira erro da linha.",
         security: seguranca,
         body: esquemaImportacao,
-        response: { 201: esquemaRespostaImportacao, 400: esquemaErro, 401: esquemaErro, 403: esquemaErro },
+        response: {
+          201: esquemaRespostaImportacao,
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+        },
       },
     },
     async (req, reply) => {
@@ -403,10 +566,19 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       if (Buffer.byteLength(conteudo, "utf8") > 512 * 1024) {
         throw requisicaoInvalida("O arquivo passa de 512 KB.");
       }
-      // eslint-disable-next-line no-control-regex
-      const arquivoNome = req.body.arquivoNome?.replace(/[\u0000-\u001f\u007f]/g, "").trim() || null;
+      const arquivoNome =
+        req.body.arquivoNome
+          // eslint-disable-next-line no-control-regex -- remove caracteres de controle do nome do arquivo
+          ?.replace(/[\u0000-\u001f\u007f]/g, "")
+          .trim() || null;
       try {
-        const res = await importarCsv(app.db, { tipo, arquivoNome, conteudo, usuarioId: req.usuario.id, agora: app.agora() });
+        const res = await importarCsv(app.db, {
+          tipo,
+          arquivoNome,
+          conteudo,
+          usuarioId: req.usuario.id,
+          agora: app.agora(),
+        });
         return reply.code(201).send(res);
       } catch (e) {
         if (e instanceof ArquivoRejeitado) throw requisicaoInvalida(e.message);

@@ -110,6 +110,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -134,6 +135,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -346,6 +348,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -370,6 +373,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -394,6 +398,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -664,6 +669,24 @@ paths:
                                   - valor
                                   - lancadoEm
                                 additionalProperties: false
+                              sugestaoPontos:
+                                nullable: true
+                                description: Nota sugerida pelos pontos do Ranking CBVela (regra PERF_PONTOS).
+                                  Só em perf_nacional e com a regra ativa; não
+                                  entra no score até o avaliador lançar a nota.
+                                type: object
+                                properties:
+                                  nota:
+                                    type: integer
+                                    minimum: -9007199254740991
+                                    maximum: 9007199254740991
+                                  pontos:
+                                    type: number
+                                    description: Pontos do Ranking CBVela na janela
+                                required:
+                                  - nota
+                                  - pontos
+                                additionalProperties: false
                               anexo:
                                 nullable: true
                                 type: object
@@ -688,6 +711,7 @@ paths:
                               - lancadoEm
                               - resposta
                               - sugestaoPendente
+                              - sugestaoPontos
                               - anexo
                             additionalProperties: false
                       required:
@@ -979,6 +1003,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1003,6 +1028,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1027,6 +1053,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1051,6 +1078,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1137,6 +1165,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1161,6 +1190,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1185,6 +1215,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1209,6 +1240,206 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/indicadores/{indicadorId}/historico:
+    get:
+      summary: Histórico de lançamentos de um indicador, do mais novo para o mais antigo
+      tags:
+        - atletas
+      description: "Mesma matriz de acesso da ficha: gestor vê todos, treinador só os
+        próprios atletas, atleta só a si. Inclui a sugestão do atleta ainda
+        pendente (pendente: true, origem resposta_sugerida). cf_peso_kg
+        (calculado) traz as pesagens, com a nota pela regra P3 atual. IBVAR:
+        pilar sensível dá 403; nos demais, sem evidência, avaliador, anexo nem
+        sugestão pendente. Atleta fora do acesso ou indicador inexistente: 404."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 64
+          in: path
+          name: indicadorId
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    valor:
+                      type: number
+                      description: Nota de 0 a 5
+                    pesoKg:
+                      nullable: true
+                      description: "Só em cf_peso_kg: o peso da pesagem"
+                      type: number
+                    evidencia:
+                      nullable: true
+                      type: string
+                    origem:
+                      type: string
+                      enum:
+                        - avaliacao
+                        - resposta_confirmada
+                        - resposta_sugerida
+                        - calculado
+                    pendente:
+                      type: boolean
+                      description: Sugestão do atleta aguardando o avaliador
+                    avaliador:
+                      nullable: true
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                      required:
+                        - id
+                        - nome
+                      additionalProperties: false
+                    cicloNome:
+                      nullable: true
+                      type: string
+                    lancadoEm:
+                      type: string
+                      description: Instante ISO
+                    anexo:
+                      nullable: true
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nomeArquivo:
+                          type: string
+                      required:
+                        - id
+                        - nomeArquivo
+                      additionalProperties: false
+                  required:
+                    - valor
+                    - pesoKg
+                    - evidencia
+                    - origem
+                    - pendente
+                    - avaliador
+                    - cicloNome
+                    - lancadoEm
+                    - anexo
+                  additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1373,9 +1604,32 @@ paths:
                       - pilares
                       - statusGates
                     additionalProperties: false
+                  sugestaoPontos:
+                    nullable: true
+                    description: "Nota sugerida para perf_nacional pelos pontos do Ranking CBVela
+                      (regra PERF_PONTOS). Nula com a regra desligada. Não entra
+                      na prévia nem no score: o avaliador confirma lançando a
+                      nota."
+                    type: object
+                    properties:
+                      indicadorId:
+                        type: string
+                      nota:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                      pontos:
+                        type: number
+                        description: Pontos do Ranking CBVela na janela
+                    required:
+                      - indicadorId
+                      - nota
+                      - pontos
+                    additionalProperties: false
                 required:
                   - antes
                   - depois
+                  - sugestaoPontos
                 additionalProperties: false
         "400":
           description: Default Response
@@ -1395,6 +1649,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1419,6 +1674,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1443,6 +1699,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1467,6 +1724,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1626,6 +1884,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1650,6 +1909,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1674,6 +1934,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1698,6 +1959,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1816,6 +2078,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1840,6 +2103,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1864,6 +2128,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1888,6 +2153,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -1993,6 +2259,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2017,6 +2284,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2041,6 +2309,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2065,6 +2334,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2113,6 +2383,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2137,6 +2408,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2238,6 +2510,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2262,6 +2535,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2286,6 +2560,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2310,6 +2585,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2334,6 +2610,188 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    get:
+      summary: Todos os atletas do piloto, para gestão do cadastro
+      tags:
+        - cadastro
+      description: "Inclui inativos e quem não aceitou o termo. Sem dado sensível nem
+        e-mail. termoAceito segue a regra do ranking (TERMO_EXIGE_REACEITE).
+        contaVinculada: já existe conta de atleta ligada a ele. busca procura no
+        nome e no código VelaID."
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          in: query
+          name: ativo
+          required: false
+        - schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          in: query
+          name: termoAceito
+          required: false
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 40
+          in: query
+          name: classeId
+          required: false
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: query
+          name: treinadorId
+          required: false
+        - schema:
+            type: string
+            maxLength: 80
+          in: query
+          name: busca
+          required: false
+          description: Parte do nome ou do VelaID
+      security: *a1
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    id:
+                      type: string
+                    nome:
+                      type: string
+                    velaid:
+                      type: string
+                    classe:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                      required:
+                        - id
+                        - nome
+                      additionalProperties: false
+                    treinador:
+                      nullable: true
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                      required:
+                        - id
+                        - nome
+                      additionalProperties: false
+                    numeroVela:
+                      nullable: true
+                      type: string
+                    ativo:
+                      type: boolean
+                    termoAceito:
+                      type: boolean
+                    contaVinculada:
+                      type: boolean
+                  required:
+                    - id
+                    - nome
+                    - velaid
+                    - classe
+                    - treinador
+                    - numeroVela
+                    - ativo
+                    - termoAceito
+                    - contaVinculada
+                  additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2342,9 +2800,11 @@ paths:
                 additionalProperties: false
   /atletas/pendentes:
     get:
-      summary: Atletas cadastrados que ainda não aceitaram o termo do piloto
+      summary: Atletas com aceite do termo do piloto pendente
       tags:
         - cadastro
+      description: Quem nunca aceitou (termoAceitoVersao nulo) e quem aceitou só uma
+        versão anterior à vigente (termoAceitoVersao preenchido).
       security: *a1
       responses:
         "200":
@@ -2376,12 +2836,17 @@ paths:
                     criadoEm:
                       type: string
                       description: Instante ISO
+                    termoAceitoVersao:
+                      nullable: true
+                      description: Última versão aceita; nulo = nunca aceitou
+                      type: string
                   required:
                     - id
                     - nome
                     - velaid
                     - classe
                     - criadoEm
+                    - termoAceitoVersao
                   additionalProperties: false
         "401":
           description: Default Response
@@ -2401,6 +2866,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2425,6 +2891,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2494,6 +2961,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2518,6 +2986,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2542,6 +3011,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2566,6 +3036,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2590,6 +3061,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2691,6 +3163,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2715,6 +3188,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2739,6 +3213,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2908,7 +3383,14 @@ paths:
                         type: string
                       termoVersao:
                         nullable: true
+                        description: Última versão do termo aceita
                         type: string
+                      termoVigenteVersao:
+                        type: string
+                        description: Versão do termo vigente hoje
+                      termoPendente:
+                        type: boolean
+                        description: true quando o atleta ainda não aceitou a versão vigente
                       compartilharIbvar:
                         type: boolean
                       atualizadoEm:
@@ -2918,6 +3400,8 @@ paths:
                     required:
                       - termoAceitoEm
                       - termoVersao
+                      - termoVigenteVersao
+                      - termoPendente
                       - compartilharIbvar
                       - atualizadoEm
                     additionalProperties: false
@@ -2949,6 +3433,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2973,6 +3458,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -2997,6 +3483,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3069,6 +3556,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3093,6 +3581,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3117,6 +3606,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3141,6 +3631,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3179,7 +3670,14 @@ paths:
                     type: string
                   termoVersao:
                     nullable: true
+                    description: Última versão do termo aceita
                     type: string
+                  termoVigenteVersao:
+                    type: string
+                    description: Versão do termo vigente hoje
+                  termoPendente:
+                    type: boolean
+                    description: true quando o atleta ainda não aceitou a versão vigente
                   compartilharIbvar:
                     type: boolean
                   atualizadoEm:
@@ -3189,6 +3687,8 @@ paths:
                 required:
                   - termoAceitoEm
                   - termoVersao
+                  - termoVigenteVersao
+                  - termoPendente
                   - compartilharIbvar
                   - atualizadoEm
                 additionalProperties: false
@@ -3210,6 +3710,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3234,6 +3735,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3258,6 +3760,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3282,6 +3785,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3351,6 +3855,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3375,6 +3880,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3399,6 +3905,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3423,6 +3930,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3506,6 +4014,22 @@ paths:
                     respondidoEm:
                       nullable: true
                       type: string
+                    avaliacaoId:
+                      nullable: true
+                      description: Lançamento ligado à resposta, se houver
+                      type: string
+                    notaAnterior:
+                      nullable: true
+                      description: Nota do lançamento anterior ao ligado (mesmo atleta e indicador)
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                    notaNova:
+                      nullable: true
+                      description: Nota do lançamento ligado
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
                   required:
                     - id
                     - atleta
@@ -3516,6 +4040,9 @@ paths:
                     - criadoEm
                     - resposta
                     - respondidoEm
+                    - avaliacaoId
+                    - notaAnterior
+                    - notaNova
                   additionalProperties: false
         "401":
           description: Default Response
@@ -3535,6 +4062,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3559,6 +4087,174 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /revisoes/{id}/lancamentos:
+    get:
+      summary: Lista os lançamentos que podem ser ligados ao pedido de revisão
+      tags:
+        - revisoes
+      description: Só os lançamentos que o PUT /revisoes/:id aceitaria em avaliacaoId
+        (mesmo atleta, indicador do pedido ou de um indicador do pilar, e
+        lançados depois do pedido), do mais novo para o mais antigo. Vale para
+        pedido aberto ou respondido. Sem evidência.
+      parameters:
+        - schema:
+            type: string
+            pattern: ^\d{1,18}$
+          in: path
+          name: id
+          required: true
+      security: *a2
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  lancamentos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        indicadorId:
+                          type: string
+                        indicadorNome:
+                          type: string
+                        valor:
+                          type: number
+                        lancadoEm:
+                          type: string
+                          description: Instante ISO do lançamento
+                        origem:
+                          type: string
+                        avaliador:
+                          nullable: true
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                          required:
+                            - id
+                            - nome
+                          additionalProperties: false
+                      required:
+                        - id
+                        - indicadorId
+                        - indicadorNome
+                        - valor
+                        - lancadoEm
+                        - origem
+                        - avaliador
+                      additionalProperties: false
+                required:
+                  - lancamentos
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3570,7 +4266,12 @@ paths:
       summary: Responde um pedido de revisão
       tags:
         - revisoes
-      description: Pedido já respondido devolve 409 (código requisicao_invalida).
+      description: "Pedido já respondido devolve 409 (código requisicao_invalida).
+        avaliacaoId (opcional) liga a resposta ao lançamento que a atendeu: do
+        mesmo atleta, do indicador do pedido (ou de um indicador do pilar, se o
+        pedido foi por pilar) e lançado depois do pedido. Depois de gravar, o
+        atleta recebe um e-mail só com o aviso e o link; falha no envio não
+        desfaz a resposta."
       requestBody:
         required: true
         content:
@@ -3582,6 +4283,15 @@ paths:
                   type: string
                   minLength: 3
                   maxLength: 2000
+                avaliacaoId:
+                  description: Id do lançamento (série histórica) que atendeu o pedido
+                  anyOf:
+                    - type: string
+                      pattern: ^\d{1,18}$
+                    - type: integer
+                      minimum: 0
+                      exclusiveMinimum: true
+                      maximum: 9007199254740991
               required:
                 - resposta
       parameters:
@@ -3652,6 +4362,22 @@ paths:
                   respondidoEm:
                     nullable: true
                     type: string
+                  avaliacaoId:
+                    nullable: true
+                    description: Lançamento ligado à resposta, se houver
+                    type: string
+                  notaAnterior:
+                    nullable: true
+                    description: Nota do lançamento anterior ao ligado (mesmo atleta e indicador)
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  notaNova:
+                    nullable: true
+                    description: Nota do lançamento ligado
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
                 required:
                   - id
                   - atleta
@@ -3662,6 +4388,9 @@ paths:
                   - criadoEm
                   - resposta
                   - respondidoEm
+                  - avaliacaoId
+                  - notaAnterior
+                  - notaNova
                 additionalProperties: false
         "400":
           description: Default Response
@@ -3681,6 +4410,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3705,6 +4435,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3729,6 +4460,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3753,6 +4485,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3777,6 +4510,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -3994,6 +4728,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4018,6 +4753,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4222,6 +4958,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4246,6 +4983,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4316,10 +5054,23 @@ paths:
                       - pilarId
                       - nota
                       - descricao
+                rubricasRemover:
+                  description: "Ids de pilar cujas rubricas próprias saem (volta a valer a escala
+                    geral). A escala geral não pode ser removida: nulo ou vazio
+                    dão 400 com mensagem explícita"
+                  minItems: 1
+                  maxItems: 20
+                  type: array
+                  items:
+                    nullable: true
+                    type: string
+                    maxLength: 40
                 regras:
                   description: "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4,
-                    RANKING_CBVELA. O valor segue o formato lido em GET
-                    /parametros"
+                    RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_PONTOS. O valor
+                    segue o formato lido em GET /parametros. PERF_PONTOS: {
+                    ativa, faixas: [{ ate, nota }] }, ate crescente e nota de 0
+                    a 5 que não diminui"
                   type: object
                   additionalProperties: {}
                 classes:
@@ -4540,6 +5291,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4564,6 +5316,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4588,6 +5341,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4670,6 +5424,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4694,6 +5449,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4718,6 +5474,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4816,6 +5573,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4840,6 +5598,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4864,6 +5623,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4888,6 +5648,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -4984,6 +5745,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5008,6 +5770,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5032,6 +5795,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5056,6 +5820,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5080,6 +5845,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5175,6 +5941,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5199,6 +5966,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5223,6 +5991,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5247,6 +6016,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5271,6 +6041,233 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /ciclos/{id}/pendencias:
+    get:
+      summary: "Quem está atrasado no ciclo aberto: treinadores e atletas com pendência"
+      tags:
+        - ciclos
+      description: "Mesma regra do job de lembretes. Só atletas ativos com o termo do
+        piloto aceito. Treinador: atletas sem nota no ciclo em algum indicador T
+        (faltam = indicadores sem nota). Atleta: perguntas do questionário sem
+        resposta. diasParaPrazo é negativo depois do prazo. Ciclo fechado: 409."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: *a3
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  treinadores:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                        atletasPendentes:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              id:
+                                type: string
+                              nome:
+                                type: string
+                              faltam:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                            required:
+                              - id
+                              - nome
+                              - faltam
+                            additionalProperties: false
+                      required:
+                        - id
+                        - nome
+                        - atletasPendentes
+                      additionalProperties: false
+                  atletas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        nome:
+                          type: string
+                        perguntasSemResposta:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                      required:
+                        - id
+                        - nome
+                        - perguntasSemResposta
+                      additionalProperties: false
+                  totais:
+                    type: object
+                    properties:
+                      treinadoresComPendencia:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                      atletasComPendencia:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                      diasParaPrazo:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                    required:
+                      - treinadoresComPendencia
+                      - atletasComPendencia
+                      - diasParaPrazo
+                    additionalProperties: false
+                required:
+                  - treinadores
+                  - atletas
+                  - totais
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5425,6 +6422,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5449,6 +6447,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5473,6 +6472,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5497,6 +6497,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5629,6 +6630,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5653,6 +6655,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5677,6 +6680,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5701,6 +6705,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5725,6 +6730,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5875,6 +6881,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5899,6 +6906,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -5923,6 +6931,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6052,6 +7061,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6076,6 +7086,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6100,6 +7111,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6111,8 +7123,9 @@ paths:
       summary: Registra um pedido do titular (acesso, correção, exclusão ou revogação)
       tags:
         - titular
-      description: O pedido fica aberto até o gestor responder. Exclusão e revogação
-        são tratadas manualmente pelo gestor, fora da API.
+      description: O pedido fica aberto até o gestor responder. Revogação é tratada
+        pelo gestor; a exclusão é atendida pela anonimização (`POST
+        /atletas/{id}/anonimizar`).
       requestBody:
         required: true
         content:
@@ -6171,6 +7184,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6195,6 +7209,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6219,6 +7234,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6243,6 +7259,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6328,6 +7345,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6352,6 +7370,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6364,10 +7383,10 @@ paths:
       tags:
         - titular
       description: "Registra a resposta e fecha o pedido. A exclusão de dados NÃO é
-        feita por esta rota: é procedimento manual do gestor, porque a série
-        histórica (notas, respostas, medidas, gates, financeiro) só aceita
-        inserção. Pedido já respondido devolve 409 (código
-        requisicao_invalida)."
+        feita por esta rota: para pedido de exclusão use `POST
+        /atletas/{id}/anonimizar`, que anonimiza o atleta e responde o pedido (a
+        série histórica, que só aceita inserção, é mantida sem identificação
+        direta). Pedido já respondido devolve 409 (código requisicao_invalida)."
       requestBody:
         required: true
         content:
@@ -6460,6 +7479,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6484,6 +7504,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6508,6 +7529,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6532,6 +7554,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6556,6 +7579,214 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/anonimizar:
+    post:
+      summary: Anonimiza o atleta a pedido de exclusão (LGPD, art. 18)
+      tags:
+        - titular
+      description: "Só o gestor, com o pedido de exclusão do próprio atleta (aberto) e
+        a confirmação `ANONIMIZAR`. Numa transação: tira nome, contato, clube,
+        cidade, número de vela, ID World Sailing e código VelaID (vira
+        `ANON-xxxxxxxx`), apaga a linha do VelaID, anonimiza a conta de login,
+        revoga os consentimentos, marca as evidências como removidas, responde o
+        pedido e audita. A série histórica (notas, respostas, medidas, gates,
+        financeiro, plano) é mantida, sem identificação direta. Depois do commit
+        remove os arquivos do Storage e a conta do Supabase Auth: se algo
+        falhar, a anonimização vale e a resposta traz `pendencias`. Repetir a
+        chamada com o mesmo pedido só tenta de novo essas pendências. Atleta já
+        anonimizado por outro pedido, ou pedido já respondido, devolve 409."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                pedidoTitularId:
+                  type: string
+                  pattern: ^\d{1,18}$
+                confirmacao:
+                  type: string
+                  enum:
+                    - ANONIMIZAR
+              required:
+                - pedidoTitularId
+                - confirmacao
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  atletaId:
+                    type: string
+                  anonimizadoEm:
+                    type: string
+                    description: Instante ISO
+                  evidenciasRemovidas:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  pendencias:
+                    type: object
+                    properties:
+                      arquivos:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                        description: Arquivos que ainda não saíram do Storage
+                      conta:
+                        type: boolean
+                        description: A conta no Supabase Auth ainda não foi apagada
+                    required:
+                      - arquivos
+                      - conta
+                    additionalProperties: false
+                required:
+                  - atletaId
+                  - anonimizadoEm
+                  - evidenciasRemovidas
+                  - pendencias
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6714,6 +7945,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6738,6 +7970,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6762,6 +7995,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6786,6 +8020,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6799,7 +8034,8 @@ paths:
         - evidencias
       description: Gestor, ou treinador dos próprios atletas. O arquivo vai em base64,
         é conferido pelo tamanho e pela assinatura e fica no Storage privado.
-        Use o `id` retornado como `anexoId` ao lançar a nota.
+        Use o `id` retornado como `anexoId` ao lançar a nota. Limite de 20
+        envios por minuto por usuário (429 `limite_excedido`).
       requestBody:
         required: true
         content:
@@ -6866,6 +8102,11 @@ paths:
                   enviadoEm:
                     type: string
                     description: Instante ISO
+                  removidoEm:
+                    nullable: true
+                    description: Instante ISO em que o arquivo foi removido (anonimização); nulo =
+                      disponível
+                    type: string
                 required:
                   - id
                   - nomeArquivo
@@ -6873,6 +8114,7 @@ paths:
                   - tamanhoBytes
                   - indicadorId
                   - enviadoEm
+                  - removidoEm
                 additionalProperties: false
         "400":
           description: Default Response
@@ -6892,6 +8134,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6916,6 +8159,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6940,6 +8184,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6964,6 +8209,32 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "429":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -6988,6 +8259,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7041,6 +8313,11 @@ paths:
                         enviadoEm:
                           type: string
                           description: Instante ISO
+                        removidoEm:
+                          nullable: true
+                          description: Instante ISO em que o arquivo foi removido (anonimização); nulo =
+                            disponível
+                          type: string
                       required:
                         - id
                         - nomeArquivo
@@ -7048,6 +8325,7 @@ paths:
                         - tamanhoBytes
                         - indicadorId
                         - enviadoEm
+                        - removidoEm
                       additionalProperties: false
                 required:
                   - anexos
@@ -7070,6 +8348,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7094,6 +8373,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7118,6 +8398,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7129,8 +8410,9 @@ paths:
       summary: Link temporário (5 minutos) para abrir a evidência
       tags:
         - evidencias
-      description: Mesmo acesso da listagem, pelo atleta do anexo. Cada geração de
-        link fica na auditoria.
+      description: Mesmo acesso da listagem, pelo atleta do anexo. Anexo removido
+        (anonimização) devolve 410 `evidencia_removida`. Cada geração de link
+        fica na auditoria.
       parameters:
         - schema:
             type: string
@@ -7176,6 +8458,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7200,6 +8483,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7224,6 +8508,32 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "410":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7248,6 +8558,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7333,6 +8644,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7357,6 +8669,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7485,6 +8798,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7509,6 +8823,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7533,6 +8848,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7557,6 +8873,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7581,6 +8898,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7687,6 +9005,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7711,6 +9030,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7735,6 +9055,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7759,6 +9080,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7814,6 +9136,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7838,6 +9161,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7862,6 +9186,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7886,6 +9211,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7910,6 +9236,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7934,6 +9261,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -7945,8 +9273,8 @@ paths:
       summary: Termo de consentimento vigente
       tags:
         - termo
-      description: Texto da versão vigente (a de maior vigente_desde). Qualquer
-        usuário autenticado lê.
+      description: Texto da versão vigente (a de maior vigente_desde que já começou).
+        Qualquer usuário autenticado lê.
       security: &a7
         - bearerAuth: []
       responses:
@@ -7990,6 +9318,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -8014,6 +9343,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -8075,6 +9405,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -8099,6 +9430,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -8123,6 +9455,7 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:
@@ -8147,6 +9480,257 @@ paths:
                       - limite_excedido
                       - mfa_obrigatorio
                       - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /termos:
+    get:
+      summary: Versões do termo de consentimento (gestor)
+      tags:
+        - termo
+      description: Da mais nova para a mais antiga, com a quantidade de aceites de
+        cada uma. Sem o texto (o vigente vem em GET /termo).
+      security: *a7
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    versao:
+                      type: string
+                    titulo:
+                      type: string
+                    vigenteDesde:
+                      type: string
+                      description: Instante ISO
+                    criadoEm:
+                      type: string
+                      description: Instante ISO
+                    vigente:
+                      type: boolean
+                      description: É a versão vigente agora
+                    futura:
+                      type: boolean
+                      description: Ainda não começou a valer
+                    aceites:
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
+                      description: Atletas distintos com aceite concedido desta versão
+                  required:
+                    - versao
+                    - titulo
+                    - vigenteDesde
+                    - criadoEm
+                    - vigente
+                    - futura
+                    - aceites
+                  additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    post:
+      summary: Publica uma nova versão do termo (gestor)
+      tags:
+        - termo
+      description: A versão passa a valer em vigenteDesde, que não pode estar no
+        passado nem ser anterior ou igual à vigência de outra versão (inclusive
+        futura). Quem aceitou só a anterior fica com aceite pendente; se o
+        ranking os exclui depende da regra TERMO_EXIGE_REACEITE. A auditoria não
+        guarda o texto.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                versao:
+                  type: string
+                  minLength: 1
+                  maxLength: 100
+                titulo:
+                  type: string
+                  minLength: 3
+                  maxLength: 200
+                texto:
+                  type: string
+                  minLength: 50
+                  maxLength: 50000
+                vigenteDesde:
+                  type: string
+                  format: date-time
+                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+              required:
+                - versao
+                - titulo
+                - texto
+                - vigenteDesde
+              additionalProperties: false
+      security: *a7
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versao:
+                    type: string
+                  titulo:
+                    type: string
+                  vigenteDesde:
+                    type: string
+                    description: Instante ISO
+                  criadoEm:
+                    type: string
+                    description: Instante ISO
+                  vigente:
+                    type: boolean
+                    description: É a versão vigente agora
+                  futura:
+                    type: boolean
+                    description: Ainda não começou a valer
+                  aceites:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                    description: Atletas distintos com aceite concedido desta versão
+                required:
+                  - versao
+                  - titulo
+                  - vigenteDesde
+                  - criadoEm
+                  - vigente
+                  - futura
+                  - aceites
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
                   mensagem:
                     type: string
                 required:

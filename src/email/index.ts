@@ -32,8 +32,12 @@ export interface LoggerEmail {
  */
 export function criarProvedorEmailLog(log: LoggerEmail): ProvedorEmail {
   return {
-    async enviar(m) {
-      log.info({ evento: "email_registrado", assunto: m.assunto, dominio: m.para.split("@")[1] ?? null }, "e-mail (provedor log)");
+    enviar(m) {
+      log.info(
+        { evento: "email_registrado", assunto: m.assunto, dominio: m.para.split("@")[1] ?? null },
+        "e-mail (provedor log)",
+      );
+      return Promise.resolve();
     },
   };
 }
@@ -43,15 +47,19 @@ export function criarProvedorEmailMemoria(): ProvedorEmail & { enviadas: Mensage
   const enviadas: MensagemEmail[] = [];
   return {
     enviadas,
-    async enviar(m) {
+    enviar(m) {
       enviadas.push(m);
+      return Promise.resolve();
     },
   };
 }
 
 /** Escolhe o provedor pela config: `log` (padrão) ou `smtp`. */
 export function criarProvedorEmail(
-  config: Pick<Config, "EMAIL_PROVEDOR" | "EMAIL_REMETENTE" | "SMTP_HOST" | "SMTP_PORT" | "SMTP_USUARIO" | "SMTP_SENHA">,
+  config: Pick<
+    Config,
+    "EMAIL_PROVEDOR" | "EMAIL_REMETENTE" | "SMTP_HOST" | "SMTP_PORT" | "SMTP_USUARIO" | "SMTP_SENHA"
+  >,
   log: LoggerEmail,
 ): ProvedorEmail {
   if (config.EMAIL_PROVEDOR === "log") return criarProvedorEmailLog(log);
@@ -68,6 +76,6 @@ export function criarProvedorEmail(
 /** Logger JSON de uma linha no stdout, para o server.ts e os jobs (antes ou fora do Fastify). */
 export const loggerConsole: LoggerEmail = {
   info(obj, msg) {
-    console.log(JSON.stringify({ level: "info", msg, ...obj }));
+    process.stdout.write(`${JSON.stringify({ level: "info", msg, ...obj })}\n`);
   },
 };

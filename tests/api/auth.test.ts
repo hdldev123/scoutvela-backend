@@ -39,7 +39,9 @@ describe("autenticação", () => {
   });
 
   it("token com assinatura errada responde 401", async () => {
-    const t = await tokenPara(gestor.authUserId, { segredo: "outro-segredo-qualquer-com-32-caracteres!!" });
+    const t = await tokenPara(gestor.authUserId, {
+      segredo: "outro-segredo-qualquer-com-32-caracteres!!",
+    });
     expect((await chamarMe(cabecalhoAuth(t))).statusCode).toBe(401);
   });
 
@@ -101,12 +103,20 @@ describe("health, CORS, erros e documentação", () => {
   });
 
   it("CORS libera origem da lista", async () => {
-    const r = await app.inject({ method: "GET", url: "/health", headers: { origin: ORIGEM_PERMITIDA_TESTE } });
+    const r = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { origin: ORIGEM_PERMITIDA_TESTE },
+    });
     expect(r.headers["access-control-allow-origin"]).toBe(ORIGEM_PERMITIDA_TESTE);
   });
 
   it("CORS recusa origem fora da lista", async () => {
-    const r = await app.inject({ method: "GET", url: "/health", headers: { origin: "http://malicioso.exemplo" } });
+    const r = await app.inject({
+      method: "GET",
+      url: "/health",
+      headers: { origin: "http://malicioso.exemplo" },
+    });
     expect(r.headers["access-control-allow-origin"]).toBeUndefined();
     const pre = await app.inject({
       method: "OPTIONS",
@@ -180,7 +190,8 @@ describe("segurança HTTP", () => {
   it("responde 429 no formato padrão ao estourar o limite; /health é isento", async () => {
     const app = await criarAppDeTeste(db, { limiteRequisicoes: { max: 3, janelaMs: 60_000 } });
     const codigos: number[] = [];
-    for (let i = 0; i < 5; i++) codigos.push((await app.inject({ method: "GET", url: "/me" })).statusCode);
+    for (let i = 0; i < 5; i++)
+      codigos.push((await app.inject({ method: "GET", url: "/me" })).statusCode);
     expect(codigos).toEqual([401, 401, 401, 429, 429]);
     const r = await app.inject({ method: "GET", url: "/me" });
     expect(r.json().erro).toBe("limite_excedido");

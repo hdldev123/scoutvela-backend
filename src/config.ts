@@ -57,13 +57,25 @@ const esquemaConfig = z
     if (c.APP_ENV === "desenvolvimento") return;
     // O disco do Render é efêmero: fora do desenvolvimento, evidência vai para o Supabase Storage.
     if (c.STORAGE_PROVEDOR !== "supabase") {
-      ctx.addIssue({ code: "custom", path: ["STORAGE_PROVEDOR"], message: "use supabase fora do desenvolvimento" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["STORAGE_PROVEDOR"],
+        message: "use supabase fora do desenvolvimento",
+      });
     }
     if (c.STORAGE_PROVEDOR === "supabase" && !c.SUPABASE_SERVICE_ROLE_KEY) {
-      ctx.addIssue({ code: "custom", path: ["SUPABASE_SERVICE_ROLE_KEY"], message: "obrigatória com STORAGE_PROVEDOR=supabase" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["SUPABASE_SERVICE_ROLE_KEY"],
+        message: "obrigatória com STORAGE_PROVEDOR=supabase",
+      });
     }
     if (c.EMAIL_PROVEDOR === "smtp" && !c.SMTP_HOST) {
-      ctx.addIssue({ code: "custom", path: ["SMTP_HOST"], message: "obrigatório com EMAIL_PROVEDOR=smtp" });
+      ctx.addIssue({
+        code: "custom",
+        path: ["SMTP_HOST"],
+        message: "obrigatório com EMAIL_PROVEDOR=smtp",
+      });
     }
   });
 

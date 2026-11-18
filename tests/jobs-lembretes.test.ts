@@ -16,7 +16,10 @@ describe("lembretes do ciclo", () => {
   afterEach(() => p.encerrar());
 
   const rodar = (dia: string, email = criarProvedorEmailMemoria()) =>
-    executarLembretes({ db: p.db, email, agora: em(dia), frontUrl: FRONT }).then((r) => ({ r, email }));
+    executarLembretes({ db: p.db, email, agora: em(dia), frontUrl: FRONT }).then((r) => ({
+      r,
+      email,
+    }));
 
   it("envia nos dias 7, 3, 1 e 0 antes do prazo", async () => {
     for (const dia of ["2026-11-23", "2026-11-27", "2026-11-29", "2026-11-30"]) {
@@ -58,8 +61,17 @@ describe("lembretes do ciclo", () => {
   });
 
   it("falha de envio libera a reserva e a próxima execução tenta de novo", async () => {
-    const quebrado = { async enviar() { throw new Error("smtp fora"); } };
-    const falha = await executarLembretes({ db: p.db, email: quebrado, agora: em("2026-11-27"), frontUrl: FRONT });
+    const quebrado = {
+      async enviar() {
+        throw new Error("smtp fora");
+      },
+    };
+    const falha = await executarLembretes({
+      db: p.db,
+      email: quebrado,
+      agora: em("2026-11-27"),
+      frontUrl: FRONT,
+    });
     expect(falha.treinadores + falha.atletas).toBe(0);
     expect(falha.ignorados).toBeGreaterThan(0);
     const { r } = await rodar("2026-11-27");
@@ -73,7 +85,9 @@ describe("lembretes do ciclo", () => {
     expect(paras).not.toContain(EMAILS_DEMO.gestor);
     expect(paras).not.toContain(EMAILS_DEMO.ibvar);
 
-    const nomes = (await p.db.query<{ nome: string }>("select nome from atletas")).rows.map((a) => a.nome);
+    const nomes = (await p.db.query<{ nome: string }>("select nome from atletas")).rows.map(
+      (a) => a.nome,
+    );
     for (const m of email.enviadas) {
       const conteudo = `${m.assunto}\n${m.texto}`;
       expect(conteudo).toMatch(/\/(avaliar|painel)/);

@@ -21,7 +21,11 @@ describe("GET /ranking", () => {
   afterAll(() => p.encerrar());
 
   const buscar = async (email: string, query = "") => {
-    const r = await p.app.inject({ method: "GET", url: `/ranking${query}`, headers: await p.como(email) });
+    const r = await p.app.inject({
+      method: "GET",
+      url: `/ranking${query}`,
+      headers: await p.como(email),
+    });
     return { status: r.statusCode, corpo: r.json() };
   };
 
@@ -40,7 +44,9 @@ describe("GET /ranking", () => {
     expect(corpo.itens).toHaveLength(14);
     expect(corpo.ocultosSemConsentimento).toBeNull();
     expect(corpo.ciclo).toEqual({ nome: "Novembro de 2026", prazo: "2026-11-30" });
-    expect(corpo.itens.map((i: Item) => i.posicao)).toEqual(Array.from({ length: 14 }, (_, i) => i + 1));
+    expect(corpo.itens.map((i: Item) => i.posicao)).toEqual(
+      Array.from({ length: 14 }, (_, i) => i + 1),
+    );
     const scores = corpo.itens.map((i: Item) => i.score);
     expect(scores).toEqual([...scores].sort((a, b) => b - a));
     expect(corpo.itens[0].pilares).toHaveLength(9);
@@ -91,11 +97,18 @@ describe("GET /ranking", () => {
   // Por último: mexe nos dados.
   it("atleta sem o termo do piloto aceito não entra no ranking, mas segue na ficha do gestor", async () => {
     const id = await p.idDe("RS-T02");
-    await p.db.query("insert into consentimentos (atleta_id, tipo, concedido) values ($1, 'termo_piloto', false)", [id]);
+    await p.db.query(
+      "insert into consentimentos (atleta_id, tipo, concedido) values ($1, 'termo_piloto', false)",
+      [id],
+    );
     const { corpo } = await buscar(EMAILS_DEMO.gestor);
     expect(corpo.itens).toHaveLength(13);
     expect(corpo.itens.map((i: Item) => i.atleta.velaid)).not.toContain("RS-T02");
-    const ficha = await p.app.inject({ method: "GET", url: `/atletas/${id}`, headers: await p.como(EMAILS_DEMO.gestor) });
+    const ficha = await p.app.inject({
+      method: "GET",
+      url: `/atletas/${id}`,
+      headers: await p.como(EMAILS_DEMO.gestor),
+    });
     expect(ficha.statusCode).toBe(200);
     expect(ficha.json().atleta.termoAceito).toBe(false);
   });
