@@ -49,7 +49,7 @@ describe("perfil do usuário (/me/perfil e /me/foto)", () => {
       headers: cabecalhoAuth(await tokenPara(u.authUserId, aal ? { aal } : {})),
       ...(payload ? { payload } : {}),
     });
-    return { status: r.statusCode, corpo: r.json() };
+    return { status: r.statusCode, corpo: r.body ? r.json() : null };
   };
   const auditoria = async (usuarioId: string) =>
     (
@@ -239,15 +239,15 @@ describe("perfil do usuário (/me/perfil e /me/foto)", () => {
       expect((await enviarFoto(outro, "image/jpeg", png())).status).toBe(400);
     });
 
-    it("DELETE remove do Storage e do banco; sem foto não faz nada", async () => {
+    it("DELETE remove do Storage e do banco; sem foto responde 204", async () => {
       const u = await novo("atleta");
       await enviarFoto(u, "image/jpeg", jpeg());
       const caminho = (await fotoDe(u.id))!;
       const r = await chamar(u, "DELETE", "/me/foto");
-      expect(r).toEqual({ status: 200, corpo: { fotoUrl: null } });
+      expect(r).toEqual({ status: 204, corpo: null });
       expect(await fotoDe(u.id)).toBeNull();
       expect(armazenamento.arquivos.has(caminho)).toBe(false);
-      expect((await chamar(u, "DELETE", "/me/foto")).status).toBe(200);
+      expect((await chamar(u, "DELETE", "/me/foto")).status).toBe(204);
       expect((await auditoria(u.id)).map((x) => x.acao)).toEqual(["enviar_foto", "remover_foto"]);
     });
   });

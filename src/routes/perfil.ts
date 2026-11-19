@@ -285,12 +285,12 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ["sessao"],
         summary: "Remove a foto de perfil",
-        description: "Sem foto, não faz nada.",
+        description: "Idempotente: sem foto, também responde 204.",
         security: [{ bearerAuth: [] }],
-        response: { 200: esquemaFoto, ...respostasComuns },
+        response: { 204: z.null().describe("Foto removida"), ...respostasComuns },
       },
     },
-    async (req) => {
+    async (req, reply) => {
       const u = req.usuario;
       const anterior = await app.db.transacao(async (tx) => {
         const r = await tx.query<{ foto_caminho: string | null }>(
@@ -304,7 +304,7 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
         return caminho;
       });
       if (anterior) await removerFotoSemFalhar(app.armazenamento, anterior, req.log);
-      return { fotoUrl: null };
+      return reply.code(204).send(null);
     },
   );
 }
