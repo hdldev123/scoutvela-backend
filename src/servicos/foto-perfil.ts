@@ -58,3 +58,25 @@ export async function caminhoDaFotoDoAtleta(db: Db, atletaId: string): Promise<s
   );
   return r.rows[0]?.foto_caminho ?? null;
 }
+
+/** Links das fotos de vários atletas (só os que têm foto), com uma consulta ao banco. */
+export async function linksDasFotosDosAtletas(
+  db: Db,
+  armazenamento: ArmazenamentoEvidencias,
+  atletaIds: string[],
+  log: Log,
+): Promise<Map<string, string | null>> {
+  if (atletaIds.length === 0) return new Map();
+  const r = await db.query<{ atleta_id: string; foto_caminho: string }>(
+    `select distinct on (atleta_id) atleta_id::text as atleta_id, foto_caminho from usuarios
+      where papel = 'atleta' and atleta_id = any($1::uuid[]) and ativo and foto_caminho is not null
+      order by atleta_id, criado_em desc`,
+    [atletaIds],
+  );
+  const pares = await Promise.all(
+    r.rows.map(
+      async (l) => [l.atleta_id, await linkDaFoto(armazenamento, l.foto_caminho, log)] as const,
+    ),
+  );
+  return new Map(pares);
+}

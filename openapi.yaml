@@ -880,6 +880,11 @@ paths:
                                 - nome
                                 - evento
                               additionalProperties: false
+                            fotoUrl:
+                              nullable: true
+                              description: Link assinado curto da foto da conta do atleta; sempre nulo para o
+                                IBVAR
+                              type: string
                           required:
                             - id
                             - nome
@@ -889,6 +894,7 @@ paths:
                             - idade
                             - genero
                             - classe
+                            - fotoUrl
                           additionalProperties: false
                         score:
                           type: number
