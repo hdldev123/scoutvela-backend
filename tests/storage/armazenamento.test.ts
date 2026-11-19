@@ -126,4 +126,27 @@ describe("armazenamento local", () => {
     await expect(s.remover(outro)).resolves.toBeUndefined();
     await expect(s.remover("../x.pdf")).rejects.toThrow(ErroArmazenamento);
   });
+
+  it("aceita foto de perfil em fotos/{usuarioId}/{uuid}.jpg|png e recusa outros formatos", async () => {
+    dir = dir ?? (await mkdtemp(join(tmpdir(), "evid-")));
+    const s = criarArmazenamentoLocal(dir);
+    const foto =
+      "fotos/55555555-5555-4555-8555-555555555555/66666666-6666-4666-8666-666666666666.jpg";
+    await s.salvar(foto, new Uint8Array([0xff, 0xd8, 0xff]), "image/jpeg");
+    expect((await s.linkTemporario(foto, "image/jpeg", "foto.jpg")).url).toBe(
+      "data:image/jpeg;base64,/9j/",
+    );
+    await s.remover(foto);
+    const pdf =
+      "fotos/55555555-5555-4555-8555-555555555555/66666666-6666-4666-8666-666666666666.pdf";
+    for (const invalido of [
+      pdf,
+      "fotos/../x.jpg",
+      "outros/55555555-5555-4555-8555-555555555555/x.jpg",
+    ]) {
+      await expect(s.salvar(invalido, new Uint8Array([1]), "image/jpeg")).rejects.toThrow(
+        ErroArmazenamento,
+      );
+    }
+  });
 });
