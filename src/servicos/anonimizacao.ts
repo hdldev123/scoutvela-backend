@@ -8,11 +8,10 @@ import type { ArmazenamentoEvidencias } from "../storage/index.js";
  * Anonimização do atleta por pedido de exclusão (LGPD, art. 18).
  *
  * Some: nome, contato, clube, cidade, número de vela, ID World Sailing, código VelaID, a linha do
- * VelaID, os dados pessoais da conta de login, a conta no Supabase Auth e os arquivos de evidência.
+ * VelaID, os dados pessoais da conta de login, a conta no Supabase Auth, a foto de perfil e os
+ * arquivos de evidência.
  * Fica: a série histórica (notas, respostas, medidas, gates, financeiro, plano, auditoria), ligada
  * ao atleta_id e sem identificação direta.
- *
- * TODO(B5): quando a foto de perfil existir, a remoção dela entra aqui, junto das evidências.
  */
 
 export const NOME_ANONIMIZADO = "Atleta anonimizado";
@@ -224,6 +223,25 @@ async function concluirPendencias(
       log.warn(
         { evento: "anonimizacao_pendencia", tipo: "arquivo", erro: nomeDoErro(e) },
         "falha ao remover arquivo na anonimização",
+      );
+    }
+  }
+
+  // A conta já está inativa: a foto não aparece mais e o caminho só sai do banco depois de removida.
+  const fotos = await db.query<{ id: string; foto_caminho: string }>(
+    `select id::text as id, foto_caminho from usuarios
+      where papel = 'atleta' and atleta_id = $1::uuid and foto_caminho is not null`,
+    [atletaId],
+  );
+  for (const { id, foto_caminho: caminho } of fotos.rows) {
+    try {
+      await armazenamento.remover(caminho);
+      await db.query(`update usuarios set foto_caminho = null where id = $1::uuid`, [id]);
+    } catch (e) {
+      falhasArquivo++;
+      log.warn(
+        { evento: "anonimizacao_pendencia", tipo: "foto", erro: nomeDoErro(e) },
+        "falha ao remover foto na anonimização",
       );
     }
   }
