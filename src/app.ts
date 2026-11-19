@@ -136,7 +136,7 @@ export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
 
   await app.register(cors, {
     origin: config.CORS_ORIGINS,
-    methods: ["GET", "POST", "PUT"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Authorization", "Content-Type"],
   });
 
