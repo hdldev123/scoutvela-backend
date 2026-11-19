@@ -12,6 +12,7 @@ import {
 } from "../apoio/app.js";
 import { criarArmazenamentoFake, type ArmazenamentoFake } from "../apoio/armazenamento.js";
 import { criarBancoDeTeste } from "../apoio/banco.js";
+import { EMAILS_DEMO, criarPiloto, type Piloto } from "../apoio/piloto.js";
 
 const jpeg = (tamanho = 64) =>
   Buffer.concat([Buffer.from([0xff, 0xd8, 0xff, 0xe0]), Buffer.alloc(tamanho - 4)]);
@@ -200,6 +201,7 @@ describe("perfil do usuário (/me/perfil e /me/foto)", () => {
       expect(armazenamento.arquivos.has(primeira!)).toBe(false);
       expect(armazenamento.arquivos.has(segunda!)).toBe(true);
 
+      expect((await chamar(u, "GET", "/me")).corpo.usuario.fotoUrl).toContain(segunda);
       expect((await chamar(u, "GET", "/me/perfil")).corpo.fotoUrl).toContain(segunda);
       expect((await auditoria(u.id)).map((x) => x.detalhes)).toEqual([
         { tipoMime: "image/jpeg", tamanhoBytes: 64 },
@@ -248,5 +250,54 @@ describe("perfil do usuário (/me/perfil e /me/foto)", () => {
       expect((await chamar(u, "DELETE", "/me/foto")).status).toBe(200);
       expect((await auditoria(u.id)).map((x) => x.acao)).toEqual(["enviar_foto", "remover_foto"]);
     });
+  });
+});
+
+describe("foto do atleta na ficha (GET /atletas/:id)", () => {
+  let p: Piloto;
+  beforeAll(async () => {
+    p = await criarPiloto();
+  });
+  afterAll(() => p.encerrar());
+
+  const fotoNaFicha = async (email: string, atletaId: string) => {
+    const r = await p.app.inject({
+      method: "GET",
+      url: `/atletas/${atletaId}`,
+      headers: await p.como(email),
+    });
+    expect(r.statusCode).toBe(200);
+    return r.json().atleta.fotoUrl as string | null;
+  };
+
+  it("gestor, treinador do atleta e o próprio atleta veem; IBVAR, não", async () => {
+    const conta = await p.db.query<{ atleta_id: string }>(
+      `select atleta_id from usuarios where email = $1`,
+      [EMAILS_DEMO.atleta],
+    );
+    const atletaId = conta.rows[0]!.atleta_id;
+    const foto = `fotos/${crypto.randomUUID()}/${crypto.randomUUID()}.jpg`;
+    await p.db.query(`update usuarios set foto_caminho = $1 where email = $2`, [
+      foto,
+      EMAILS_DEMO.atleta,
+    ]);
+    await p.db.query(
+      `update atletas set treinador_id = (select id from usuarios where email = $1) where id = $2`,
+      [EMAILS_DEMO.treinadora, atletaId],
+    );
+    await p.db.query(
+      `insert into consentimentos (atleta_id, tipo, concedido, versao_termo, registrado_por)
+       values ($1, 'compartilhar_ibvar', true, 'v1', (select id from usuarios where email = $2))`,
+      [atletaId, EMAILS_DEMO.atleta],
+    );
+
+    for (const email of [EMAILS_DEMO.gestor, EMAILS_DEMO.treinadora, EMAILS_DEMO.atleta]) {
+      expect(await fotoNaFicha(email, atletaId)).toContain(foto);
+    }
+    expect(await fotoNaFicha(EMAILS_DEMO.ibvar, atletaId)).toBeNull();
+  });
+
+  it("atleta sem conta ou sem foto: nulo", async () => {
+    expect(await fotoNaFicha(EMAILS_DEMO.gestor, await p.idDe("SP-T08"))).toBeNull();
   });
 });

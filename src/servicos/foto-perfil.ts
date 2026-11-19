@@ -1,3 +1,4 @@
+import type { Db } from "../db/db.js";
 import type { ArmazenamentoEvidencias } from "../storage/index.js";
 
 interface Log {
@@ -37,4 +38,23 @@ export async function removerFotoSemFalhar(
     log.warn({ evento: "foto_orfa", erro: nomeDoErro(e) }, "falha ao remover foto do Storage");
     return false;
   }
+}
+
+export async function caminhoDaFotoDoUsuario(db: Db, usuarioId: string): Promise<string | null> {
+  const r = await db.query<{ foto_caminho: string | null }>(
+    `select foto_caminho from usuarios where id = $1::uuid`,
+    [usuarioId],
+  );
+  return r.rows[0]?.foto_caminho ?? null;
+}
+
+/** Foto da conta ativa do atleta (a conta anonimizada fica inativa e não expõe a foto). */
+export async function caminhoDaFotoDoAtleta(db: Db, atletaId: string): Promise<string | null> {
+  const r = await db.query<{ foto_caminho: string }>(
+    `select foto_caminho from usuarios
+      where papel = 'atleta' and atleta_id = $1::uuid and ativo and foto_caminho is not null
+      order by criado_em desc limit 1`,
+    [atletaId],
+  );
+  return r.rows[0]?.foto_caminho ?? null;
 }
