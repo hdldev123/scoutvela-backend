@@ -6,6 +6,7 @@ import {
   VELAID_EXTRAS,
   autonomiaComponente,
 } from "./prototipo.js";
+import { preencherAlturasFicticias } from "./alturas-ficticias.js";
 
 const NIVEIS: Record<string, string> = {
   Mundial: "mundial",
@@ -76,6 +77,9 @@ export async function semear(db: Db): Promise<void> {
     if (Number(existentes.rows[0]!.n) > 0) {
       throw new Error("O banco já tem atletas; o seed só roda em banco sem atletas.");
     }
+
+    // Alturas de referência FICTÍCIAS das classes (só informativas; em produção a faixa nasce vazia).
+    await preencherAlturasFicticias(tx);
 
     const gestorId = await inserirUsuario(tx, {
       email: "gestor@scoutvela.dev",

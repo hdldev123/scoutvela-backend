@@ -41,6 +41,12 @@ const esquemaParametros = z.object({
       pesoMinKg: z.number(),
       pesoMedioKg: z.number(),
       pesoMaxKg: z.number(),
+      alturaMinCm: z
+        .number()
+        .nullable()
+        .describe("Altura de referência (informativa); nula se não definida"),
+      alturaMediaCm: z.number().nullable(),
+      alturaMaxCm: z.number().nullable(),
     }),
   ),
   rubricas: z.array(
@@ -62,6 +68,7 @@ const esquemaParametros = z.object({
 });
 
 const pesoKg = z.number().min(0).max(400);
+const alturaCm = z.number().min(120).max(230).nullable();
 const esquemaAtualizacao = z
   .object({
     pesos: z
@@ -108,6 +115,13 @@ const esquemaAtualizacao = z
           pesoMinKg: pesoKg.optional(),
           pesoMedioKg: pesoKg.optional(),
           pesoMaxKg: pesoKg.optional(),
+          alturaMinCm: alturaCm
+            .optional()
+            .describe(
+              "Altura de referência da classe, só informativa (não entra no score nem nos gates). Informe as três (min, média, max; 120 a 230 cm, min <= média <= max) ou as três nulas para limpar",
+            ),
+          alturaMediaCm: alturaCm.optional(),
+          alturaMaxCm: alturaCm.optional(),
           ativa: z.boolean().optional().describe("Não dá para desativar classe com atleta ativo"),
         }),
       )

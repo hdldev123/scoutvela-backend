@@ -151,3 +151,107 @@ describe("/parametros", () => {
     });
   });
 });
+
+describe("/parametros: altura de referência da classe (informativa)", () => {
+  let p: Piloto;
+  beforeAll(async () => {
+    p = await criarPiloto(AGORA);
+  });
+  afterAll(() => p.encerrar());
+
+  const g = EMAILS_DEMO.gestor;
+  const ler = async () =>
+    (await p.app.inject({ method: "GET", url: "/parametros", headers: await p.como(g) })).json()
+      .classes as Record<string, unknown>[];
+  const gravar = async (classe: Record<string, unknown>) => {
+    const r = await p.app.inject({
+      method: "PUT",
+      url: "/parametros",
+      headers: await p.como(g),
+      payload: { classes: [classe] },
+    });
+    return { status: r.statusCode, corpo: r.json() };
+  };
+  const auditorias = async () =>
+    (
+      await p.db.query<{ detalhes: { classes: { antes: unknown; depois: unknown } } }>(
+        "select detalhes from auditoria where acao = 'atualizar_parametros' order by id",
+      )
+    ).rows.map((l) => l.detalhes.classes);
+
+  it("GET traz a faixa de altura da classe (do seed fictício) e nula quando não definida", async () => {
+    const ilca7 = (await ler()).find((c) => c.id === "ilca7");
+    expect(ilca7).toMatchObject({ alturaMinCm: 180, alturaMediaCm: 185, alturaMaxCm: 190 });
+    await p.db.query(
+      "update classes set altura_min_cm = null, altura_media_cm = null, altura_max_cm = null where id = 'ilca6'",
+    );
+    expect((await ler()).find((c) => c.id === "ilca6")).toMatchObject({
+      alturaMinCm: null,
+      alturaMediaCm: null,
+      alturaMaxCm: null,
+    });
+  });
+
+  it("faixa inválida -> 400 sem gravar", async () => {
+    const base = { id: "ilca6", alturaMinCm: 170, alturaMediaCm: 175, alturaMaxCm: 180 };
+    const antes = await ler();
+    for (const ruim of [
+      { alturaMinCm: 119.9 },
+      { alturaMaxCm: 230.1 },
+      { alturaMinCm: 176 },
+      { alturaMaxCm: 172 },
+      { alturaMinCm: null },
+    ]) {
+      expect((await gravar({ ...base, ...ruim })).status, JSON.stringify(ruim)).toBe(400);
+    }
+    // Faltando uma das três.
+    expect((await gravar({ id: "ilca6", alturaMinCm: 170, alturaMediaCm: 175 })).status).toBe(400);
+    expect(await ler()).toEqual(antes);
+    expect(await auditorias()).toHaveLength(0);
+  });
+
+  it("faixa válida grava, audita antes e depois, e limpar volta a nulo", async () => {
+    const ok = await gravar({
+      id: "ilca6",
+      alturaMinCm: 168,
+      alturaMediaCm: 173.5,
+      alturaMaxCm: 178,
+    });
+    expect(ok.status).toBe(200);
+    expect(ok.corpo.classes.find((c: { id: string }) => c.id === "ilca6")).toMatchObject({
+      alturaMinCm: 168,
+      alturaMediaCm: 173.5,
+      alturaMaxCm: 178,
+    });
+
+    const limpa = await gravar({
+      id: "ilca6",
+      alturaMinCm: null,
+      alturaMediaCm: null,
+      alturaMaxCm: null,
+    });
+    expect(limpa.status).toBe(200);
+    expect(limpa.corpo.classes.find((c: { id: string }) => c.id === "ilca6")).toMatchObject({
+      alturaMinCm: null,
+      alturaMediaCm: null,
+      alturaMaxCm: null,
+    });
+
+    const [a1, a2] = await auditorias();
+    expect(a1).toMatchObject({
+      antes: { ilca6: { alturaCm: null } },
+      depois: { ilca6: { alturaCm: [168, 173.5, 178] } },
+    });
+    expect(a2).toMatchObject({
+      antes: { ilca6: { alturaCm: [168, 173.5, 178] } },
+      depois: { ilca6: { alturaCm: null } },
+    });
+  });
+
+  it("editar só a altura não mexe no peso", async () => {
+    const antes = (await ler()).find((c) => c.id === "ilca7")!;
+    await gravar({ id: "ilca7", alturaMinCm: 181, alturaMediaCm: 186, alturaMaxCm: 191 });
+    const depois = (await ler()).find((c) => c.id === "ilca7")!;
+    expect(depois).toEqual({ ...antes, alturaMinCm: 181, alturaMediaCm: 186, alturaMaxCm: 191 });
+  });
+});

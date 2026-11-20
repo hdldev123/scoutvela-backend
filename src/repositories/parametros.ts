@@ -170,10 +170,17 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
   return { pilares, faixas, classes, regras: regrasDoBanco(regrasRows) };
 }
 
+/** Faixa de altura de referência da classe (informativa). As três nulas = não definida. */
+export interface FaixaAlturaClasse {
+  alturaMinCm: number | null;
+  alturaMediaCm: number | null;
+  alturaMaxCm: number | null;
+}
+
 export interface ParametrosCompletos {
   pilares: Pilar[];
   faixas: FaixaScore[];
-  classes: (Classe & { ativa: boolean })[];
+  classes: (Classe & { ativa: boolean } & FaixaAlturaClasse)[];
   rubricas: { pilarId: string | null; nota: number; descricao: string }[];
   regras: { codigo: string; descricao: string; valor: unknown; atualizadoEm: string }[];
   componentesCusto: { id: string; nome: string }[];
@@ -190,13 +197,29 @@ export async function carregarParametrosCompletos(db: Db): Promise<ParametrosCom
       "select codigo, descricao, valor, atualizado_em from regras order by codigo",
     ),
     db.query<{ id: string; nome: string }>("select id, nome from componentes_custo order by ordem"),
-    db.query<{ id: string; ativa: boolean }>("select id, ativa from classes"),
+    db.query<{
+      id: string;
+      ativa: boolean;
+      altura_min_cm: string | null;
+      altura_media_cm: string | null;
+      altura_max_cm: string | null;
+    }>("select id, ativa, altura_min_cm, altura_media_cm, altura_max_cm from classes"),
   ]);
-  const ativaPorId = new Map(ativas.rows.map((c) => [c.id, c.ativa]));
+  const extraPorId = new Map(ativas.rows.map((c) => [c.id, c]));
+  const num = (v: string | null | undefined) => (v == null ? null : Number(v));
   return {
     pilares: base.pilares,
     faixas: base.faixas,
-    classes: base.classes.map((c) => ({ ...c, ativa: ativaPorId.get(c.id) ?? true })),
+    classes: base.classes.map((c) => {
+      const x = extraPorId.get(c.id);
+      return {
+        ...c,
+        ativa: x?.ativa ?? true,
+        alturaMinCm: num(x?.altura_min_cm),
+        alturaMediaCm: num(x?.altura_media_cm),
+        alturaMaxCm: num(x?.altura_max_cm),
+      };
+    }),
     rubricas: rubricas.rows.map((r) => ({
       pilarId: r.pilar_id,
       nota: r.nota,
@@ -225,6 +248,10 @@ export interface AtualizacaoParametros {
         pesoMinKg?: number | undefined;
         pesoMedioKg?: number | undefined;
         pesoMaxKg?: number | undefined;
+        /** Altura de referência (informativa): as três juntas, ou as três nulas para limpar. */
+        alturaMinCm?: number | null | undefined;
+        alturaMediaCm?: number | null | undefined;
+        alturaMaxCm?: number | null | undefined;
         ativa?: boolean | undefined;
       }[]
     | undefined;
@@ -405,7 +432,36 @@ export async function atualizarParametros(
         if (!comFaixa && faixaInformada.some((v) => v !== undefined)) {
           throw new ErroParametros(`Classe ${c.id}: informe peso mínimo, médio e máximo juntos.`);
         }
-        if (!comFaixa && c.ativa === undefined)
+        const { alturaMinCm: amin, alturaMediaCm: amedia, alturaMaxCm: amax } = c;
+        const alturaInformada = [amin, amedia, amax].some((v) => v !== undefined);
+        let alturaNova: [number, number, number] | null | undefined;
+        if (alturaInformada) {
+          if (amin === undefined || amedia === undefined || amax === undefined) {
+            throw new ErroParametros(
+              `Classe ${c.id}: informe altura mínima, média e máxima juntas (ou as três nulas para limpar).`,
+            );
+          }
+          if (amin === null && amedia === null && amax === null) {
+            alturaNova = null;
+          } else if (amin === null || amedia === null || amax === null) {
+            throw new ErroParametros(
+              `Classe ${c.id}: a faixa de altura é toda preenchida ou toda nula.`,
+            );
+          } else {
+            if ([amin, amedia, amax].some((v) => v < 120 || v > 230)) {
+              throw new ErroParametros(
+                `Classe ${c.id}: a altura precisa ficar entre 120 e 230 cm.`,
+              );
+            }
+            if (!(amin <= amedia && amedia <= amax)) {
+              throw new ErroParametros(
+                "Em cada classe, a altura mínima não pode passar da média, nem a média da máxima.",
+              );
+            }
+            alturaNova = [amin, amedia, amax];
+          }
+        }
+        if (!comFaixa && alturaNova === undefined && c.ativa === undefined)
           throw new ErroParametros(`Classe ${c.id}: nada para alterar.`);
         if (comFaixa && !(min <= medio && medio <= max)) {
           throw new ErroParametros(
@@ -417,10 +473,15 @@ export async function atualizarParametros(
             peso_min_kg: string;
             peso_medio_kg: string;
             peso_max_kg: string;
+            altura_min_cm: string | null;
+            altura_media_cm: string | null;
+            altura_max_cm: string | null;
             ativa: boolean;
-          }>("select peso_min_kg, peso_medio_kg, peso_max_kg, ativa from classes where id = $1", [
-            c.id,
-          ])
+          }>(
+            `select peso_min_kg, peso_medio_kg, peso_max_kg, altura_min_cm, altura_media_cm, altura_max_cm, ativa
+               from classes where id = $1`,
+            [c.id],
+          )
         ).rows[0];
         if (!atual) throw new ErroParametros(`Classe desconhecida: ${c.id}.`);
         if (c.ativa === false && atual.ativa) {
@@ -439,11 +500,32 @@ export async function atualizarParametros(
           Number(atual.peso_medio_kg),
           Number(atual.peso_max_kg),
         ];
-        antes[c.id] = { pesoKg: pesoAtual, ativa: atual.ativa };
+        const alturaAtual =
+          atual.altura_min_cm === null
+            ? null
+            : [
+                Number(atual.altura_min_cm),
+                Number(atual.altura_media_cm),
+                Number(atual.altura_max_cm),
+              ];
+        // A altura só entra na auditoria quando a requisição a altera.
+        const comAltura = alturaNova !== undefined;
+        antes[c.id] = {
+          pesoKg: pesoAtual,
+          ...(comAltura ? { alturaCm: alturaAtual } : {}),
+          ativa: atual.ativa,
+        };
         depois[c.id] = {
           pesoKg: comFaixa ? [min, medio, max] : pesoAtual,
+          ...(comAltura ? { alturaCm: alturaNova } : {}),
           ativa: c.ativa ?? atual.ativa,
         };
+        if (alturaNova !== undefined) {
+          await tx.query(
+            "update classes set altura_min_cm = $1, altura_media_cm = $2, altura_max_cm = $3 where id = $4",
+            alturaNova === null ? [null, null, null, c.id] : [...alturaNova, c.id],
+          );
+        }
         if (comFaixa) {
           await tx.query(
             "update classes set peso_min_kg = $1, peso_medio_kg = $2, peso_max_kg = $3 where id = $4",

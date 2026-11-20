@@ -8,6 +8,7 @@ import { criarAdminAuth } from "../src/integracoes/supabase-admin.js";
 import { migrar } from "../src/db/migrar.js";
 import { criarDbPglite } from "../src/db/pglite.js";
 import { CONTAS_DEMO } from "../seed/contas-demo.js";
+import { preencherAlturasFicticias } from "../seed/alturas-ficticias.js";
 import { semear } from "../seed/semear.js";
 import { criarAuthLocal, ouvirLocal, vincularContasLocais } from "./auth-local.js";
 
@@ -55,6 +56,12 @@ const { rows } = await db.query<{ n: string }>("select count(*)::text as n from 
 if (Number(rows[0]!.n) === 0) {
   await semear(db);
   console.log("Seed aplicado: 14 atletas fictícios, 5 usuários e 3 ciclos.");
+}
+// Só desenvolvimento (APP_ENV fixo acima): bancos locais antigos ganham as alturas fictícias das classes
+// que ainda estão sem faixa. Idempotente: não mexe em classe que já tem faixa.
+const alturasPreenchidas = await preencherAlturasFicticias(db);
+if (alturasPreenchidas > 0) {
+  console.log(`Alturas de referência fictícias gravadas em ${alturasPreenchidas} classes.`);
 }
 await vincularContasLocais(db);
 

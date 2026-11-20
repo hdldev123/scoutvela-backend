@@ -6,3 +6,4 @@ export * from "./gates.js";
 export * from "./calculo.js";
 export * from "./plano.js";
 export * from "./pontos.js";
+export * from "./altura.js";

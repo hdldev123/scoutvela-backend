@@ -4,6 +4,7 @@ import { z } from "zod";
 import {
   INDICADOR_PONTOS_RANKING,
   distanciaClassFit,
+  situacaoAltura,
   funcaoNaClasse,
   idadeEm,
   notaPeso,
@@ -123,6 +124,23 @@ const esquemaFicha = z.object({
       pesoMaxKg: z.number(),
       deltaKg: z.number(),
       distanciaRelativa: z.number(),
+      altura: z
+        .object({
+          cm: z.number().nullable().describe("Altura do atleta; nula se não medida"),
+          minCm: z
+            .number()
+            .nullable()
+            .describe("Faixa de referência da classe; nula se não definida"),
+          mediaCm: z.number().nullable(),
+          maxCm: z.number().nullable(),
+          situacao: z
+            .enum(["dentro", "abaixo", "acima"])
+            .nullable()
+            .describe(
+              "Nula se faltar a altura ou a faixa. Só informativa: não entra no score nem nos gates",
+            ),
+        })
+        .describe("Altura de referência da classe. O IBVAR não recebe (classFit inteiro nulo)"),
     })
     .nullable(),
   resultados: z.array(
@@ -284,6 +302,18 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
               pesoMaxKg: atleta.classe.pesoMaxKg,
               deltaKg: calculo.classFit.deltaKg,
               distanciaRelativa: calculo.classFit.distanciaRelativa,
+              altura: {
+                cm: dados.medida.alturaCm,
+                minCm: atleta.classe.alturaMinCm,
+                mediaCm: atleta.classe.alturaMediaCm,
+                maxCm: atleta.classe.alturaMaxCm,
+                situacao: situacaoAltura(
+                  dados.medida.alturaCm,
+                  atleta.classe.alturaMinCm === null || atleta.classe.alturaMaxCm === null
+                    ? null
+                    : { minCm: atleta.classe.alturaMinCm, maxCm: atleta.classe.alturaMaxCm },
+                ),
+              },
             };
 
       const fin = dados.financeiro;
