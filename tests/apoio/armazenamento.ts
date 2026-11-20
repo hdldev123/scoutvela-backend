@@ -5,6 +5,10 @@ export interface ArmazenamentoFake extends ArmazenamentoEvidencias {
   falhar: boolean;
   /** Quando true, remover lança erro. */
   falharRemocao: boolean;
+  /** Caminhos cuja remoção falha (os demais seguem normais). */
+  falharCaminhos: Set<string>;
+  /** Registro das chamadas em lote de linksTemporarios. */
+  chamadasEmLote: { caminho: string; tipoMime: string }[][];
 }
 
 /** Armazenamento em memória para os testes. */
@@ -14,6 +18,8 @@ export function criarArmazenamentoFake(): ArmazenamentoFake {
     arquivos,
     falhar: false,
     falharRemocao: false,
+    falharCaminhos: new Set(),
+    chamadasEmLote: [],
     async salvar(caminho, bytes, tipoMime) {
       if (fake.falhar) throw new Error("storage fora do ar");
       arquivos.set(caminho, { bytes, tipoMime });
@@ -25,8 +31,22 @@ export function criarArmazenamentoFake(): ArmazenamentoFake {
         expiraEm: "2026-11-06T15:05:00.000Z",
       };
     },
+    async linksTemporarios(itens) {
+      fake.chamadasEmLote.push(itens);
+      if (fake.falhar) throw new Error("storage fora do ar");
+      return new Map(
+        itens.map((i) => [
+          i.caminho,
+          {
+            url: `https://storage.teste/assinado/${i.caminho}?token=abc`,
+            expiraEm: "2026-11-06T15:05:00.000Z",
+          },
+        ]),
+      );
+    },
     async remover(caminho) {
-      if (fake.falharRemocao) throw new Error("storage fora do ar");
+      if (fake.falharRemocao || fake.falharCaminhos.has(caminho))
+        throw new Error("storage fora do ar");
       arquivos.delete(caminho);
     },
   };

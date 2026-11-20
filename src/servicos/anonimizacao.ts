@@ -214,12 +214,13 @@ async function concluirPendencias(
       where atleta_id = $1::uuid and removido_em is not null order by enviado_em, id`,
     [atletaId],
   );
-  let falhasArquivo = 0;
+  let falhasEvidencia = 0;
+  let falhasFoto = 0;
   for (const { caminho } of arquivos.rows) {
     try {
       await armazenamento.remover(caminho);
     } catch (e) {
-      falhasArquivo++;
+      falhasEvidencia++;
       log.warn(
         { evento: "anonimizacao_pendencia", tipo: "arquivo", erro: nomeDoErro(e) },
         "falha ao remover arquivo na anonimização",
@@ -238,7 +239,7 @@ async function concluirPendencias(
       await armazenamento.remover(caminho);
       await db.query(`update usuarios set foto_caminho = null where id = $1::uuid`, [id]);
     } catch (e) {
-      falhasArquivo++;
+      falhasFoto++;
       log.warn(
         { evento: "anonimizacao_pendencia", tipo: "foto", erro: nomeDoErro(e) },
         "falha ao remover foto na anonimização",
@@ -269,7 +270,7 @@ async function concluirPendencias(
   }
 
   return {
-    evidenciasRemovidas: arquivos.rows.length - falhasArquivo,
-    pendencias: { arquivos: falhasArquivo, conta: contaPendente },
+    evidenciasRemovidas: arquivos.rows.length - falhasEvidencia,
+    pendencias: { arquivos: falhasEvidencia + falhasFoto, conta: contaPendente },
   };
 }

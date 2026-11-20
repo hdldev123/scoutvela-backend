@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
 import type { Piloto } from "../apoio/piloto.js";
 
@@ -144,5 +144,36 @@ describe("GET /ranking", () => {
     const ibvar = (await buscar(EMAILS_DEMO.ibvar)).corpo.itens;
     expect(fotoDe(ibvar, atletaId)).toBeNull();
     expect(JSON.stringify(ibvar)).not.toContain(foto);
+  });
+
+  it("fotos de vários atletas: uma chamada em lote ao Storage, sem chamadas por atleta", async () => {
+    const velaids = ["SP-T07", "CE-T09", "DF-T11"];
+    for (const v of velaids) {
+      const atletaId = await p.idDe(v);
+      await p.db.query(
+        `insert into usuarios (auth_user_id, email, nome, papel, atleta_id, foto_caminho)
+         values ($1, $2, 'Conta Foto', 'atleta', $3, $4)`,
+        [
+          crypto.randomUUID(),
+          `foto-${v.toLowerCase()}@exemplo.dev`,
+          atletaId,
+          `fotos/${crypto.randomUUID()}/${crypto.randomUUID()}.jpg`,
+        ],
+      );
+    }
+    const unitario = vi.spyOn(p.armazenamento, "linkTemporario");
+    const antes = p.armazenamento.chamadasEmLote.length;
+    const { corpo } = await buscar(EMAILS_DEMO.gestor);
+    unitario.mockRestore();
+
+    const emLote = p.armazenamento.chamadasEmLote.slice(antes);
+    expect(emLote).toHaveLength(1);
+    expect(unitario).not.toHaveBeenCalled();
+    const comFoto = corpo.itens.filter((i: Item) => i.atleta.fotoUrl !== null);
+    expect(comFoto.length).toBeGreaterThanOrEqual(3);
+    expect(emLote[0]).toHaveLength(comFoto.length);
+    for (const v of velaids) {
+      expect(comFoto.map((i: Item) => i.atleta.velaid)).toContain(v);
+    }
   });
 });

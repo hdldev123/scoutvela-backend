@@ -61,6 +61,7 @@ O esquema só muda por migration: nada é criado à mão no painel. As senhas do
    - desligue o cadastro público (Sign In / Providers > "Allow new users to sign up"); contas são criadas pela CBVela em `POST /usuarios`;
    - mantenha a confirmação de e-mail ligada (o vínculo da conta no primeiro login usa o e-mail do token);
    - ative o MFA por TOTP (Multi-Factor) e use `EXIGIR_MFA=true`;
+   - ligue **"Secure password change"** (Authentication > Providers > Email): a troca de senha pelo `updateUser` passa a exigir login recente. O modal "Meu perfil" do front troca a senha sem pedir a atual;
    - em URL Configuration, Site URL = domínio do front e redirect permitido `FRONT_URL/redefinir-senha` (convite e redefinição de senha). Em homologação, inclua também o preview da Vercel e `http://localhost:8080/redefinir-senha`;
    - anote se o projeto usa chave JWT nova (JWKS, deixe `SUPABASE_JWT_SECRET` vazio) ou legada (HS256, guarde o segredo).
 3. **`.env` local** apontando para o ambiente (`APP_ENV=homologacao` ou `producao`):

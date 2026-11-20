@@ -12,6 +12,10 @@ export interface LinkTemporario {
 export interface ArmazenamentoEvidencias {
   salvar(caminho: string, bytes: Uint8Array, tipoMime: string): Promise<void>;
   linkTemporario(caminho: string, tipoMime: string, nomeArquivo: string): Promise<LinkTemporario>;
+  /** Links de vários arquivos de uma vez; o Map é indexado pelo caminho. Item que não pôde ser assinado fica de fora. */
+  linksTemporarios(
+    itens: { caminho: string; tipoMime: string }[],
+  ): Promise<Map<string, LinkTemporario>>;
   /** Apaga o arquivo. Idempotente: arquivo que não existe não é erro. */
   remover(caminho: string): Promise<void>;
 }
@@ -53,6 +57,13 @@ export function criarArmazenamentoLocal(dir: string): ArmazenamentoEvidencias {
         expiraEm: new Date(Date.now() + VALIDADE_LINK_SEGUNDOS * 1000).toISOString(),
       };
     },
+    async linksTemporarios(itens) {
+      const links = new Map<string, LinkTemporario>();
+      for (const { caminho, tipoMime } of itens) {
+        links.set(caminho, await this.linkTemporario(caminho, tipoMime, "arquivo"));
+      }
+      return links;
+    },
     async remover(caminho) {
       try {
         await unlink(arquivo(caminho));
@@ -78,6 +89,17 @@ export function criarArmazenamentoSupabase(o: OpcoesSupabase): ArmazenamentoEvid
   const agora = o.agora ?? (() => new Date());
   const cabecalho = { Authorization: `Bearer ${o.chaveServico}`, apikey: o.chaveServico };
   const caminhoUrl = (c: string) => caminhoSeguro(c).split("/").map(encodeURIComponent).join("/");
+  // signedURL vem relativo a /storage/v1 (ex.: "/object/sign/bucket/x?token=...").
+  const urlAssinada = (signedURL: string): LinkTemporario => {
+    const rel = signedURL.startsWith("/") ? signedURL : `/${signedURL}`;
+    const url = /^https?:\/\//.test(signedURL)
+      ? signedURL
+      : `${base}/storage/v1${rel.startsWith("/storage/v1") ? rel.slice("/storage/v1".length) : rel}`;
+    return {
+      url,
+      expiraEm: new Date(agora().getTime() + VALIDADE_LINK_SEGUNDOS * 1000).toISOString(),
+    };
+  };
 
   return {
     async salvar(caminho, bytes, tipoMime) {
@@ -112,15 +134,30 @@ export function criarArmazenamentoSupabase(o: OpcoesSupabase): ArmazenamentoEvid
       if (!r.ok) throw new ErroArmazenamento(`Storage recusou o link (HTTP ${r.status}).`);
       const corpo = (await r.json()) as { signedURL?: string };
       if (!corpo.signedURL) throw new ErroArmazenamento("Resposta do Storage sem link.");
-      // signedURL vem relativo a /storage/v1 (ex.: "/object/sign/bucket/x?token=...").
-      const rel = corpo.signedURL.startsWith("/") ? corpo.signedURL : `/${corpo.signedURL}`;
-      const url = /^https?:\/\//.test(corpo.signedURL)
-        ? corpo.signedURL
-        : `${base}/storage/v1${rel.startsWith("/storage/v1") ? rel.slice("/storage/v1".length) : rel}`;
-      return {
-        url,
-        expiraEm: new Date(agora().getTime() + VALIDADE_LINK_SEGUNDOS * 1000).toISOString(),
-      };
+      return urlAssinada(corpo.signedURL);
+    },
+    async linksTemporarios(itens) {
+      const links = new Map<string, LinkTemporario>();
+      if (itens.length === 0) return links;
+      const caminhos = [...new Set(itens.map((i) => caminhoSeguro(i.caminho)))];
+      const r = await f(`${base}/storage/v1/object/sign/${encodeURIComponent(o.bucket)}`, {
+        method: "POST",
+        headers: { ...cabecalho, "Content-Type": "application/json" },
+        body: JSON.stringify({ expiresIn: VALIDADE_LINK_SEGUNDOS, paths: caminhos }),
+      });
+      if (!r.ok) throw new ErroArmazenamento(`Storage recusou os links (HTTP ${r.status}).`);
+      const corpo = (await r.json()) as {
+        path?: string;
+        signedURL?: string | null;
+        error?: unknown;
+      }[];
+      if (!Array.isArray(corpo)) throw new ErroArmazenamento("Resposta do Storage inválida.");
+      const pedidos = new Set(caminhos);
+      for (const item of corpo) {
+        if (item.error || !item.signedURL || !item.path || !pedidos.has(item.path)) continue;
+        links.set(item.path, urlAssinada(item.signedURL));
+      }
+      return links;
     },
   };
 }
