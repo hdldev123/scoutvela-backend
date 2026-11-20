@@ -62,11 +62,16 @@ paths:
                           - atleta
                           - ibvar
                           - responsavel
+                      fotoUrl:
+                        nullable: true
+                        description: Link assinado curto; nulo = sem foto
+                        type: string
                     required:
                       - id
                       - nome
                       - email
                       - papel
+                      - fotoUrl
                     additionalProperties: false
                   atleta:
                     nullable: true
@@ -92,6 +97,626 @@ paths:
                   - telas
                   - telaInicial
                 additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /me/perfil:
+    get:
+      summary: "Meu perfil: dados de contato, foto e, para o atleta, o cadastro"
+      tags:
+        - sessao
+      description: Atleta, treinador e gestor. IBVAR recebe 403.
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nome:
+                    type: string
+                  email:
+                    type: string
+                    description: E-mail de login (só leitura)
+                  papel:
+                    type: string
+                    enum:
+                      - gestor
+                      - treinador
+                      - atleta
+                  fotoUrl:
+                    nullable: true
+                    description: Link assinado curto; nulo = sem foto
+                    type: string
+                  mfaAtivo:
+                    type: boolean
+                    description: A sessão atual passou pelo segundo fator (aal2)
+                  atleta:
+                    nullable: true
+                    type: object
+                    properties:
+                      velaid:
+                        type: string
+                      classe:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                        additionalProperties: false
+                      numeroVela:
+                        nullable: true
+                        type: string
+                      dataNascimento:
+                        type: string
+                        description: AAAA-MM-DD
+                      clube:
+                        nullable: true
+                        type: string
+                      cidade:
+                        nullable: true
+                        type: string
+                      uf:
+                        nullable: true
+                        type: string
+                      treinador:
+                        nullable: true
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                        additionalProperties: false
+                      emailContato:
+                        nullable: true
+                        type: string
+                      termoAceitoEm:
+                        nullable: true
+                        description: Instante ISO do aceite do termo do piloto
+                        type: string
+                      compartilharIbvar:
+                        type: boolean
+                    required:
+                      - velaid
+                      - classe
+                      - numeroVela
+                      - dataNascimento
+                      - clube
+                      - cidade
+                      - uf
+                      - treinador
+                      - emailContato
+                      - termoAceitoEm
+                      - compartilharIbvar
+                    additionalProperties: false
+                  treinador:
+                    nullable: true
+                    type: object
+                    properties:
+                      quantidadeAtletas:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                    required:
+                      - quantidadeAtletas
+                    additionalProperties: false
+                required:
+                  - nome
+                  - email
+                  - papel
+                  - fotoUrl
+                  - mfaAtivo
+                  - atleta
+                  - treinador
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    put:
+      summary: "Edita o perfil: nome (treinador e gestor) ou e-mail de contato (atleta)"
+      tags:
+        - sessao
+      description: "Os dados vindos do VelaID não são editáveis aqui: a correção é
+        pelo pedido do titular (tipo `correcao`). A auditoria guarda só os nomes
+        dos campos."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome:
+                  type: string
+                  minLength: 2
+                  maxLength: 120
+                emailContato:
+                  nullable: true
+                  type: string
+                  maxLength: 254
+                  format: email
+                  pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+              additionalProperties: false
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nome:
+                    type: string
+                  email:
+                    type: string
+                    description: E-mail de login (só leitura)
+                  papel:
+                    type: string
+                    enum:
+                      - gestor
+                      - treinador
+                      - atleta
+                  fotoUrl:
+                    nullable: true
+                    description: Link assinado curto; nulo = sem foto
+                    type: string
+                  mfaAtivo:
+                    type: boolean
+                    description: A sessão atual passou pelo segundo fator (aal2)
+                  atleta:
+                    nullable: true
+                    type: object
+                    properties:
+                      velaid:
+                        type: string
+                      classe:
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                        additionalProperties: false
+                      numeroVela:
+                        nullable: true
+                        type: string
+                      dataNascimento:
+                        type: string
+                        description: AAAA-MM-DD
+                      clube:
+                        nullable: true
+                        type: string
+                      cidade:
+                        nullable: true
+                        type: string
+                      uf:
+                        nullable: true
+                        type: string
+                      treinador:
+                        nullable: true
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                          nome:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                        additionalProperties: false
+                      emailContato:
+                        nullable: true
+                        type: string
+                      termoAceitoEm:
+                        nullable: true
+                        description: Instante ISO do aceite do termo do piloto
+                        type: string
+                      compartilharIbvar:
+                        type: boolean
+                    required:
+                      - velaid
+                      - classe
+                      - numeroVela
+                      - dataNascimento
+                      - clube
+                      - cidade
+                      - uf
+                      - treinador
+                      - emailContato
+                      - termoAceitoEm
+                      - compartilharIbvar
+                    additionalProperties: false
+                  treinador:
+                    nullable: true
+                    type: object
+                    properties:
+                      quantidadeAtletas:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                    required:
+                      - quantidadeAtletas
+                    additionalProperties: false
+                required:
+                  - nome
+                  - email
+                  - papel
+                  - fotoUrl
+                  - mfaAtivo
+                  - atleta
+                  - treinador
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /me/foto:
+    post:
+      summary: Envia ou troca a foto de perfil (JPEG ou PNG de até 2 MB)
+      tags:
+        - sessao
+      description: A foto anterior é removida do Storage. Limite de 10 envios por
+        minuto por usuário (429 `limite_excedido`).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tipoMime:
+                  type: string
+                  enum:
+                    - image/jpeg
+                    - image/png
+                conteudoBase64:
+                  type: string
+                  minLength: 4
+                  maxLength: 2800000
+              required:
+                - tipoMime
+                - conteudoBase64
+              additionalProperties: false
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fotoUrl:
+                    nullable: true
+                    type: string
+                required:
+                  - fotoUrl
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "429":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "503":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    delete:
+      summary: Remove a foto de perfil
+      tags:
+        - sessao
+      description: "Idempotente: sem foto, também responde 204."
+      security:
+        - bearerAuth: []
+      responses:
+        "204":
+          description: Foto removida
+          content:
+            application/json:
+              schema:
+                type: string
+                nullable: true
+                enum:
+                  - null
+                description: Foto removida
         "401":
           description: Default Response
           content:
@@ -255,6 +880,11 @@ paths:
                                 - nome
                                 - evento
                               additionalProperties: false
+                            fotoUrl:
+                              nullable: true
+                              description: Link assinado curto da foto da conta do atleta; sempre nulo para o
+                                IBVAR
+                              type: string
                           required:
                             - id
                             - nome
@@ -264,6 +894,7 @@ paths:
                             - idade
                             - genero
                             - classe
+                            - fotoUrl
                           additionalProperties: false
                         score:
                           type: number
@@ -463,6 +1094,11 @@ paths:
                       uf:
                         nullable: true
                         type: string
+                      fotoUrl:
+                        nullable: true
+                        description: Link assinado curto da foto da conta do atleta; sempre nulo para o
+                          IBVAR
+                        type: string
                       termoAceito:
                         type: boolean
                       classe:
@@ -497,6 +1133,7 @@ paths:
                       - clube
                       - cidade
                       - uf
+                      - fotoUrl
                       - termoAceito
                       - classe
                     additionalProperties: false

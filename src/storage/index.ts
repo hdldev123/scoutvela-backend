@@ -8,7 +8,7 @@ export interface LinkTemporario {
   expiraEm: string;
 }
 
-/** Guarda os arquivos das evidências. O caminho é sempre `${atletaId}/${uuid}.${ext}`. */
+/** Caminhos: evidência `${atletaId}/${uuid}.${ext}`, foto de perfil `fotos/${usuarioId}/${uuid}.${ext}`. */
 export interface ArmazenamentoEvidencias {
   salvar(caminho: string, bytes: Uint8Array, tipoMime: string): Promise<void>;
   linkTemporario(caminho: string, tipoMime: string, nomeArquivo: string): Promise<LinkTemporario>;
@@ -23,8 +23,11 @@ export class ErroArmazenamento extends Error {}
 
 /** Caminho relativo seguro: sem "..", sem barra inicial, sem caracteres estranhos. */
 function caminhoSeguro(caminho: string): string {
-  if (!/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png)$/.test(caminho)) {
-    throw new ErroArmazenamento("Caminho de evidência inválido.");
+  if (
+    !/^[0-9a-f-]{36}\/[0-9a-f-]{36}\.(pdf|jpg|png)$/.test(caminho) &&
+    !/^fotos\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.(jpg|png)$/.test(caminho)
+  ) {
+    throw new ErroArmazenamento("Caminho de arquivo inválido.");
   }
   return caminho;
 }
@@ -34,7 +37,7 @@ export function criarArmazenamentoLocal(dir: string): ArmazenamentoEvidencias {
   const raiz = resolve(dir);
   const arquivo = (caminho: string) => {
     const alvo = resolve(join(raiz, normalize(caminhoSeguro(caminho))));
-    if (!alvo.startsWith(raiz + sep)) throw new ErroArmazenamento("Caminho de evidência inválido.");
+    if (!alvo.startsWith(raiz + sep)) throw new ErroArmazenamento("Caminho de arquivo inválido.");
     return alvo;
   };
   return {

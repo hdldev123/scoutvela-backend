@@ -11,6 +11,7 @@ import {
 } from "../repositories/atletas.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
+import { linksDasFotosDosAtletas } from "../servicos/foto-perfil.js";
 
 const esquemaCiclo = z
   .object({ nome: z.string(), prazo: z.string().describe("AAAA-MM-DD") })
@@ -27,6 +28,10 @@ const esquemaItem = z.object({
     idade: z.number().int(),
     genero: z.enum(["F", "M"]),
     classe: z.object({ id: z.string(), nome: z.string(), evento: z.string() }),
+    fotoUrl: z
+      .string()
+      .nullable()
+      .describe("Link assinado curto da foto da conta do atleta; sempre nulo para o IBVAR"),
   }),
   score: z.number(),
   faixa: z.object({ id: z.string(), nome: z.string(), nomeCurto: z.string() }),
@@ -98,6 +103,15 @@ export async function rotasRanking(app: FastifyInstance): Promise<void> {
         return d !== 0 ? d : a.atleta.nome.localeCompare(b.atleta.nome, "pt-BR");
       });
 
+      const fotos =
+        req.usuario.papel === "ibvar"
+          ? new Map<string, string | null>()
+          : await linksDasFotosDosAtletas(
+              app.db,
+              app.armazenamento,
+              filtrados.map((x) => x.atleta.id),
+              req.log,
+            );
       const nomeCurto = new Map(parametros.pilares.map((p) => [p.id, p.nomeCurto]));
       const itens = filtrados.map(({ atleta, calculo }, i) => ({
         posicao: i + 1,
@@ -110,6 +124,7 @@ export async function rotasRanking(app: FastifyInstance): Promise<void> {
           idade: idadeEm(atleta.dataNascimento, referencia),
           genero: atleta.genero,
           classe: { id: atleta.classe.id, nome: atleta.classe.nome, evento: atleta.classe.evento },
+          fotoUrl: fotos.get(atleta.id) ?? null,
         },
         score: calculo.score,
         faixa: {

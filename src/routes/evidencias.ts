@@ -11,6 +11,7 @@ import {
   servicoIndisponivel,
 } from "../erros.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
+import { TIPOS_ARQUIVO, decodificarArquivo } from "../servicos/arquivo-base64.js";
 
 const TAMANHO_MAXIMO_BYTES = 5 * 1024 * 1024;
 /** Envios por minuto, por usuário autenticado (não por IP). Conta também as tentativas recusadas. */
@@ -18,12 +19,6 @@ const LIMITE_ENVIOS = 20;
 
 /** Base64 de 5 MB tem ~6,7 milhões de caracteres. */
 const BASE64_MAXIMO = 7_000_000;
-
-const TIPOS = {
-  "application/pdf": { ext: "pdf", assinatura: [0x25, 0x50, 0x44, 0x46] },
-  "image/png": { ext: "png", assinatura: [0x89, 0x50, 0x4e, 0x47] },
-  "image/jpeg": { ext: "jpg", assinatura: [0xff, 0xd8, 0xff] },
-} as const;
 
 const esquemaAnexo = z.object({
   id: z.uuid(),
@@ -122,19 +117,11 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
       const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
-      if (
-        !/^[A-Za-z0-9+/]+={0,2}$/.test(body.conteudoBase64) ||
-        body.conteudoBase64.length % 4 !== 0
-      ) {
-        throw requisicaoInvalida("Conteúdo do arquivo inválido.");
-      }
-      const bytes = Buffer.from(body.conteudoBase64, "base64");
-      if (bytes.length === 0) throw requisicaoInvalida("Arquivo vazio.");
-      if (bytes.length > TAMANHO_MAXIMO_BYTES) throw requisicaoInvalida("O arquivo passa de 5 MB.");
-      const tipo = TIPOS[body.tipoMime];
-      if (!tipo.assinatura.every((b, i) => bytes[i] === b)) {
-        throw requisicaoInvalida("O conteúdo do arquivo não corresponde ao tipo informado.");
-      }
+      const bytes = decodificarArquivo(body.conteudoBase64, body.tipoMime, {
+        bytes: TAMANHO_MAXIMO_BYTES,
+        mensagem: "O arquivo passa de 5 MB.",
+      });
+      const tipo = TIPOS_ARQUIVO[body.tipoMime];
 
       if (body.indicadorId) {
         const ind = await app.db.query(`select 1 from indicadores where id = $1`, [

@@ -29,6 +29,7 @@ import { rotasEvidencias } from "./routes/evidencias.js";
 import { rotasInvestimento } from "./routes/investimento.js";
 import { rotasMe } from "./routes/me.js";
 import { rotasPainel } from "./routes/painel.js";
+import { rotasPerfil } from "./routes/perfil.js";
 import { rotasPlano } from "./routes/plano.js";
 import { rotasParametros } from "./routes/parametros.js";
 import { rotasRanking } from "./routes/ranking.js";
@@ -75,6 +76,7 @@ type PluginDeRotas = (app: FastifyInstance) => Promise<void>;
 const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasHealth,
   rotasMe,
+  rotasPerfil,
   rotasRanking,
   rotasAtletas,
   rotasAvaliacoes,
@@ -136,7 +138,7 @@ export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
 
   await app.register(cors, {
     origin: config.CORS_ORIGINS,
-    methods: ["GET", "POST", "PUT"],
+    methods: ["GET", "POST", "PUT", "DELETE"],
     allowedHeaders: ["Authorization", "Content-Type"],
   });
 
