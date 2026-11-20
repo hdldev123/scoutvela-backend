@@ -57,21 +57,33 @@ export function diasParaPrazo(prazo: string, agora: Date): number {
   return dias(prazo) - dias(diaEmBrasilia(agora));
 }
 
+/**
+ * Restringe a consulta a um treinador (só a parte dos treinadores) ou a um atleta (só a parte dos
+ * atletas), com a MESMA regra. Usado pelas notificações (GET /me/notificacoes).
+ */
+export interface FiltroPendencias {
+  treinadorId?: string;
+  atletaId?: string;
+}
+
 export async function pendenciasDoCiclo(
   db: Db,
   cicloId: string,
   agora: Date,
+  filtro: FiltroPendencias = {},
 ): Promise<PendenciasCiclo> {
   const [treinos, atletas] = await Promise.all([
-    db.query<{
-      treinador_id: string;
-      treinador_nome: string;
-      treinador_email: string;
-      atleta_id: string;
-      atleta_nome: string;
-      faltam: string;
-    }>(
-      `select u.id as treinador_id, u.nome as treinador_nome, u.email as treinador_email,
+    filtro.atletaId
+      ? Promise.resolve({ rows: [] as never[] })
+      : db.query<{
+          treinador_id: string;
+          treinador_nome: string;
+          treinador_email: string;
+          atleta_id: string;
+          atleta_nome: string;
+          faltam: string;
+        }>(
+          `select u.id as treinador_id, u.nome as treinador_nome, u.email as treinador_email,
               a.id as atleta_id, a.nome as atleta_nome,
               (select count(*) from indicadores i
                 where i.tipo = 'T' and not i.calculado
@@ -82,17 +94,20 @@ export async function pendenciasDoCiclo(
          join atletas a on a.treinador_id = u.id and a.ativo
         where u.papel = 'treinador' and u.ativo
           and ${termoSql.aceitoNoPiloto("a.id", "$2")}
+          and ($3::uuid is null or u.id = $3::uuid)
         order by u.nome, u.id, a.nome, a.id`,
-      [cicloId, agora],
-    ),
-    db.query<{
-      id: string;
-      nome: string;
-      perguntas: string;
-      usuario_id: string | null;
-      usuario_email: string | null;
-    }>(
-      `select a.id, a.nome,
+          [cicloId, agora, filtro.treinadorId ?? null],
+        ),
+    filtro.treinadorId
+      ? Promise.resolve({ rows: [] as never[] })
+      : db.query<{
+          id: string;
+          nome: string;
+          perguntas: string;
+          usuario_id: string | null;
+          usuario_email: string | null;
+        }>(
+          `select a.id, a.nome,
               (select count(*) from perguntas_atleta q
                 where not exists (select 1 from resposta_atual ra
                                    where ra.atleta_id = a.id and ra.indicador_id = q.indicador_id))::text as perguntas,
@@ -102,9 +117,10 @@ export async function pendenciasDoCiclo(
                              where u.atleta_id = a.id and u.papel = 'atleta' and u.ativo
                              order by u.criado_em, u.id limit 1) conta on true
         where a.ativo and ${termoSql.aceitoNoPiloto("a.id", "$1")}
+          and ($2::uuid is null or a.id = $2::uuid)
         order by a.nome, a.id`,
-      [agora],
-    ),
+          [agora, filtro.atletaId ?? null],
+        ),
   ]);
 
   const treinadores: TreinadorComPendencia[] = [];
