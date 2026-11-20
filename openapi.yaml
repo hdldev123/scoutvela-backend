@@ -147,6 +147,204 @@ paths:
                   - erro
                   - mensagem
                 additionalProperties: false
+  /me/notificacoes:
+    get:
+      summary: Contagens dos balões do menu lateral (itens que pedem atenção)
+      tags:
+        - sessao
+      description: "Só as chaves do papel, sempre presentes (0 quando nada pede
+        atenção). Gestor: `revisoes` (pedidos de revisão e do titular abertos) e
+        `cadastro` (atletas ativos sem aceite da versão vigente do termo).
+        Treinador: `revisoes` (pedidos de revisão abertos dos próprios atletas)
+        e `avaliar` (próprios atletas com indicadores pendentes no ciclo aberto;
+        0 sem ciclo aberto). Atleta: `painel` (perguntas sem resposta no ciclo
+        aberto + 1 se o termo vigente está pendente + respostas a pedidos de
+        revisão e do titular dadas depois da última marcação de visto). IBVAR:
+        objeto vazio. `total` é a soma. Feito para consulta a cada 60 s."
+      security: &a1
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  contagens:
+                    type: object
+                    additionalProperties:
+                      type: integer
+                      minimum: 0
+                      maximum: 9007199254740991
+                  total:
+                    type: integer
+                    minimum: 0
+                    maximum: 9007199254740991
+                required:
+                  - contagens
+                  - total
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /me/notificacoes/vistas:
+    put:
+      summary: Marca uma tela como vista (zera as respostas novas do balão)
+      tags:
+        - sessao
+      description: "Grava o instante atual como última visita à tela. Por enquanto só
+        o atleta marca `painel`; qualquer outra combinação de papel e chave
+        responde 400. Não gera auditoria: é dado de interface, não de decisão."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                chave:
+                  type: string
+                  enum:
+                    - painel
+                    - revisoes
+                    - cadastro
+                    - avaliar
+              required:
+                - chave
+      security: *a1
+      responses:
+        "204":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: string
+                nullable: true
+                enum:
+                  - null
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
   /me/perfil:
     get:
       summary: "Meu perfil: dados de contato, foto e, para o atleta, o cadastro"
@@ -1430,6 +1628,41 @@ paths:
                         type: number
                       distanciaRelativa:
                         type: number
+                      altura:
+                        type: object
+                        properties:
+                          cm:
+                            nullable: true
+                            description: Altura do atleta; nula se não medida
+                            type: number
+                          minCm:
+                            nullable: true
+                            description: Faixa de referência da classe; nula se não definida
+                            type: number
+                          mediaCm:
+                            nullable: true
+                            type: number
+                          maxCm:
+                            nullable: true
+                            type: number
+                          situacao:
+                            nullable: true
+                            description: "Nula se faltar a altura ou a faixa. Só informativa: não entra no
+                              score nem nos gates"
+                            type: string
+                            enum:
+                              - dentro
+                              - abaixo
+                              - acima
+                        required:
+                          - cm
+                          - minCm
+                          - mediaCm
+                          - maxCm
+                          - situacao
+                        additionalProperties: false
+                        description: Altura de referência da classe. O IBVAR não recebe (classFit
+                          inteiro nulo)
                     required:
                       - pesoKg
                       - alturaCm
@@ -1438,6 +1671,7 @@ paths:
                       - pesoMaxKg
                       - deltaKg
                       - distanciaRelativa
+                      - altura
                     additionalProperties: false
                   resultados:
                     type: array
@@ -1755,7 +1989,7 @@ paths:
           in: path
           name: id
           required: true
-      security: &a6
+      security: &a7
         - bearerAuth: []
       responses:
         "200":
@@ -2818,7 +3052,7 @@ paths:
                     normalizados"
               required:
                 - codigo
-      security: &a1
+      security: &a2
         - bearerAuth: []
       responses:
         "200":
@@ -2983,7 +3217,7 @@ paths:
       summary: Treinadores ativos (para escolher o responsável no cadastro)
       tags:
         - cadastro
-      security: *a1
+      security: *a2
       responses:
         "200":
           description: Default Response
@@ -3087,7 +3321,7 @@ paths:
                 - velaidCodigo
                 - classeId
                 - treinadorId
-      security: *a1
+      security: *a2
       responses:
         "201":
           description: Default Response
@@ -3300,7 +3534,7 @@ paths:
           name: busca
           required: false
           description: Parte do nome ou do VelaID
-      security: *a1
+      security: *a2
       responses:
         "200":
           description: Default Response
@@ -3442,7 +3676,7 @@ paths:
         - cadastro
       description: Quem nunca aceitou (termoAceitoVersao nulo) e quem aceitou só uma
         versão anterior à vigente (termoAceitoVersao preenchido).
-      security: *a1
+      security: *a2
       responses:
         "200":
           description: Default Response
@@ -3564,7 +3798,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a1
+      security: *a2
       responses:
         "200":
           description: Default Response
@@ -3739,7 +3973,7 @@ paths:
               required:
                 - tipo
                 - conteudo
-      security: *a1
+      security: *a2
       responses:
         "201":
           description: Default Response
@@ -3864,7 +4098,7 @@ paths:
         - painel
       description: "Não expõe as notas sugeridas das opções: a resposta só vira nota
         quando o treinador confirma."
-      security: &a2
+      security: &a3
         - bearerAuth: []
       responses:
         "200":
@@ -4153,7 +4387,7 @@ paths:
               required:
                 - indicadorId
                 - resposta
-      security: *a2
+      security: *a3
       responses:
         "201":
           description: Default Response
@@ -4292,7 +4526,7 @@ paths:
                   type: boolean
               required:
                 - compartilharIbvar
-      security: *a2
+      security: *a3
       responses:
         "200":
           description: Default Response
@@ -4455,7 +4689,7 @@ paths:
                   maxLength: 2000
               required:
                 - motivo
-      security: *a2
+      security: *a3
       responses:
         "201":
           description: Default Response
@@ -4588,7 +4822,7 @@ paths:
           in: query
           name: status
           required: false
-      security: *a2
+      security: *a3
       responses:
         "200":
           description: Default Response
@@ -4747,7 +4981,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a2
+      security: *a3
       responses:
         "200":
           description: Default Response
@@ -4938,7 +5172,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a2
+      security: *a3
       responses:
         "200":
           description: Default Response
@@ -5507,6 +5741,16 @@ paths:
                           type: number
                         pesoMaxKg:
                           type: number
+                        alturaMinCm:
+                          nullable: true
+                          description: Altura de referência (informativa); nula se não definida
+                          type: number
+                        alturaMediaCm:
+                          nullable: true
+                          type: number
+                        alturaMaxCm:
+                          nullable: true
+                          type: number
                       required:
                         - id
                         - ativa
@@ -5516,6 +5760,9 @@ paths:
                         - pesoMinKg
                         - pesoMedioKg
                         - pesoMaxKg
+                        - alturaMinCm
+                        - alturaMediaCm
+                        - alturaMaxCm
                       additionalProperties: false
                   rubricas:
                     type: array
@@ -5732,6 +5979,25 @@ paths:
                         type: number
                         minimum: 0
                         maximum: 400
+                      alturaMinCm:
+                        description: Altura de referência da classe, só informativa (não entra no score
+                          nem nos gates). Informe as três (min, média, max; 120
+                          a 230 cm, min <= média <= max) ou as três nulas para
+                          limpar
+                        nullable: true
+                        type: number
+                        minimum: 120
+                        maximum: 230
+                      alturaMediaCm:
+                        nullable: true
+                        type: number
+                        minimum: 120
+                        maximum: 230
+                      alturaMaxCm:
+                        nullable: true
+                        type: number
+                        minimum: 120
+                        maximum: 230
                       ativa:
                         description: Não dá para desativar classe com atleta ativo
                         type: boolean
@@ -5840,6 +6106,16 @@ paths:
                           type: number
                         pesoMaxKg:
                           type: number
+                        alturaMinCm:
+                          nullable: true
+                          description: Altura de referência (informativa); nula se não definida
+                          type: number
+                        alturaMediaCm:
+                          nullable: true
+                          type: number
+                        alturaMaxCm:
+                          nullable: true
+                          type: number
                       required:
                         - id
                         - ativa
@@ -5849,6 +6125,9 @@ paths:
                         - pesoMinKg
                         - pesoMedioKg
                         - pesoMaxKg
+                        - alturaMinCm
+                        - alturaMediaCm
+                        - alturaMaxCm
                       additionalProperties: false
                   rubricas:
                     type: array
@@ -5990,7 +6269,7 @@ paths:
       summary: Lista os ciclos de avaliação, do mais recente ao mais antigo
       tags:
         - ciclos
-      security: &a3
+      security: &a4
         - bearerAuth: []
       responses:
         "200":
@@ -6148,7 +6427,7 @@ paths:
                 - inicio
                 - prazo
               additionalProperties: false
-      security: *a3
+      security: *a4
       responses:
         "201":
           description: Default Response
@@ -6320,7 +6599,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a3
+      security: *a4
       responses:
         "200":
           description: Default Response
@@ -6505,7 +6784,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a3
+      security: *a4
       responses:
         "200":
           description: Default Response
@@ -6702,7 +6981,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a3
+      security: *a4
       responses:
         "200":
           description: Default Response
@@ -6987,7 +7266,7 @@ paths:
           in: path
           name: id
           required: true
-      security: &a4
+      security: &a5
         - bearerAuth: []
       responses:
         "200":
@@ -7202,7 +7481,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a4
+      security: *a5
       responses:
         "201":
           description: Default Response
@@ -7584,7 +7863,7 @@ paths:
         consentimentos, notas com evidência e avaliador, respostas, medidas,
         resultados, decisões de gate, financeiro, pedidos de revisão e pedidos
         do titular. Só o atleta logado, só os próprios dados."
-      security: &a5
+      security: &a6
         - bearerAuth: []
       responses:
         "200":
@@ -7784,7 +8063,7 @@ paths:
               required:
                 - tipo
                 - descricao
-      security: *a5
+      security: *a6
       responses:
         "201":
           description: Default Response
@@ -7908,7 +8187,7 @@ paths:
         seus)"
       tags:
         - titular
-      security: *a5
+      security: *a6
       responses:
         "200":
           description: Default Response
@@ -8044,7 +8323,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a5
+      security: *a6
       responses:
         "200":
           description: Default Response
@@ -9207,7 +9486,7 @@ paths:
       summary: Lista as contas do sistema
       tags:
         - usuarios
-      security: *a6
+      security: *a7
       responses:
         "200":
           description: Default Response
@@ -9351,7 +9630,7 @@ paths:
                 - nome
                 - email
                 - papel
-      security: *a6
+      security: *a7
       responses:
         "201":
           description: Default Response
@@ -9570,7 +9849,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a6
+      security: *a7
       responses:
         "200":
           description: Default Response
@@ -9739,7 +10018,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a6
+      security: *a7
       responses:
         "200":
           description: Default Response
@@ -9912,7 +10191,7 @@ paths:
         - termo
       description: Texto da versão vigente (a de maior vigente_desde que já começou).
         Qualquer usuário autenticado lê.
-      security: &a7
+      security: &a8
         - bearerAuth: []
       responses:
         "200":
@@ -10008,7 +10287,7 @@ paths:
                   maxLength: 100
               required:
                 - versao
-      security: *a7
+      security: *a8
       responses:
         "200":
           description: Default Response
@@ -10131,7 +10410,7 @@ paths:
         - termo
       description: Da mais nova para a mais antiga, com a quantidade de aceites de
         cada uma. Sem o texto (o vigente vem em GET /termo).
-      security: *a7
+      security: *a8
       responses:
         "200":
           description: Default Response
@@ -10260,7 +10539,7 @@ paths:
                 - texto
                 - vigenteDesde
               additionalProperties: false
-      security: *a7
+      security: *a8
       responses:
         "201":
           description: Default Response
