@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
 import type { Piloto } from "../apoio/piloto.js";
 
@@ -7,7 +7,7 @@ const DA_ANA = ["SC-T01", "RJ-T03", "RJ-T04", "SP-T07", "CE-T09", "DF-T11", "DF-
 
 interface Item {
   posicao: number;
-  atleta: { velaid: string; genero: string; classe: { evento: string } };
+  atleta: { velaid: string; genero: string; classe: { evento: string }; fotoUrl: string | null };
   score: number;
   faixa: { id: string };
   pontosCbvela: number;
@@ -111,5 +111,69 @@ describe("GET /ranking", () => {
     });
     expect(ficha.statusCode).toBe(200);
     expect(ficha.json().atleta.termoAceito).toBe(false);
+  });
+
+  it("foto do atleta: gestor e treinador veem; IBVAR, não; sem foto, nula", async () => {
+    const conta = await p.db.query<{ atleta_id: string }>(
+      "select atleta_id from usuarios where email = $1",
+      [EMAILS_DEMO.atleta],
+    );
+    const atletaId = conta.rows[0]!.atleta_id;
+    const foto = `fotos/${crypto.randomUUID()}/${crypto.randomUUID()}.jpg`;
+    await p.db.query("update usuarios set foto_caminho = $1 where email = $2", [
+      foto,
+      EMAILS_DEMO.atleta,
+    ]);
+    await p.db.query(
+      "update atletas set treinador_id = (select id from usuarios where email = $1) where id = $2",
+      [EMAILS_DEMO.treinadora, atletaId],
+    );
+    await p.db.query(
+      `insert into consentimentos (atleta_id, tipo, concedido, versao_termo, registrado_por)
+       values ($1, 'compartilhar_ibvar', true, 'v1', (select id from usuarios where email = $2))`,
+      [atletaId, EMAILS_DEMO.atleta],
+    );
+    const fotoDe = (itens: { atleta: { id: string; fotoUrl: string | null } }[], id: string) =>
+      itens.find((i) => i.atleta.id === id)?.atleta.fotoUrl;
+
+    for (const email of [EMAILS_DEMO.gestor, EMAILS_DEMO.treinadora]) {
+      const { corpo } = await buscar(email);
+      expect(fotoDe(corpo.itens, atletaId)).toContain(foto);
+      expect(corpo.itens.filter((i: Item) => i.atleta.fotoUrl !== null)).toHaveLength(1);
+    }
+    const ibvar = (await buscar(EMAILS_DEMO.ibvar)).corpo.itens;
+    expect(fotoDe(ibvar, atletaId)).toBeNull();
+    expect(JSON.stringify(ibvar)).not.toContain(foto);
+  });
+
+  it("fotos de vários atletas: uma chamada em lote ao Storage, sem chamadas por atleta", async () => {
+    const velaids = ["SP-T07", "CE-T09", "DF-T11"];
+    for (const v of velaids) {
+      const atletaId = await p.idDe(v);
+      await p.db.query(
+        `insert into usuarios (auth_user_id, email, nome, papel, atleta_id, foto_caminho)
+         values ($1, $2, 'Conta Foto', 'atleta', $3, $4)`,
+        [
+          crypto.randomUUID(),
+          `foto-${v.toLowerCase()}@exemplo.dev`,
+          atletaId,
+          `fotos/${crypto.randomUUID()}/${crypto.randomUUID()}.jpg`,
+        ],
+      );
+    }
+    const unitario = vi.spyOn(p.armazenamento, "linkTemporario");
+    const antes = p.armazenamento.chamadasEmLote.length;
+    const { corpo } = await buscar(EMAILS_DEMO.gestor);
+    unitario.mockRestore();
+
+    const emLote = p.armazenamento.chamadasEmLote.slice(antes);
+    expect(emLote).toHaveLength(1);
+    expect(unitario).not.toHaveBeenCalled();
+    const comFoto = corpo.itens.filter((i: Item) => i.atleta.fotoUrl !== null);
+    expect(comFoto.length).toBeGreaterThanOrEqual(3);
+    expect(emLote[0]).toHaveLength(comFoto.length);
+    for (const v of velaids) {
+      expect(comFoto.map((i: Item) => i.atleta.velaid)).toContain(v);
+    }
   });
 });

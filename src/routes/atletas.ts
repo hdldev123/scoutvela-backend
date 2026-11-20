@@ -17,6 +17,7 @@ import { carregarParametros } from "../repositories/parametros.js";
 import { buscarPlanoAtual } from "../repositories/plano.js";
 import { esquemaPlanoRegistrado, esquemaTextosPlano } from "./plano.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
+import { caminhoDaFotoDoAtleta, linkDaFoto } from "../servicos/foto-perfil.js";
 
 const NOMES_GATES: Record<number, string> = {
   1: "Class Fit",
@@ -65,6 +66,10 @@ const esquemaFicha = z.object({
     clube: z.string().nullable(),
     cidade: z.string().nullable(),
     uf: z.string().nullable(),
+    fotoUrl: z
+      .string()
+      .nullable()
+      .describe("Link assinado curto da foto da conta do atleta; sempre nulo para o IBVAR"),
     termoAceito: z.boolean(),
     classe: z.object({
       id: z.string(),
@@ -198,6 +203,13 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
       const { atleta, dados, calculo } = avaliado;
 
       const ibvar = usuario.papel === "ibvar";
+      const fotoUrl = ibvar
+        ? null
+        : await linkDaFoto(
+            app.armazenamento,
+            await caminhoDaFotoDoAtleta(app.db, atleta.id),
+            req.log,
+          );
       const notaPorIndicador = new Map(dados.notas.map((n) => [n.indicadorId, n]));
       const pilaresCalc = new Map(calculo.pilares.map((p) => [p.pilarId, p]));
       // Só sugestão: não entra no score até o avaliador lançar a nota.
@@ -318,6 +330,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
           clube: atleta.clube,
           cidade: atleta.cidade,
           uf: atleta.uf,
+          fotoUrl,
           termoAceito: atleta.termoAceito,
           classe: {
             id: atleta.classe.id,

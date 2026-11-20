@@ -18,6 +18,7 @@ export interface UsuarioAutenticado {
   email: string;
   papel: Papel;
   atletaId: string | null;
+  aal: "aal1" | "aal2";
 }
 
 declare module "fastify" {
@@ -105,6 +106,7 @@ export function registrarAutenticacao(
       email: u.email,
       papel: u.papel,
       atletaId: u.atletaId,
+      aal: aal ?? "aal1",
     };
   });
 }

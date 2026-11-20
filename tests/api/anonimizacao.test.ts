@@ -439,4 +439,55 @@ describe("anonimização do atleta (LGPD)", () => {
     );
     expect(r.pendencias).toEqual({ arquivos: 0, conta: true });
   });
+
+  it("remove a foto de perfil; falha no Storage vira pendência e a retomada conclui", async () => {
+    const id = await p.idDe("CE-T09");
+    const authUserId = await criarConta(id);
+    const foto = `fotos/${crypto.randomUUID()}/${crypto.randomUUID()}.jpg`;
+    await p.armazenamento.salvar(foto, new Uint8Array([0xff, 0xd8, 0xff]), "image/jpeg");
+    await p.db.query("update usuarios set foto_caminho = $1 where auth_user_id = $2", [
+      foto,
+      authUserId,
+    ]);
+    const pedido = await criarPedido(id);
+
+    p.armazenamento.falharRemocao = true;
+    const r = await anonimizar(id, pedido);
+    p.armazenamento.falharRemocao = false;
+    expect(r.status).toBe(200);
+    expect(r.corpo.evidenciasRemovidas).toBe(0);
+    expect(r.corpo.pendencias.arquivos).toBe(1);
+    expect(p.armazenamento.arquivos.has(foto)).toBe(true);
+
+    const retomada = await anonimizar(id, pedido);
+    expect(retomada.corpo.evidenciasRemovidas).toBe(0);
+    expect(retomada.corpo.pendencias.arquivos).toBe(0);
+    expect(p.armazenamento.arquivos.has(foto)).toBe(false);
+    const linha = await p.db.query<{ foto_caminho: string | null }>(
+      "select foto_caminho from usuarios where papel = 'atleta' and atleta_id = $1",
+      [id],
+    );
+    expect(linha.rows.map((x) => x.foto_caminho)).toEqual([null]);
+  });
+
+  it("evidência removida e foto que falha: evidenciasRemovidas conta só a evidência", async () => {
+    const id = await p.idDe("CE-T10");
+    const authUserId = await criarConta(id);
+    await anexar(id);
+    const foto = `fotos/${crypto.randomUUID()}/${crypto.randomUUID()}.jpg`;
+    await p.armazenamento.salvar(foto, new Uint8Array([0xff, 0xd8, 0xff]), "image/jpeg");
+    await p.db.query("update usuarios set foto_caminho = $1 where auth_user_id = $2", [
+      foto,
+      authUserId,
+    ]);
+    const pedido = await criarPedido(id);
+
+    p.armazenamento.falharCaminhos.add(foto);
+    const r = await anonimizar(id, pedido);
+    p.armazenamento.falharCaminhos.delete(foto);
+    expect(r.status).toBe(200);
+    expect(r.corpo.evidenciasRemovidas).toBe(1);
+    expect(r.corpo.pendencias.arquivos).toBe(1);
+    expect(p.armazenamento.arquivos.has(foto)).toBe(true);
+  });
 });

@@ -63,6 +63,95 @@ describe("armazenamento Supabase", () => {
   });
 });
 
+describe("armazenamento Supabase: linksTemporarios", () => {
+  const FOTO_A =
+    "fotos/11111111-1111-4111-8111-111111111111/22222222-2222-4222-8222-222222222222.jpg";
+  const FOTO_B =
+    "fotos/33333333-3333-4333-8333-333333333333/44444444-4444-4444-8444-444444444444.png";
+  const FOTO_C =
+    "fotos/55555555-5555-4555-8555-555555555555/66666666-6666-4666-8666-666666666666.jpg";
+  const criar = (fetchImpl: typeof fetch) =>
+    criarArmazenamentoSupabase({
+      supabaseUrl: "https://proj.supabase.co/",
+      chaveServico: "chave",
+      bucket: "evidencias",
+      fetchImpl,
+      agora: () => new Date("2026-11-06T12:00:00Z"),
+    });
+
+  it("assina tudo numa chamada só e ignora item com erro", async () => {
+    const chamadas: { url: string; init: RequestInit }[] = [];
+    const s = criar((async (url: string, init: RequestInit) => {
+      chamadas.push({ url, init });
+      return new Response(
+        JSON.stringify([
+          { path: FOTO_A, signedURL: `/object/sign/evidencias/${FOTO_A}?token=a`, error: null },
+          { path: FOTO_B, signedURL: null, error: "Object not found" },
+          { path: FOTO_C, signedURL: `/object/sign/evidencias/${FOTO_C}?token=c`, error: null },
+        ]),
+        { status: 200 },
+      );
+    }) as unknown as typeof fetch);
+
+    const links = await s.linksTemporarios([
+      { caminho: FOTO_A, tipoMime: "image/jpeg" },
+      { caminho: FOTO_B, tipoMime: "image/png" },
+      { caminho: FOTO_C, tipoMime: "image/jpeg" },
+    ]);
+    expect(chamadas).toHaveLength(1);
+    expect(chamadas[0]!.url).toBe("https://proj.supabase.co/storage/v1/object/sign/evidencias");
+    expect(chamadas[0]!.init.method).toBe("POST");
+    expect(chamadas[0]!.init.headers).toMatchObject({
+      Authorization: "Bearer chave",
+      apikey: "chave",
+      "Content-Type": "application/json",
+    });
+    expect(JSON.parse(chamadas[0]!.init.body as string)).toEqual({
+      expiresIn: 300,
+      paths: [FOTO_A, FOTO_B, FOTO_C],
+    });
+    expect([...links.keys()]).toEqual([FOTO_A, FOTO_C]);
+    expect(links.get(FOTO_A)).toEqual({
+      url: `https://proj.supabase.co/storage/v1/object/sign/evidencias/${FOTO_A}?token=a`,
+      expiraEm: "2026-11-06T12:05:00.000Z",
+    });
+  });
+
+  it("lista vazia não chama o Storage; HTTP de erro e caminho inválido viram ErroArmazenamento", async () => {
+    let chamadas = 0;
+    const vazio = criar(async () => {
+      chamadas++;
+      return new Response("[]", { status: 200 });
+    });
+    expect((await vazio.linksTemporarios([])).size).toBe(0);
+    expect(chamadas).toBe(0);
+
+    const quebrado = criar(async () => new Response("erro", { status: 500 }));
+    await expect(
+      quebrado.linksTemporarios([{ caminho: FOTO_A, tipoMime: "image/jpeg" }]),
+    ).rejects.toThrow(ErroArmazenamento);
+    await expect(
+      vazio.linksTemporarios([{ caminho: "../fora.jpg", tipoMime: "image/jpeg" }]),
+    ).rejects.toThrow(ErroArmazenamento);
+  });
+});
+
+describe("armazenamento local: linksTemporarios", () => {
+  it("gera os links em sequência", async () => {
+    const d = await mkdtemp(join(tmpdir(), "evid-"));
+    try {
+      const s = criarArmazenamentoLocal(d);
+      const foto =
+        "fotos/55555555-5555-4555-8555-555555555555/66666666-6666-4666-8666-666666666666.jpg";
+      await s.salvar(foto, new Uint8Array([0xff, 0xd8, 0xff]), "image/jpeg");
+      const links = await s.linksTemporarios([{ caminho: foto, tipoMime: "image/jpeg" }]);
+      expect(links.get(foto)?.url).toBe("data:image/jpeg;base64,/9j/");
+    } finally {
+      await rm(d, { recursive: true, force: true });
+    }
+  });
+});
+
 describe("armazenamento Supabase: remover", () => {
   const criar = (fetchImpl: typeof fetch) =>
     criarArmazenamentoSupabase({
@@ -125,5 +214,28 @@ describe("armazenamento local", () => {
     await expect(s.linkTemporario(outro, "image/png", "x.png")).rejects.toThrow();
     await expect(s.remover(outro)).resolves.toBeUndefined();
     await expect(s.remover("../x.pdf")).rejects.toThrow(ErroArmazenamento);
+  });
+
+  it("aceita foto de perfil em fotos/{usuarioId}/{uuid}.jpg|png e recusa outros formatos", async () => {
+    dir = dir ?? (await mkdtemp(join(tmpdir(), "evid-")));
+    const s = criarArmazenamentoLocal(dir);
+    const foto =
+      "fotos/55555555-5555-4555-8555-555555555555/66666666-6666-4666-8666-666666666666.jpg";
+    await s.salvar(foto, new Uint8Array([0xff, 0xd8, 0xff]), "image/jpeg");
+    expect((await s.linkTemporario(foto, "image/jpeg", "foto.jpg")).url).toBe(
+      "data:image/jpeg;base64,/9j/",
+    );
+    await s.remover(foto);
+    const pdf =
+      "fotos/55555555-5555-4555-8555-555555555555/66666666-6666-4666-8666-666666666666.pdf";
+    for (const invalido of [
+      pdf,
+      "fotos/../x.jpg",
+      "outros/55555555-5555-4555-8555-555555555555/x.jpg",
+    ]) {
+      await expect(s.salvar(invalido, new Uint8Array([1]), "image/jpeg")).rejects.toThrow(
+        ErroArmazenamento,
+      );
+    }
   });
 });
