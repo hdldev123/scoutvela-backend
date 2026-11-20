@@ -73,10 +73,19 @@ export async function linksDasFotosDosAtletas(
       order by atleta_id, criado_em desc`,
     [atletaIds],
   );
-  const pares = await Promise.all(
-    r.rows.map(
-      async (l) => [l.atleta_id, await linkDaFoto(armazenamento, l.foto_caminho, log)] as const,
-    ),
-  );
-  return new Map(pares);
+  const resultado = new Map<string, string | null>();
+  if (r.rows.length === 0) return resultado;
+  let links = new Map<string, { url: string }>();
+  try {
+    links = await armazenamento.linksTemporarios(
+      r.rows.map((l) => ({
+        caminho: l.foto_caminho,
+        tipoMime: l.foto_caminho.endsWith(".png") ? "image/png" : "image/jpeg",
+      })),
+    );
+  } catch (e) {
+    log.warn({ evento: "foto_link_falhou", erro: nomeDoErro(e) }, "falha ao gerar link da foto");
+  }
+  for (const l of r.rows) resultado.set(l.atleta_id, links.get(l.foto_caminho)?.url ?? null);
+  return resultado;
 }
