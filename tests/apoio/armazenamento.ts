@@ -5,6 +5,8 @@ export interface ArmazenamentoFake extends ArmazenamentoEvidencias {
   falhar: boolean;
   /** Quando true, remover lança erro. */
   falharRemocao: boolean;
+  /** Caminhos cuja remoção falha (os demais seguem normais). */
+  falharCaminhos: Set<string>;
 }
 
 /** Armazenamento em memória para os testes. */
@@ -14,6 +16,7 @@ export function criarArmazenamentoFake(): ArmazenamentoFake {
     arquivos,
     falhar: false,
     falharRemocao: false,
+    falharCaminhos: new Set(),
     async salvar(caminho, bytes, tipoMime) {
       if (fake.falhar) throw new Error("storage fora do ar");
       arquivos.set(caminho, { bytes, tipoMime });
@@ -26,7 +29,8 @@ export function criarArmazenamentoFake(): ArmazenamentoFake {
       };
     },
     async remover(caminho) {
-      if (fake.falharRemocao) throw new Error("storage fora do ar");
+      if (fake.falharRemocao || fake.falharCaminhos.has(caminho))
+        throw new Error("storage fora do ar");
       arquivos.delete(caminho);
     },
   };
