@@ -12,6 +12,13 @@ import type {
 
 type UsuarioDeAcesso = Pick<UsuarioAutenticado, "id" | "papel" | "atletaId">;
 
+/** Faixa de altura de referência da classe (informativa, nula se não definida). */
+export interface ClasseAltura {
+  alturaMinCm: number | null;
+  alturaMediaCm: number | null;
+  alturaMaxCm: number | null;
+}
+
 /** Atleta com o que o cadastro, a classe e o treinador respondem. */
 export interface AtletaBase {
   id: string;
@@ -20,7 +27,7 @@ export interface AtletaBase {
   genero: Genero;
   /** AAAA-MM-DD. */
   dataNascimento: string;
-  classe: Classe;
+  classe: Classe & ClasseAltura;
   clube: string | null;
   cidade: string | null;
   uf: string | null;
@@ -141,6 +148,9 @@ interface LinhaBase {
   peso_min_kg: string;
   peso_medio_kg: string;
   peso_max_kg: string;
+  altura_min_cm: string | null;
+  altura_media_cm: string | null;
+  altura_max_cm: string | null;
 }
 
 export interface FiltrosListagem {
@@ -180,7 +190,8 @@ export async function listarAtletasVisiveis(
             a.treinador_id, t.nome as treinador_nome,
             ${termoAceito} as termo_aceito,
             c.id as classe_id, c.nome as classe_nome, c.evento as classe_evento, c.posicao as classe_posicao,
-            c.peso_min_kg, c.peso_medio_kg, c.peso_max_kg
+            c.peso_min_kg, c.peso_medio_kg, c.peso_max_kg,
+            c.altura_min_cm, c.altura_media_cm, c.altura_max_cm
        from atletas a
        join classes c on c.id = a.classe_id
        left join usuarios t on t.id = a.treinador_id
@@ -202,6 +213,9 @@ export async function listarAtletasVisiveis(
       pesoMinKg: Number(l.peso_min_kg),
       pesoMedioKg: Number(l.peso_medio_kg),
       pesoMaxKg: Number(l.peso_max_kg),
+      alturaMinCm: l.altura_min_cm === null ? null : Number(l.altura_min_cm),
+      alturaMediaCm: l.altura_media_cm === null ? null : Number(l.altura_media_cm),
+      alturaMaxCm: l.altura_max_cm === null ? null : Number(l.altura_max_cm),
     },
     clube: l.clube,
     cidade: l.cidade,

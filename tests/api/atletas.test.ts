@@ -98,6 +98,52 @@ describe("GET /atletas/:id", () => {
     expect((await ficha(EMAILS_DEMO.atleta, "SC-T01")).status).toBe(404);
   });
 
+  it("altura de referência (informativa): gestor e treinador do atleta veem; situação calculada no servidor", async () => {
+    const id = await p.idDe("SC-T01");
+    const alvo = (
+      await p.db.query<{ classe_id: string }>("select classe_id from atletas where id = $1", [id])
+    ).rows[0]!;
+    await p.db.query(
+      "update classes set altura_min_cm = 180, altura_media_cm = 185, altura_max_cm = 190 where id = $1",
+      [alvo.classe_id],
+    );
+    for (const [altura, situacao] of [
+      [185, "dentro"],
+      [175, "abaixo"],
+      [195, "acima"],
+    ] as const) {
+      await p.db.query(
+        "insert into medidas_corporais (atleta_id, altura_cm, medido_em, evidencia, registrado_por) values ($1, $2, clock_timestamp() + interval '1 day', 'Medição de teste', (select id from usuarios where email = $3))",
+        [id, altura, EMAILS_DEMO.gestor],
+      );
+      for (const email of [EMAILS_DEMO.gestor, EMAILS_DEMO.treinadora]) {
+        const { status, corpo } = await ficha(email, id);
+        expect(status).toBe(200);
+        expect(corpo.classFit.altura).toEqual({
+          cm: altura,
+          minCm: 180,
+          mediaCm: 185,
+          maxCm: 190,
+          situacao,
+        });
+      }
+    }
+    // Sem faixa na classe: faixa e situação nulas, a altura do atleta segue.
+    await p.db.query(
+      "update classes set altura_min_cm = null, altura_media_cm = null, altura_max_cm = null where id = $1",
+      [alvo.classe_id],
+    );
+    const sem = (await ficha(EMAILS_DEMO.gestor, id)).corpo.classFit.altura;
+    expect(sem).toEqual({ cm: 195, minCm: null, mediaCm: null, maxCm: null, situacao: null });
+  });
+
+  it("IBVAR não recebe a altura nem a faixa (classFit nulo)", async () => {
+    const { corpo, texto } = await ficha(EMAILS_DEMO.ibvar, "SC-T01");
+    expect(corpo.classFit).toBeNull();
+    expect(texto).not.toContain("alturaCm");
+    expect(texto).not.toContain("minCm");
+  });
+
   it("IBVAR: 404 na Helena (sem consentimento)", async () => {
     expect((await ficha(EMAILS_DEMO.ibvar, "SP-T07")).status).toBe(404);
   });

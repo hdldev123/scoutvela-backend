@@ -28,6 +28,7 @@ import { rotasCiclos } from "./routes/ciclos.js";
 import { rotasEvidencias } from "./routes/evidencias.js";
 import { rotasInvestimento } from "./routes/investimento.js";
 import { rotasMe } from "./routes/me.js";
+import { rotasNotificacoes } from "./routes/notificacoes.js";
 import { rotasPainel } from "./routes/painel.js";
 import { rotasPerfil } from "./routes/perfil.js";
 import { rotasPlano } from "./routes/plano.js";
@@ -76,6 +77,7 @@ type PluginDeRotas = (app: FastifyInstance) => Promise<void>;
 const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasHealth,
   rotasMe,
+  rotasNotificacoes,
   rotasPerfil,
   rotasRanking,
   rotasAtletas,
