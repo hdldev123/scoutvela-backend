@@ -44,10 +44,12 @@ describe("GET /pedidos-titular: estado da anonimização", () => {
       headers: await p.como(EMAILS_DEMO.gestor),
     });
     expect(r.statusCode).toBe(200);
-    return r.json() as {
-      id: string;
-      anonimizacao: { em: string; pendencias: { arquivos: number; conta: boolean } } | null;
-    }[];
+    return r.json<
+      {
+        id: string;
+        anonimizacao: { em: string; pendencias: { arquivos: number; conta: boolean } } | null;
+      }[]
+    >();
   };
 
   it("nulo antes e nos pedidos que não anonimizaram; preenchido, com pendências, no que anonimizou", async () => {
