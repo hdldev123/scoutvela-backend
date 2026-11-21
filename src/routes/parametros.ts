@@ -136,7 +136,7 @@ const esquemaAtualizacao = z
       .record(z.string().min(1).max(40), z.unknown())
       .optional()
       .describe(
-        "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4, RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_PONTOS. O valor segue o formato lido em GET /parametros. PERF_PONTOS: { ativa, faixas: [{ ate, nota }] }, ate crescente e nota de 0 a 5 que não diminui",
+        "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4, RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_PONTOS. O valor segue o formato lido em GET /parametros. PERF_PONTOS: { ativa, indicador (opcional, padrão perf_nacional; precisa ser um indicador T não calculado), faixas: [{ ate, nota }] }, ate crescente e nota de 0 a 5 que não diminui",
       ),
     classes: z
       .array(

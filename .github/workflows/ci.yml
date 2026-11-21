@@ -5,6 +5,12 @@ on:
     branches: [main, staging, "release-*"]
   push:
     branches: [main, staging, "release-*"]
+  workflow_dispatch:
+
+# Pull request cancela a execução anterior da mesma branch; push em staging ou main nunca cancela.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 permissions:
   contents: read
@@ -15,6 +21,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
       - uses: actions/setup-node@v7
         with:
           node-version-file: .node-version

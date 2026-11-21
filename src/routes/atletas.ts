@@ -2,7 +2,6 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import {
-  INDICADOR_PONTOS_RANKING,
   distanciaClassFit,
   situacaoAltura,
   funcaoNaClasse,
@@ -274,7 +273,8 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                 lancadoEm: lancada?.lancadoEm ?? null,
                 resposta: ibvar ? null : (dados.respostas[i.id] ?? null),
                 sugestaoPendente: ibvar ? null : sug,
-                sugestaoPontos: i.id === INDICADOR_PONTOS_RANKING ? sugestaoPontos : null,
+                sugestaoPontos:
+                  i.id === parametros.regras.perfPontos.indicador ? sugestaoPontos : null,
                 // O IBVAR não vê evidências anexadas.
                 anexo: ibvar ? null : (lancada?.anexo ?? null),
               };

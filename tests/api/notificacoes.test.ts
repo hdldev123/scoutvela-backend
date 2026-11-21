@@ -1,5 +1,4 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { pendenciasDoCiclo } from "../../src/repositories/pendencias.js";
 import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
 import type { Piloto } from "../apoio/piloto.js";
 
@@ -65,16 +64,44 @@ describe("notificações do menu (GET /me/notificacoes, PUT /me/notificacoes/vis
     expect(a.total).toBe(a.contagens.painel);
   });
 
-  it("treinador: avaliar segue a regra de pendência do ciclo; sem ciclo aberto, 0", async () => {
+  it("treinador: avaliar conta os atletas próprios com indicador T sem nota no ciclo; sem ciclo aberto, 0", async () => {
+    // Seed: a Ana tem 7 atletas ativos e nenhum tem nota de ciclo nos 33 indicadores T lançáveis.
+    // O Marcos (outro treinador) tem 7 atletas e não entra na conta dela.
     const ciclo = (
       await p.db.query<{ id: string }>("select id from ciclos_avaliacao where status = 'aberto'")
     ).rows[0]!.id;
-    const todas = await pendenciasDoCiclo(p.db, ciclo, agora);
-    const ana = todas.treinadores.find((t) => t.email === "treinadora@scoutvela.dev")!;
-    expect(ana.atletasPendentes.length).toBeGreaterThan(0);
-    expect((await contagens(EMAILS_DEMO.treinadora)).contagens.avaliar).toBe(
-      ana.atletasPendentes.length,
+    expect((await contagens(EMAILS_DEMO.treinadora)).contagens.avaliar).toBe(7);
+
+    // Lançar todas as notas T de um atleta da Ana tira só esse atleta da conta.
+    const indicadores = await p.db.query<{ id: string }>(
+      "select id from indicadores where tipo = 'T' and not calculado",
     );
+    expect(indicadores.rows).toHaveLength(33);
+    const r = await chamar(
+      EMAILS_DEMO.treinadora,
+      "POST",
+      `/atletas/${await p.idDe("SC-T01")}/avaliacoes`,
+      {
+        notas: indicadores.rows.map((i) => ({
+          indicadorId: i.id,
+          valor: 3,
+          evidencia: "Observação do ciclo",
+        })),
+      },
+    );
+    expect(r.status).toBe(201);
+    expect((await contagens(EMAILS_DEMO.treinadora)).contagens.avaliar).toBe(6);
+
+    // Outro atleta da Ana, também completo: sai da conta.
+    const outro = await p.idDe("RJ-T04");
+    await chamar(EMAILS_DEMO.treinadora, "POST", `/atletas/${outro}/avaliacoes`, {
+      notas: indicadores.rows.map((i) => ({
+        indicadorId: i.id,
+        valor: 2,
+        evidencia: "Observação do ciclo",
+      })),
+    });
+    expect((await contagens(EMAILS_DEMO.treinadora)).contagens.avaliar).toBe(5);
 
     await p.db.query("update ciclos_avaliacao set status = 'fechado' where id = $1", [ciclo]);
     expect((await contagens(EMAILS_DEMO.treinadora)).contagens.avaliar).toBe(0);
@@ -191,5 +218,49 @@ describe("notificações do menu (GET /me/notificacoes, PUT /me/notificacoes/vis
     expect((await chamar(EMAILS_DEMO.atleta, "PUT", "/me/notificacoes/vistas", {})).status).toBe(
       400,
     );
+  });
+});
+
+describe("notificações: perguntas sem resposta no painel do atleta", () => {
+  let p: Piloto;
+  beforeAll(async () => {
+    p = await criarPiloto(() => agora);
+  });
+  afterAll(() => p.encerrar());
+
+  const painel = async () =>
+    (
+      await p.app.inject({
+        method: "GET",
+        url: "/me/notificacoes",
+        headers: await p.como(EMAILS_DEMO.atleta),
+      })
+    ).json().contagens.painel as number;
+
+  it("conta 1 por pergunta do questionário ainda sem resposta (não é por ciclo) e cai ao responder", async () => {
+    // Seed: o questionário tem 8 perguntas e a Helena não respondeu nenhuma; termo aceito, sem resposta de revisão.
+    expect(await painel()).toBe(8);
+
+    const r = await p.app.inject({
+      method: "POST",
+      url: "/respostas",
+      headers: await p.como(EMAILS_DEMO.atleta),
+      payload: { indicadorId: "amb_apoio_familiar", resposta: "Apoia totalmente" },
+    });
+    expect(r.statusCode).toBe(201);
+    expect(await painel()).toBe(7);
+
+    // Responder de novo a mesma pergunta não muda a contagem.
+    await p.app.inject({
+      method: "POST",
+      url: "/respostas",
+      headers: await p.como(EMAILS_DEMO.atleta),
+      payload: { indicadorId: "amb_apoio_familiar", resposta: "Apoia totalmente" },
+    });
+    expect(await painel()).toBe(7);
+
+    // Não é por ciclo: o tempo passar (mesmo depois do prazo) não zera a conta.
+    avancar(60 * 24 * 40);
+    expect(await painel()).toBe(7);
   });
 });

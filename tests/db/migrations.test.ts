@@ -168,6 +168,16 @@ describe("Migrations", () => {
         [ATLETA, evento, fonte],
       );
 
+    const anonimizarResultados = (evento: string) =>
+      db.transacao(async (tx) => {
+        await tx.query(`select set_config('scoutvela.anonimizando', $1, true)`, [ATLETA]);
+        await tx.query(
+          `update resultados_regata set evento = 'Evento anonimizado', link_oficial = null, anonimizado = true
+            where atleta_id = $1 and evento = $2`,
+          [ATLETA, evento],
+        );
+      });
+
     it("recusa o mesmo atleta + evento + data (sem diferenciar maiúsculas) na fonte do ranking", async () => {
       await inserir("Copa Unica");
       await expect(inserir("COPA UNICA")).rejects.toThrow(/resultados_ranking_unico/);
@@ -177,15 +187,9 @@ describe("Migrations", () => {
       await inserir("Copa Manual", "manual");
       await inserir("Copa Manual", "manual");
       await inserir("Copa Anon");
-      await db.query(
-        `update resultados_regata set evento = 'Evento anonimizado', anonimizado = true where atleta_id = $1 and evento = 'Copa Anon'`,
-        [ATLETA],
-      );
+      await anonimizarResultados("Copa Anon");
       await inserir("Copa Anon");
-      await db.query(
-        `update resultados_regata set evento = 'Evento anonimizado', anonimizado = true where atleta_id = $1 and evento = 'Copa Anon'`,
-        [ATLETA],
-      );
+      await anonimizarResultados("Copa Anon");
     });
   });
 });

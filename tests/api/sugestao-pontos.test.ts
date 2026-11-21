@@ -149,4 +149,33 @@ describe("PERF_PONTOS: nota sugerida de Performance pelo Ranking CBVela", () => 
     const depois = await ficha();
     expect(indicadores(depois).find((i) => i.id === "perf_nacional")!.nota).toBe(sugerida);
   });
+
+  it("campo indicador: troca o indicador da sugestão; indicador inválido ou calculado é 400", async () => {
+    expect(
+      (await gravarRegra({ ativa: true, indicador: "nao_existe", faixas: FAIXAS })).status,
+    ).toBe(400);
+    const calculado = (
+      await p.db.query<{ id: string }>("select id from indicadores where calculado limit 1")
+    ).rows[0]!.id;
+    expect((await gravarRegra({ ativa: true, indicador: calculado, faixas: FAIXAS })).status).toBe(
+      400,
+    );
+
+    expect((await gravarRegra({ ativa: true, indicador: "tec_trim", faixas: FAIXAS })).status).toBe(
+      200,
+    );
+    const f = await ficha();
+    expect(indicadores(f).find((i) => i.id === "tec_trim")!.sugestaoPontos).toEqual({
+      nota: notaEsperada(f.pontosCbvela),
+      pontos: f.pontosCbvela,
+    });
+    expect(indicadores(f).find((i) => i.id === "perf_nacional")!.sugestaoPontos).toBeNull();
+    expect((await previa()).sugestaoPontos).toMatchObject({ indicadorId: "tec_trim" });
+
+    // Sem o campo, volta ao padrão.
+    expect((await gravarRegra({ ativa: true, faixas: FAIXAS })).status).toBe(200);
+    expect(
+      indicadores(await ficha()).find((i) => i.id === "perf_nacional")!.sugestaoPontos,
+    ).not.toBeNull();
+  });
 });

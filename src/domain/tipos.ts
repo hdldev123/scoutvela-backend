@@ -91,7 +91,12 @@ export interface Regras {
   rankingCbvela: { janelaSemanas: number };
   /** Pontos do Ranking CBVela → nota sugerida de perf_nacional. Faixas em ordem crescente de `ate`;
    *  cada uma vale até `ate` pontos (inclusive) e, acima da última, vale a nota dela. Não entra no score. */
-  perfPontos: { ativa: boolean; faixas: { ate: number; nota: number }[] };
+  perfPontos: {
+    ativa: boolean;
+    /** Indicador que recebe a sugestão (padrão: perf_nacional). */
+    indicador: string;
+    faixas: { ate: number; nota: number }[];
+  };
 }
 
 export interface Parametros {

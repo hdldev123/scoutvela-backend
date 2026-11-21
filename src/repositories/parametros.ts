@@ -1,4 +1,5 @@
 import type { Db } from "../db/db.js";
+import { INDICADOR_PONTOS_PADRAO } from "../domain/pontos.js";
 import { CODIGOS_REGRAS, ESQUEMAS_REGRAS, type CodigoRegra } from "./regras-esquemas.js";
 import type {
   Classe,
@@ -78,10 +79,14 @@ export function regrasDoBanco(linhas: { codigo: string; valor: ValorRegra }[]): 
 
 /** PERF_PONTOS (migration 0012). Ausente ou desligada: sem nota sugerida. */
 function perfPontosDoBanco(valor: ValorRegra | undefined): Regras["perfPontos"] {
-  if (!valor) return { ativa: false, faixas: [] };
+  if (!valor) return { ativa: false, indicador: INDICADOR_PONTOS_PADRAO, faixas: [] };
   const faixas = Array.isArray(valor.faixas) ? (valor.faixas as Record<string, unknown>[]) : [];
   return {
     ativa: valor.ativa === true,
+    indicador:
+      typeof valor.indicador === "string" && valor.indicador
+        ? valor.indicador
+        : INDICADOR_PONTOS_PADRAO,
     faixas: faixas
       .map((f) => ({
         ate: numero(f.ate, "PERF_PONTOS", "faixas.ate"),
@@ -436,6 +441,19 @@ export async function atualizarParametros(
           throw new ErroParametros(
             `Regra ${codigo} inválida${onde}: ${problema?.message ?? "valor incorreto"}.`,
           );
+        }
+        if (codigo === "PERF_PONTOS") {
+          const ind = (parsed.data as { indicador?: string }).indicador;
+          if (ind !== undefined) {
+            const ok = await tx.query(
+              "select 1 from indicadores where id = $1 and tipo = 'T' and not calculado",
+              [ind],
+            );
+            if (ok.rows.length === 0)
+              throw new ErroParametros(
+                `Regra PERF_PONTOS inválida (indicador): "${ind}" não é um indicador T não calculado.`,
+              );
+          }
         }
         const atual = (
           await tx.query<{ valor: unknown }>("select valor from regras where codigo = $1", [codigo])
