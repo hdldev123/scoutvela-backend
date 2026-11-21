@@ -50,6 +50,7 @@ export const ESQUEMAS_REGRAS = {
   PERF_PONTOS: z
     .strictObject({
       ativa: z.boolean(),
+      indicador: z.string().min(1).max(60).optional(),
       faixas: z
         .array(
           z.strictObject({

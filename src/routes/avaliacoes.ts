@@ -3,7 +3,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
-import { INDICADOR_PONTOS_RANKING, notaSugeridaPorPontos } from "../domain/index.js";
+import { notaSugeridaPorPontos } from "../domain/index.js";
 import type { Parametros, ResultadoCalculo, StatusGate, SugestaoPontos } from "../domain/index.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { recusarAtletaAnonimizado, travarAtletaEditavel } from "../repositories/anonimizado.js";
@@ -179,8 +179,8 @@ async function avaliarUm(db: Db, parametros: Parametros, atleta: AtletaBase, ref
   return avaliado;
 }
 
-const sugestaoComIndicador = (s: SugestaoPontos | null) =>
-  s ? { indicadorId: INDICADOR_PONTOS_RANKING, ...s } : null;
+const sugestaoComIndicador = (s: SugestaoPontos | null, indicadorId: string) =>
+  s ? { indicadorId, ...s } : null;
 
 export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
   const rota = app.withTypeProvider<ZodTypeProvider>();
@@ -254,6 +254,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
         },
         sugestaoPontos: sugestaoComIndicador(
           notaSugeridaPorPontos(antes.calculo.pontosCbvela, parametros.regras.perfPontos),
+          parametros.regras.perfPontos.indicador,
         ),
       };
     },

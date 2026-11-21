@@ -1,7 +1,7 @@
 import type { Regras } from "./tipos.js";
 
-/** Indicador de Performance que recebe a nota sugerida pelos pontos do Ranking CBVela. */
-export const INDICADOR_PONTOS_RANKING = "perf_nacional";
+/** Indicador que recebe a nota sugerida quando a regra PERF_PONTOS não traz o campo `indicador`. */
+export const INDICADOR_PONTOS_PADRAO = "perf_nacional";
 
 export interface SugestaoPontos {
   nota: number;
@@ -16,7 +16,7 @@ export interface SugestaoPontos {
  */
 export function notaSugeridaPorPontos(
   pontos: number,
-  regra: Regras["perfPontos"],
+  regra: Omit<Regras["perfPontos"], "indicador">,
 ): SugestaoPontos | null {
   if (!regra.ativa || regra.faixas.length === 0) return null;
   const faixas = [...regra.faixas].sort((a, b) => a.ate - b.ate);
