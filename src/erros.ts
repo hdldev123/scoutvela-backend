@@ -67,6 +67,14 @@ export function registrarTratamentoDeErros(app: FastifyInstance): void {
         .code(400)
         .send({ erro: "requisicao_invalida", mensagem: "Requisição inválida." });
     }
+    // Gatilho do banco: escrita em atleta anonimizado (migration 0015). As rotas já recusam antes.
+    if ((err as { code?: string }).code === "SV409") {
+      return reply.code(409).send({
+        erro: "requisicao_invalida",
+        mensagem:
+          "Este atleta foi anonimizado a pedido do titular (LGPD): o registro está fechado e não aceita alterações.",
+      });
+    }
     const status = (err as { statusCode?: number }).statusCode;
     if (status === 429) {
       return reply.code(429).send({

@@ -7,14 +7,21 @@ import type { ArmazenamentoEvidencias } from "../storage/index.js";
 /**
  * Anonimização do atleta por pedido de exclusão (LGPD, art. 18).
  *
- * Some: nome, contato, clube, cidade, número de vela, ID World Sailing, código VelaID, a linha do
- * VelaID, os dados pessoais da conta de login, a conta no Supabase Auth, a foto de perfil e os
- * arquivos de evidência.
- * Fica: a série histórica (notas, respostas, medidas, gates, financeiro, plano, auditoria), ligada
- * ao atleta_id e sem identificação direta.
+ * Some: nome, contato, clube, cidade, UF, número de vela, ID World Sailing, código VelaID, a linha
+ * do VelaID, os dados pessoais da conta de login, a conta no Supabase Auth, a foto de perfil, os
+ * arquivos de evidência, os textos livres da série histórica (evidência das notas e das medidas,
+ * justificativa de gate, plano individual, pedidos de revisão e do titular, nome do evento e link
+ * dos resultados de regata) e as chaves com dado pessoal da trilha de auditoria. A data de
+ * nascimento vira 1º de julho do mesmo ano.
+ * Fica: a série histórica (valores, datas, status), ligada ao atleta_id e sem identificação direta.
+ *
+ * Os gatilhos de só-inserção aceitam essas trocas de texto apenas dentro da transação abaixo, que
+ * marca `scoutvela.anonimizando` com o id do atleta (migration 0015).
  */
 
 export const NOME_ANONIMIZADO = "Atleta anonimizado";
+export const MARCADOR_REMOVIDO = "[removido na anonimização]";
+export const EVENTO_ANONIMIZADO = "Evento anonimizado";
 
 export interface DepsAnonimizacao {
   db: Db;
@@ -112,6 +119,9 @@ async function anonimizarNoBanco(
 ): Promise<void> {
   const { atletaId, pedidoTitularId, gestorId, em } = e;
 
+  // Libera, só nesta transação, a exceção dos gatilhos de só-inserção para ESTE atleta.
+  await tx.query(`select set_config('scoutvela.anonimizando', lower($1), true)`, [atletaId]);
+
   // Trava o atleta: duas anonimizações ao mesmo tempo não passam juntas.
   const lock = await tx.query<{ anonimizado_em: Date | null; velaid_codigo: string }>(
     `select anonimizado_em, velaid_codigo from atletas where id = $1::uuid for update`,
@@ -126,12 +136,7 @@ async function anonimizarNoBanco(
         set status = 'respondido', resposta = $2, respondido_por = $3::uuid, respondido_em = $4
       where id = $1::bigint and status = 'aberto'
   returning id`,
-    [
-      pedidoTitularId,
-      `Dados pessoais anonimizados em ${dataBr(em)}. A série histórica de avaliações foi mantida sem identificação direta.`,
-      gestorId,
-      em,
-    ],
+    [pedidoTitularId, textoDaResposta(em), gestorId, em],
   );
   if (respondeu.rows.length === 0) throw conflito("Este pedido já foi respondido.");
 
@@ -140,6 +145,7 @@ async function anonimizarNoBanco(
     `update atletas
         set nome = $2, clube = null, cidade = null, uf = null, numero_vela = null, ws_id = null,
             email_contato = null, velaid_codigo = $3, ativo = false,
+            data_nascimento = make_date(extract(year from data_nascimento)::int, 7, 1),
             anonimizado_em = $4, anonimizado_pedido_id = $5::bigint
       where id = $1::uuid`,
     [atletaId, NOME_ANONIMIZADO, codigoAnonimo, em, pedidoTitularId],
@@ -178,12 +184,8 @@ async function anonimizarNoBanco(
     [atletaId, em, gestorId],
   );
 
-  const evidencias = await tx.query(
-    `update evidencias_anexos set removido_em = $2, nome_arquivo = 'removido'
-      where atleta_id = $1::uuid and removido_em is null
-  returning id`,
-    [atletaId, em],
-  );
+  const evidencias = await marcarEvidenciasRemovidas(tx, atletaId, em);
+  await removerTextosLivres(tx, atletaId, pedidoTitularId);
 
   // Só ids e contagens: nada de nome, e-mail nem código VelaID.
   await tx.query(
@@ -194,11 +196,81 @@ async function anonimizarNoBanco(
       atletaId,
       JSON.stringify({
         pedidoTitularId,
-        evidencias: evidencias.rows.length,
+        evidencias,
         contaAuth: temContaAuth,
       }),
       em,
     ],
+  );
+}
+
+/** Texto da resposta ao titular: diz exatamente o que sumiu e o que ficou. */
+export function textoDaResposta(em: Date): string {
+  return [
+    `Dados pessoais anonimizados em ${dataBr(em)}.`,
+    "Removidos: nome, e-mail de contato, clube, cidade, UF, número de vela, ID World Sailing e código VelaID (trocado por um código anônimo); o registro no VelaID; os dados da conta de login (nome, e-mail e acesso) e a conta no serviço de login; a foto de perfil e os arquivos de evidência; os textos livres da série histórica (evidências das notas e das medidas, justificativas de gates, plano individual, pedidos de revisão e do titular, nome e link dos resultados de regata); e os dados pessoais da trilha de auditoria. O compartilhamento com o IBVAR e o aceite do termo foram revogados.",
+    "Alterado: a data de nascimento foi generalizada para 1º de julho do mesmo ano.",
+    "Mantidos, sem identificação direta e ligados apenas a um identificador interno: notas, respostas do questionário, medidas corporais, resultados de regata (nível, data, posição, tamanho da frota e pontos), status e datas das decisões de gate, financeiro da campanha, pontuações dos ciclos e a trilha de auditoria (quem fez o quê e quando, sem dados pessoais).",
+  ].join(" ");
+}
+
+/**
+ * Marca como removidas todas as evidências do atleta ainda disponíveis (também as que chegaram
+ * durante a anonimização). Devolve quantas foram marcadas agora. O arquivo sai do Storage depois.
+ */
+async function marcarEvidenciasRemovidas(tx: Db, atletaId: string, em: Date): Promise<number> {
+  const r = await tx.query(
+    `update evidencias_anexos set removido_em = $2, nome_arquivo = 'removido'
+      where atleta_id = $1::uuid and removido_em is null
+  returning id`,
+    [atletaId, em],
+  );
+  return r.rows.length;
+}
+
+/** Troca os textos livres pelo marcador (ou nulo/limpo, conforme a coluna) e limpa a auditoria. */
+async function removerTextosLivres(
+  tx: Db,
+  atletaId: string,
+  pedidoTitularId: string,
+): Promise<void> {
+  const m = MARCADOR_REMOVIDO;
+  const q = (sql: string, params: unknown[] = []) => tx.query(sql, [atletaId, m, ...params]);
+
+  await q(`update avaliacoes set evidencia = $2 where atleta_id = $1::uuid and evidencia <> $2`);
+  await q(
+    `update medidas_corporais set evidencia = $2 where atleta_id = $1::uuid and evidencia <> $2`,
+  );
+  await q(
+    `update gates_decisoes set justificativa = $2
+      where atleta_id = $1::uuid and justificativa is not null and justificativa <> $2`,
+  );
+  await q(
+    `update plano_individual set forcas = $2, lacunas = $2, meta_12m = $2, meta_24m = $2, recomendacao = $2
+      where atleta_id = $1::uuid
+        and not (forcas = $2 and lacunas = $2 and meta_12m = $2 and meta_24m = $2 and recomendacao = $2)`,
+  );
+  await q(
+    `update pedidos_revisao set motivo = $2, resposta = case when resposta is null then null else $2 end
+      where atleta_id = $1::uuid`,
+  );
+  // A resposta do pedido de exclusão é o registro da anonimização: fica. Só a descrição sai.
+  await q(
+    `update pedidos_titular
+        set descricao = $2,
+            resposta = case when resposta is null or id = $3::bigint then resposta else $2 end
+      where atleta_id = $1::uuid`,
+    [pedidoTitularId],
+  );
+  await tx.query(
+    `update resultados_regata set evento = $2, link_oficial = null, anonimizado = true
+      where atleta_id = $1::uuid`,
+    [atletaId, EVENTO_ANONIMIZADO],
+  );
+  await tx.query(
+    `update auditoria set detalhes = anonimiza_detalhes_auditoria(detalhes)
+      where entidade_id = $1 and detalhes is distinct from anonimiza_detalhes_auditoria(detalhes)`,
+    [atletaId],
   );
 }
 
@@ -207,45 +279,72 @@ async function concluirPendencias(
   deps: DepsAnonimizacao,
   atletaId: string,
 ): Promise<Pick<ResultadoAnonimizacao, "evidenciasRemovidas" | "pendencias">> {
-  const { db, armazenamento, adminAuth, log } = deps;
+  const { db, armazenamento, adminAuth, log, agora } = deps;
 
-  const arquivos = await db.query<{ caminho: string }>(
+  // Evidência que ainda estava disponível (chegou durante a anonimização, ou numa retomada) também
+  // é marcada como removida. As travas do banco impedem novos envios depois da anonimização.
+  await db.transacao(async (tx) => {
+    await tx.query(`select set_config('scoutvela.anonimizando', lower($1), true)`, [atletaId]);
+    await marcarEvidenciasRemovidas(tx, atletaId, agora());
+  });
+
+  const registradas = await db.query<{ caminho: string }>(
     `select caminho from evidencias_anexos
       where atleta_id = $1::uuid and removido_em is not null order by enviado_em, id`,
     [atletaId],
   );
-  let falhasEvidencia = 0;
-  let falhasFoto = 0;
-  for (const { caminho } of arquivos.rows) {
+  const contasDeLogin = await db.query<{ id: string; foto_caminho: string | null }>(
+    `select id::text as id, foto_caminho from usuarios where papel = 'atleta' and atleta_id = $1::uuid`,
+    [atletaId],
+  );
+
+  // Tudo o que existe no Storage sob os prefixos do atleta: o registro do banco pode não ter
+  // apontado para o arquivo (falha no rollback, troca de foto, envio que chegou tarde).
+  const prefixos = [
+    `${atletaId.toLowerCase()}/`,
+    ...contasDeLogin.rows.map((c) => `fotos/${c.id}/`),
+  ];
+  const alvos = new Set<string>(registradas.rows.map((r) => r.caminho));
+  for (const c of contasDeLogin.rows) if (c.foto_caminho) alvos.add(c.foto_caminho);
+  const falhas = new Set<string>();
+  let listagemFalhou = 0;
+  for (const prefixo of prefixos) {
+    try {
+      for (const caminho of await armazenamento.listar(prefixo)) alvos.add(caminho);
+    } catch (e) {
+      listagemFalhou++;
+      log.warn(
+        { evento: "anonimizacao_pendencia", tipo: "listagem", erro: nomeDoErro(e) },
+        "falha ao listar arquivos na anonimização",
+      );
+    }
+    const pend = await db.query<{ caminho: string }>(
+      `select caminho from arquivos_pendentes where left(caminho, length($1)) = $1`,
+      [prefixo],
+    );
+    for (const { caminho } of pend.rows) alvos.add(caminho);
+  }
+
+  for (const caminho of alvos) {
     try {
       await armazenamento.remover(caminho);
+      await db.query(`delete from arquivos_pendentes where caminho = $1`, [caminho]);
     } catch (e) {
-      falhasEvidencia++;
+      falhas.add(caminho);
       log.warn(
         { evento: "anonimizacao_pendencia", tipo: "arquivo", erro: nomeDoErro(e) },
         "falha ao remover arquivo na anonimização",
       );
     }
   }
-
   // A conta já está inativa: a foto não aparece mais e o caminho só sai do banco depois de removida.
-  const fotos = await db.query<{ id: string; foto_caminho: string }>(
-    `select id::text as id, foto_caminho from usuarios
-      where papel = 'atleta' and atleta_id = $1::uuid and foto_caminho is not null`,
-    [atletaId],
-  );
-  for (const { id, foto_caminho: caminho } of fotos.rows) {
-    try {
-      await armazenamento.remover(caminho);
-      await db.query(`update usuarios set foto_caminho = null where id = $1::uuid`, [id]);
-    } catch (e) {
-      falhasFoto++;
-      log.warn(
-        { evento: "anonimizacao_pendencia", tipo: "foto", erro: nomeDoErro(e) },
-        "falha ao remover foto na anonimização",
-      );
+  for (const c of contasDeLogin.rows) {
+    if (c.foto_caminho && !falhas.has(c.foto_caminho)) {
+      await db.query(`update usuarios set foto_caminho = null where id = $1::uuid`, [c.id]);
     }
   }
+  const falhasEvidencia = registradas.rows.filter((r) => falhas.has(r.caminho)).length;
+  const falhasArquivos = falhas.size + listagemFalhou;
 
   const contas = await db.query<{ auth_user_id: string }>(
     `select auth_user_id::text as auth_user_id from anonimizacoes_pendentes where atleta_id = $1::uuid`,
@@ -270,7 +369,7 @@ async function concluirPendencias(
   }
 
   return {
-    evidenciasRemovidas: arquivos.rows.length - falhasEvidencia,
-    pendencias: { arquivos: falhasEvidencia + falhasFoto, conta: contaPendente },
+    evidenciasRemovidas: registradas.rows.length - falhasEvidencia,
+    pendencias: { arquivos: falhasArquivos, conta: contaPendente },
   };
 }

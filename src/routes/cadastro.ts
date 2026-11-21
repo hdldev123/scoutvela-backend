@@ -5,6 +5,7 @@ import { exigirPapel } from "../auth/plugin.js";
 import { idadeEm } from "../domain/index.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { ContaJaExiste } from "../integracoes/supabase-admin.js";
+import { erroAtletaAnonimizado, recusarAtletaAnonimizado } from "../repositories/anonimizado.js";
 import { listarAtletasGestao } from "../repositories/atletas.js";
 import { buscarTermoVigente, termoSql } from "../repositories/termo.js";
 import { ArquivoRejeitado, importarCsv } from "../importacao/index.js";
@@ -265,7 +266,9 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
             ],
           );
           const id = ins.rows[0]!.id;
-          const detalhes = JSON.stringify({ velaid: codigo, classeId, versaoTermo: termo.versao });
+          // Sem o VelaID: o entidade_id já identifica o atleta, e a anonimização não pode deixar
+          // o código original na trilha de auditoria.
+          const detalhes = JSON.stringify({ classeId, versaoTermo: termo.versao });
           await tx.query(
             `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
              values ($1, 'cadastrar_atleta', 'atletas', $2, $3::jsonb), ($1, 'enviar_termo', 'atletas', $2, $3::jsonb)`,
@@ -489,7 +492,7 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
   r.post(
     "/atletas/:id/termo",
     {
-      preHandler: soGestor,
+      preHandler: [...soGestor, recusarAtletaAnonimizado(app)],
       schema: {
         tags: ["cadastro"],
         summary: "Registra o aceite do termo do piloto recebido do atleta",
@@ -516,8 +519,13 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         const vigente = await buscarTermoVigente(tx, agora);
         if (req.body.versao !== vigente.versao)
           throw requisicaoInvalida("A versão do termo não é a vigente.");
-        const a = await tx.query("select 1 from atletas where id = $1 and ativo for update", [id]);
+        const a = await tx.query<{ ativo: boolean; anonimizado_em: Date | null }>(
+          "select ativo, anonimizado_em from atletas where id = $1 for update",
+          [id],
+        );
         if (a.rows.length === 0) throw naoEncontrado("Atleta não encontrado.");
+        if (a.rows[0]!.anonimizado_em) throw erroAtletaAnonimizado();
+        if (!a.rows[0]!.ativo) throw naoEncontrado("Atleta não encontrado.");
         const aceito = await tx.query(
           `select 1 from consentimento_atual where atleta_id = $1 and tipo = 'termo_piloto' and concedido and versao_termo = $2`,
           [id, vigente.versao],

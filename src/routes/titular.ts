@@ -4,6 +4,7 @@ import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { conflito, esquemaErro, naoEncontrado } from "../erros.js";
+import { travarAtletaEditavel } from "../repositories/anonimizado.js";
 
 /**
  * Direitos do titular (LGPD, art. 18) para o atleta: exportar os próprios dados e
@@ -252,6 +253,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
       const atletaId = usuario.atletaId;
       const { tipo, descricao } = req.body;
       const id = await app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, atletaId);
         const r = await tx.query<{ id: string }>(
           `insert into pedidos_titular (atleta_id, tipo, descricao, criado_por, criado_em)
            values ($1::uuid, $2, $3, $4::uuid, $5) returning id::text as id`,
@@ -322,11 +324,11 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
       const usuario = req.usuario;
       const { id } = req.params;
       await app.db.transacao(async (tx) => {
-        const r = await tx.query(
+        const r = await tx.query<{ atleta_id: string }>(
           `update pedidos_titular
               set status = 'respondido', resposta = $2, respondido_por = $3::uuid, respondido_em = $4
             where id = $1::bigint and status = 'aberto'
-        returning id`,
+        returning atleta_id`,
           [id, req.body.resposta, usuario.id, app.agora()],
         );
         if (r.rows.length === 0) {
@@ -336,6 +338,8 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           if (existe.rows.length === 0) throw naoEncontrado("Pedido não encontrado.");
           throw conflito("Este pedido já foi respondido.");
         }
+        // Atleta anonimizado: nada mais é gravado (a resposta da exclusão já ficou na anonimização).
+        await travarAtletaEditavel(tx, r.rows[0]!.atleta_id);
         await auditar(tx, usuario.id, "responder_titular", "pedidos_titular", id, {});
       });
       const r = await app.db.query<LinhaPedido>(`${SQL_PEDIDO} where p.id = $1::bigint`, [id]);

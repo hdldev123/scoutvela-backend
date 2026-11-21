@@ -10,6 +10,7 @@ import {
   requisicaoInvalida,
   servicoIndisponivel,
 } from "../erros.js";
+import { erroAtletaAnonimizado } from "../repositories/anonimizado.js";
 import { ContaJaExiste } from "../integracoes/supabase-admin.js";
 
 const PAPEIS_CONVIDAVEIS = ["gestor", "treinador", "ibvar", "atleta"] as const;
@@ -173,10 +174,13 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
       const id = await app.db
         .transacao(async (tx) => {
           if (atletaId) {
-            const a = await tx.query("select 1 from atletas where id = $1 and ativo for update", [
-              atletaId,
-            ]);
+            const a = await tx.query<{ ativo: boolean; anonimizado_em: Date | null }>(
+              "select ativo, anonimizado_em from atletas where id = $1 for update",
+              [atletaId],
+            );
             if (a.rows.length === 0) throw naoEncontrado("Atleta não encontrado.");
+            if (a.rows[0]!.anonimizado_em) throw erroAtletaAnonimizado();
+            if (!a.rows[0]!.ativo) throw naoEncontrado("Atleta não encontrado.");
             const jaTem = await tx.query("select 1 from usuarios where atleta_id = $1", [atletaId]);
             if (jaTem.rows.length > 0) throw conflito("Este atleta já tem uma conta.");
           }
@@ -217,7 +221,7 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
         tags: ["usuarios"],
         summary: "Edita nome ou ativa/desativa uma conta",
         description:
-          "O gestor não desativa a própria conta. Conta inativa perde o acesso na próxima requisição.",
+          "O gestor não desativa a própria conta. Conta inativa perde o acesso na próxima requisição. Conta ligada a atleta anonimizado não pode ser alterada: 409.",
         security: seguranca,
         params: z.object({ id: z.uuid() }),
         body: z
@@ -234,6 +238,7 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
           401: esquemaErro,
           403: esquemaErro,
           404: esquemaErro,
+          409: esquemaErro,
         },
       },
     },
@@ -247,6 +252,13 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
         ...(ativo !== undefined ? ["ativo"] : []),
       ];
       await app.db.transacao(async (tx) => {
+        // Conta ligada a atleta anonimizado fica fechada: não reativa nem recebe nome de volta.
+        const vinculo = await tx.query(
+          `select 1 from usuarios u join atletas a on a.id = u.atleta_id
+            where u.id = $1 and a.anonimizado_em is not null for update of a`,
+          [id],
+        );
+        if (vinculo.rows.length > 0) throw erroAtletaAnonimizado();
         const u = await tx.query(
           "update usuarios set nome = coalesce($2, nome), ativo = coalesce($3, ativo) where id = $1 returning id",
           [id, nome ?? null, ativo ?? null],
@@ -325,7 +337,8 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ["usuarios"],
         summary: "Edita classe, treinador, número de vela ou situação do atleta",
-        description: "Valida classe ativa e treinador ativo. numeroVela vazio limpa o campo.",
+        description:
+          "Valida classe ativa e treinador ativo. numeroVela vazio limpa o campo. Atleta anonimizado não pode ser alterado nem reativado: 409.",
         security: seguranca,
         params: z.object({ id: z.uuid() }),
         body: z
@@ -350,6 +363,7 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
           401: esquemaErro,
           403: esquemaErro,
           404: esquemaErro,
+          409: esquemaErro,
         },
       },
     },
@@ -367,11 +381,12 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
         .filter(([, v]) => v !== undefined)
         .map(([k]) => k);
       return app.db.transacao(async (tx) => {
-        if (
-          (await tx.query("select 1 from atletas where id = $1 for update", [id])).rows.length === 0
-        ) {
-          throw naoEncontrado("Atleta não encontrado.");
-        }
+        const atual = await tx.query<{ anonimizado_em: Date | null }>(
+          "select anonimizado_em from atletas where id = $1 for update",
+          [id],
+        );
+        if (atual.rows.length === 0) throw naoEncontrado("Atleta não encontrado.");
+        if (atual.rows[0]!.anonimizado_em) throw erroAtletaAnonimizado();
         if (
           classeId !== undefined &&
           (await tx.query("select 1 from classes where id = $1 and ativa", [classeId])).rows

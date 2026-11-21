@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { anonimizarAtleta } from "../../src/servicos/anonimizacao.js";
+import { anonimizarAtleta, textoDaResposta } from "../../src/servicos/anonimizacao.js";
 import { criarAdminAuthFalso, type AdminAuthFalso } from "../apoio/app.js";
 import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
 import type { Piloto } from "../apoio/piloto.js";
@@ -197,9 +197,9 @@ describe("anonimização do atleta (LGPD)", () => {
       )
     ).rows[0]!;
     expect(ped.status).toBe("respondido");
-    expect(ped.resposta).toBe(
-      "Dados pessoais anonimizados em 06/11/2026. A série histórica de avaliações foi mantida sem identificação direta.",
-    );
+    expect(ped.resposta).toBe(textoDaResposta(AGORA()));
+    expect(ped.resposta).toMatch(/^Dados pessoais anonimizados em 06\/11\/2026\. Removidos: /);
+    expect(ped.resposta).toContain("Mantidos, sem identificação direta");
     expect(ped.respondido_por).toBe(await gestorId());
 
     // auditoria sem dado pessoal
@@ -330,8 +330,8 @@ describe("anonimização do atleta (LGPD)", () => {
   it("atleta já anonimizado com outro pedido: 409", async () => {
     const id = await p.idDe("RJ-T03");
     const primeiro = await criarPedido(id);
-    expect((await anonimizar(id, primeiro)).status).toBe(200);
     const segundo = await criarPedido(id);
+    expect((await anonimizar(id, primeiro)).status).toBe(200);
     expect((await anonimizar(id, segundo)).status).toBe(409);
   });
 

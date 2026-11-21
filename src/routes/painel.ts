@@ -4,6 +4,7 @@ import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
+import { travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
 import { buscarTermoVigente } from "../repositories/termo.js";
 import { lancamentoEhElegivel, listarLancamentosElegiveis } from "../repositories/revisoes.js";
@@ -333,6 +334,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       const agora = app.agora();
 
       await app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, usuario.atletaId!);
         const cicloId = await cicloAbertoId(tx);
         await tx.query(
           `insert into respostas_atleta (atleta_id, indicador_id, ciclo_id, resposta, respondido_em, respondido_por)
@@ -387,6 +389,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       const atletaId = usuario.atletaId;
       const { compartilharIbvar } = req.body;
       await app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, atletaId);
         await tx.query(
           `insert into consentimentos (atleta_id, tipo, concedido, registrado_em, registrado_por)
            values ($1::uuid, 'compartilhar_ibvar', $2, $3, $4::uuid)`,
@@ -461,6 +464,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       }
 
       const id = await app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, atletaId);
         const r = await tx.query<{ id: string }>(
           `insert into pedidos_revisao (atleta_id, pilar_id, indicador_id, motivo, criado_por, criado_em)
            values ($1::uuid, $2, $3, $4, $5::uuid, $6) returning id::text as id`,
@@ -621,6 +625,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           )
         ).rows[0];
         if (!pedido) throw naoEncontrado("Pedido de revisão não encontrado.");
+        await travarAtletaEditavel(tx, pedido.atleta_id);
         if (pedido.status !== "aberto")
           throw new ErroApi(409, "requisicao_invalida", "Este pedido já foi respondido.");
 

@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import { conflito, esquemaErro, requisicaoInvalida, semAcesso } from "../erros.js";
+import { erroAtletaAnonimizado } from "../repositories/anonimizado.js";
 import { buscarTermoVigente, listarTermos } from "../repositories/termo.js";
 
 const esquemaItemTermo = z.object({
@@ -76,7 +77,11 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
             "A versão do termo não é a vigente. Recarregue a página e leia o termo atual.",
           );
         }
-        await tx.query("select 1 from atletas where id = $1 for update", [atletaId]);
+        const atleta = await tx.query<{ anonimizado_em: Date | null }>(
+          "select anonimizado_em from atletas where id = $1 for update",
+          [atletaId],
+        );
+        if (atleta.rows[0]?.anonimizado_em) throw erroAtletaAnonimizado();
         const aceito = await tx.query(
           "select 1 from consentimento_atual where atleta_id = $1 and tipo = 'termo_piloto' and concedido and versao_termo = $2",
           [atletaId, vigente.versao],

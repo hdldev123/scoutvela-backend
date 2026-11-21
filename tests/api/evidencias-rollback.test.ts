@@ -108,10 +108,19 @@ describe("evidências: rollback do arquivo quando o banco falha", () => {
     expect(armazenamento.arquivos.size).toBe(1);
     const caminho = [...armazenamento.arquivos.keys()][0]!;
 
-    const orfa = logs.find((a) => (a[0] as { evento?: string })?.evento === "evidencia_orfa");
+    const orfa = logs.find((a) => (a[0] as { evento?: string })?.evento === "arquivo_pendente");
     expect(orfa).toBeDefined();
-    expect(orfa![0]).toEqual({ evento: "evidencia_orfa", erro: "Error" });
-    expect(orfa![1]).toBe("falha ao remover arquivo órfão");
+    expect(orfa![0]).toEqual({
+      evento: "arquivo_pendente",
+      motivo: "rollback_evidencia",
+      erro: "Error",
+    });
+    expect(orfa![1]).toBe("arquivo não saiu do Storage");
+    // O caminho fica registrado para a limpeza (e só ali, nunca no log).
+    const pendentes = await db.query<{ caminho: string; motivo: string }>(
+      "select caminho, motivo from arquivos_pendentes",
+    );
+    expect(pendentes.rows).toEqual([{ caminho, motivo: "rollback_evidencia" }]);
 
     const texto = JSON.stringify(logs);
     expect(texto).not.toContain(caminho);

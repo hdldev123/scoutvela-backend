@@ -10,7 +10,9 @@ import {
   requisicaoInvalida,
   servicoIndisponivel,
 } from "../erros.js";
+import { recusarAtletaAnonimizado, travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
+import { removerOuPendenciar } from "../servicos/arquivos-pendentes.js";
 import { TIPOS_ARQUIVO, decodificarArquivo, limparMetadados } from "../servicos/arquivo-base64.js";
 
 const TAMANHO_MAXIMO_BYTES = 5 * 1024 * 1024;
@@ -75,7 +77,7 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
     {
       // onRequest: limite por IP e sessão são conferidos ANTES de o corpo (até 8 MB) ser lido.
       onRequest: [limiteIp, app.autenticar],
-      preHandler: [exigirPapel("gestor", "treinador")],
+      preHandler: [exigirPapel("gestor", "treinador"), recusarAtletaAnonimizado(app)],
       bodyLimit: 8 * 1024 * 1024,
       // Limite por usuário no preHandler: roda depois de autenticar, então 401 não gasta a cota.
       config: {
@@ -109,6 +111,7 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
           201: esquemaAnexo,
           400: esquemaErro,
           ...respostasComuns,
+          409: esquemaErro,
           429: esquemaErro,
           503: esquemaErro,
         },
@@ -150,6 +153,9 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
       let anexo: LinhaAnexo;
       try {
         anexo = await app.db.transacao(async (tx) => {
+          // Trava o atleta (`for share`): uma anonimização em andamento termina antes, e o envio
+          // que chega depois dela é recusado com 409 (o arquivo já no Storage sai no rollback).
+          await travarAtletaEditavel(tx, base.id, { exigirAtivo: true });
           const r = await tx.query<LinhaAnexo>(
             `insert into evidencias_anexos
              (atleta_id, indicador_id, nome_arquivo, tipo_mime, tamanho_bytes, caminho, sha256, enviado_por, enviado_em)
@@ -187,20 +193,13 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
           return linha;
         });
       } catch (e) {
-        // O arquivo já está no Storage e o registro não saiu: não deixa arquivo órfão.
-        try {
-          await app.armazenamento.remover(caminho);
-        } catch (e2) {
-          // Sem caminho, nome de arquivo nem dados do atleta no log.
-          const falha = e2 as { code?: unknown; name?: string };
-          req.log.error(
-            {
-              evento: "evidencia_orfa",
-              erro: typeof falha.code === "string" ? falha.code : (falha.name ?? "Error"),
-            },
-            "falha ao remover arquivo órfão",
-          );
-        }
+        // O arquivo já está no Storage e o registro não saiu: não deixa arquivo órfão. Se a
+        // remoção falhar, o caminho vai para `arquivos_pendentes` (sem nome de arquivo nem dado do atleta).
+        await removerOuPendenciar(
+          { db: app.db, armazenamento: app.armazenamento, log: req.log, agora: app.agora },
+          caminho,
+          "rollback_evidencia",
+        );
         throw e;
       }
       return reply.code(201).send(paraAnexo(anexo));
