@@ -171,7 +171,7 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
         tags: ["ciclos"],
         summary: "Fecha o ciclo e congela o score e a faixa dos atletas do piloto",
         description:
-          "Calcula score e faixa de todos os atletas ativos com o termo do piloto aceito, grava em scores_ciclo e marca o ciclo como fechado, numa transação. Alimenta o histórico de score da ficha.",
+          "Calcula score e faixa de todos os atletas ativos com o termo do piloto aceito, grava em scores_ciclo e marca o ciclo como fechado, numa transação. Alimenta o histórico de score da ficha. Se nenhum atleta tiver o termo aceito mas houver atletas ativos, recusa com 409 (nada a congelar).",
         security: seguranca,
         params,
         response: {
@@ -196,6 +196,19 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
           agora,
         });
         const avaliados = await carregarEAvaliarAtletas(tx, parametros, atletas, agora);
+        if (avaliados.length === 0) {
+          // Nenhum atleta com o termo em dia: fechar congelaria um ciclo vazio. Só vale fechar
+          // vazio se o piloto também não tem atletas ativos.
+          const ativos = await tx.query<{ n: string }>(
+            `select count(*)::text as n from atletas where ativo`,
+          );
+          const n = Number(ativos.rows[0]?.n ?? 0);
+          if (n > 0) {
+            throw conflito(
+              `Nenhum atleta ativo tem o termo do piloto aceito, então não há score para congelar (${n} ${n === 1 ? "atleta ativo" : "atletas ativos"}). Confira os aceites do termo (e a regra TERMO_EXIGE_REACEITE) antes de fechar o ciclo.`,
+            );
+          }
+        }
         for (const x of avaliados) {
           await tx.query(
             `insert into scores_ciclo (atleta_id, ciclo_id, score, faixa_id, calculado_em) values ($1, $2, $3, $4, $5)`,

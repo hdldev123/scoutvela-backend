@@ -6,7 +6,7 @@ import type { Db } from "../db/db.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
-import { buscarTermoVigente } from "../repositories/termo.js";
+import { buscarTermoProximo, buscarTermoVigente, termoSql } from "../repositories/termo.js";
 import { lancamentoEhElegivel, listarLancamentosElegiveis } from "../repositories/revisoes.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
@@ -18,7 +18,11 @@ const esquemaConsentimento = z.object({
   termoAceitoEm: z.string().nullable().describe("Instante ISO do aceite do termo do piloto"),
   termoVersao: z.string().nullable().describe("Última versão do termo aceita"),
   termoVigenteVersao: z.string().describe("Versão do termo vigente hoje"),
-  termoPendente: z.boolean().describe("true quando o atleta ainda não aceitou a versão vigente"),
+  termoPendente: z
+    .boolean()
+    .describe(
+      "true quando o atleta ainda não aceitou a versão vigente (nem uma mais nova, por aceite antecipado)",
+    ),
   compartilharIbvar: z.boolean(),
   atualizadoEm: z.string().nullable().describe("Instante ISO da última decisão sobre o IBVAR"),
 });
@@ -56,6 +60,16 @@ const esquemaPainel = z.object({
   ),
   pendencias: z.array(z.string()).describe("nomeCurto dos pilares com resposta faltando"),
   consentimento: esquemaConsentimento,
+  termoProxima: z
+    .object({
+      versao: z.string(),
+      titulo: z.string(),
+      vigenteDesde: z.string().describe("Instante ISO em que passa a valer"),
+    })
+    .nullable()
+    .describe(
+      "Próxima versão do termo, já publicada e ainda sem vigência, que o atleta não aceitou. O texto vem em GET /termo/proxima e o aceite antecipado em POST /termo/aceite. Nulo se não houver ou se já foi aceita.",
+    ),
 });
 
 const esquemaRevisao = z.object({
@@ -100,6 +114,10 @@ async function cicloAbertoId(db: Db): Promise<string | null> {
 
 async function lerConsentimento(db: Db, atletaId: string, agora: Date) {
   const vigente = await buscarTermoVigente(db, agora);
+  const aceitoVigente = await db.query<{ ok: boolean }>(
+    `select ${termoSql.aceitoVigente("$1::uuid", "$2")} as ok`,
+    [atletaId, agora],
+  );
   const r = await db.query<{
     tipo: string;
     concedido: boolean;
@@ -115,10 +133,23 @@ async function lerConsentimento(db: Db, atletaId: string, agora: Date) {
     termoAceitoEm: termo?.concedido ? iso(termo.registrado_em) : null,
     termoVersao: termo?.concedido ? termo.versao_termo : null,
     termoVigenteVersao: vigente.versao,
-    termoPendente: !(termo?.concedido && termo.versao_termo === vigente.versao),
+    // Aceite antecipado de uma versão mais nova também vale para a vigente.
+    termoPendente: !aceitoVigente.rows[0]?.ok,
     compartilharIbvar: ibvar?.concedido ?? false,
     atualizadoEm: ibvar ? iso(ibvar.registrado_em) : null,
   };
+}
+
+/** Próxima versão publicada que o atleta ainda não aceitou (nem ela nem uma mais nova). */
+async function termoProximaPendente(db: Db, atletaId: string, agora: Date) {
+  const proxima = await buscarTermoProximo(db, agora);
+  if (!proxima) return null;
+  const r = await db.query<{ ok: boolean }>(
+    `select ${termoSql.aceitoVersao("$1::uuid", "$2")} as ok`,
+    [atletaId, proxima.versao],
+  );
+  if (r.rows[0]?.ok) return null;
+  return { versao: proxima.versao, titulo: proxima.titulo, vigenteDesde: proxima.vigenteDesde };
 }
 
 interface LinhaRevisao {
@@ -281,6 +312,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           .filter((m) => m.respostasFeitas < m.respostasTotal)
           .map((m) => m.nomeCurto),
         consentimento,
+        termoProxima: await termoProximaPendente(app.db, base.id, app.agora()),
       };
     },
   );

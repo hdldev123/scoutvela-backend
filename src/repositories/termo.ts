@@ -18,6 +18,8 @@ export const termoSql = {
   /** Aceitou a versão vigente. */
   aceitoVigente: (atleta: string, agora: string) =>
     `termo_aceito_vigente(${atleta}, ${agora}::timestamptz)`,
+  /** Aceitou a versão informada ou uma mais nova (aceite antecipado), sem revogação depois. */
+  aceitoVersao: (atleta: string, versao: string) => `termo_aceito_versao(${atleta}, ${versao})`,
   /** Aceitou alguma versão. */
   aceitoAlguma: (atleta: string) => `termo_aceito_alguma(${atleta})`,
   /** Vale para o piloto (ranking, listas, lembretes): segue TERMO_EXIGE_REACEITE. */
@@ -41,6 +43,42 @@ export async function buscarTermoVigente(db: Db, agora: Date): Promise<TermoVige
     texto: l.texto,
     vigenteDesde: new Date(l.vigente_desde).toISOString(),
   };
+}
+
+/**
+ * Próxima versão publicada que ainda não começou a valer: a de menor vigente_desde no futuro.
+ * Nula se não houver versão futura.
+ */
+export async function buscarTermoProximo(db: Db, agora: Date): Promise<TermoVigente | null> {
+  const r = await db.query<{ versao: string; titulo: string; texto: string; vigente_desde: Date }>(
+    `select versao, titulo, texto, vigente_desde from termos_consentimento
+      where vigente_desde > $1::timestamptz
+      order by vigente_desde asc, criado_em asc limit 1`,
+    [agora],
+  );
+  const l = r.rows[0];
+  if (!l) return null;
+  return {
+    versao: l.versao,
+    titulo: l.titulo,
+    texto: l.texto,
+    vigenteDesde: new Date(l.vigente_desde).toISOString(),
+  };
+}
+
+/**
+ * Versões que o atleta pode aceitar agora: a vigente ou a próxima publicada (aceite antecipado).
+ * Devolve a versão pedida, ou nulo se não for nenhuma das duas.
+ */
+export async function termoAceitavel(
+  db: Db,
+  agora: Date,
+  versao: string,
+): Promise<TermoVigente | null> {
+  const vigente = await buscarTermoVigente(db, agora);
+  if (versao === vigente.versao) return vigente;
+  const proxima = await buscarTermoProximo(db, agora);
+  return proxima && versao === proxima.versao ? proxima : null;
 }
 
 export interface ItemTermo {

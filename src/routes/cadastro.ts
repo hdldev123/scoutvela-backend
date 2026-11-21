@@ -7,7 +7,7 @@ import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { ContaJaExiste } from "../integracoes/supabase-admin.js";
 import { erroAtletaAnonimizado, recusarAtletaAnonimizado } from "../repositories/anonimizado.js";
 import { listarAtletasGestao } from "../repositories/atletas.js";
-import { buscarTermoVigente, termoSql } from "../repositories/termo.js";
+import { buscarTermoVigente, termoAceitavel, termoSql } from "../repositories/termo.js";
 import { ArquivoRejeitado, importarCsv } from "../importacao/index.js";
 
 const IDADE_MINIMA_PILOTO = 18;
@@ -497,7 +497,7 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         tags: ["cadastro"],
         summary: "Registra o aceite do termo do piloto recebido do atleta",
         description:
-          "Não concede o compartilhamento com o IBVAR: essa decisão é do atleta (consentimento explícito). Depois do aceite o atleta entra no ranking.",
+          "Aceita a versão vigente ou a próxima publicada (aceite antecipado, como em POST /termo/aceite). Não concede o compartilhamento com o IBVAR: essa decisão é do atleta (consentimento explícito). Depois do aceite o atleta entra no ranking.",
         security: seguranca,
         params: z.object({ id: z.uuid() }),
         body: z.object({ versao: z.string().min(1).max(100) }),
@@ -516,9 +516,9 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       const usuarioId = req.usuario.id;
       await app.db.transacao(async (tx) => {
         const agora = app.agora();
-        const vigente = await buscarTermoVigente(tx, agora);
-        if (req.body.versao !== vigente.versao)
-          throw requisicaoInvalida("A versão do termo não é a vigente.");
+        const alvo = await termoAceitavel(tx, agora, req.body.versao);
+        if (!alvo)
+          throw requisicaoInvalida("A versão do termo não é a vigente nem a próxima publicada.");
         const a = await tx.query<{ ativo: boolean; anonimizado_em: Date | null }>(
           "select ativo, anonimizado_em from atletas where id = $1 for update",
           [id],
@@ -526,16 +526,16 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         if (a.rows.length === 0) throw naoEncontrado("Atleta não encontrado.");
         if (a.rows[0]!.anonimizado_em) throw erroAtletaAnonimizado();
         if (!a.rows[0]!.ativo) throw naoEncontrado("Atleta não encontrado.");
-        const aceito = await tx.query(
-          `select 1 from consentimento_atual where atleta_id = $1 and tipo = 'termo_piloto' and concedido and versao_termo = $2`,
-          [id, vigente.versao],
+        const aceito = await tx.query<{ ok: boolean }>(
+          `select ${termoSql.aceitoVersao("$1::uuid", "$2")} as ok`,
+          [id, alvo.versao],
         );
-        if (aceito.rows.length > 0)
+        if (aceito.rows[0]?.ok)
           throw conflito("Esta versão do termo já foi aceita por este atleta.");
         await tx.query(
           `insert into consentimentos (atleta_id, tipo, concedido, versao_termo, registrado_em, registrado_por)
            values ($1, 'termo_piloto', true, $2, $3, $4)`,
-          [id, req.body.versao, agora, usuarioId],
+          [id, alvo.versao, agora, usuarioId],
         );
         await tx.query(
           `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
