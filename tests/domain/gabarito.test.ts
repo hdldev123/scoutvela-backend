@@ -86,7 +86,8 @@ describe("gabarito do protótipo", () => {
       );
       expect(r.gates.map((g) => g.motivo)).toEqual(a.gates.map((g) => corrigir(g.motivo)));
       expect(r.statusFinal).toBe(STATUS_FINAL[a.statusFinal] ?? a.statusFinal);
-      expect(r.pontosCbvela).toBeCloseTo(a.pontosCbvela, 9);
+      // O protótipo somava floats sem arredondar; aqui a soma sai com 2 casas, como no banco.
+      expect(r.pontosCbvela).toBe(Math.round(a.pontosCbvela * 100) / 100);
       expect(r.notas.cf_peso_kg).toBe(a.notas.cf_peso_kg);
     });
   }
