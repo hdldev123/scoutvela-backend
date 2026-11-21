@@ -155,7 +155,7 @@ tests/           domínio, paridade com o protótipo, permissões, rotas, banco
 - **Série histórica:** notas, medidas, gates, consentimentos e financeiro só aceitam `INSERT`, com trigger no banco. O valor atual é o último lançamento. A única exceção é a anonimização (abaixo), que troca texto livre pelo marcador `[removido na anonimização]` dentro da própria transação.
 - **Matriz de acesso no SQL:** treinador só vê os próprios atletas; atleta só a si; IBVAR só quem consentiu, sem detalhe sensível, sem contato e só com o perfil de suporte. Quem não consentiu entra só nos agregados.
 - **Nota sugerida pela resposta do atleta** não conta no score até o treinador confirmar.
-- **Nota sugerida pelo Ranking CBVela:** com a regra `PERF_PONTOS` ativa (`{ ativa, faixas: [{ ate, nota }] }`; cada faixa vale até `ate` pontos e, acima da última, vale a nota dela), o indicador `perf_nacional` da ficha (`GET /atletas/:id`) e a prévia (`POST /atletas/:id/avaliacoes/previa`) trazem `sugestaoPontos: { nota, pontos }`. Não entra no score: o treinador confirma lançando a nota. Vem desligada (migration 0012) até a CBVela passar a tabela de conversão.
+- **Nota sugerida pelo Ranking CBVela:** com a regra `PERF_PONTOS` ativa (`{ ativa, indicador?, faixas: [{ ate, nota }] }`; `indicador` é o id do indicador T não calculado que recebe a sugestão e, sem o campo, vale `perf_nacional`; cada faixa vale até `ate` pontos e, acima da última, vale a nota dela), o indicador `perf_nacional` da ficha (`GET /atletas/:id`) e a prévia (`POST /atletas/:id/avaliacoes/previa`) trazem `sugestaoPontos: { nota, pontos }`. Não entra no score: o treinador confirma lançando a nota. Vem desligada (migration 0012) até a CBVela passar a tabela de conversão.
 - **Histórico do indicador:** `GET /atletas/:id/indicadores/:indicadorId/historico` lista os lançamentos do mais novo para o mais antigo (valor, evidência, origem, avaliador, ciclo, data e anexo), com a sugestão pendente do atleta marcada (`pendente: true`). `cf_peso_kg` traz as pesagens de `medidas_corporais`. Segue a matriz da ficha; para o IBVAR, pilar sensível dá 403 e os demais vêm sem evidência, avaliador, anexo nem sugestão.
 - **Lista de gestão:** `GET /atletas` (só o gestor) traz todos os atletas, inclusive inativos e sem termo aceito, com classe, treinador, número de vela, situação, termo e conta vinculada, sem dado sensível nem e-mail. Filtros: `ativo`, `termoAceito`, `classeId`, `treinadorId` e `busca` (nome ou VelaID).
 - **Ciclos:** só um aberto por vez. Ao fechar, a API calcula e congela em `scores_ciclo` o score e a faixa de todos os atletas ativos com termo aceito, numa transação. Ciclo fechado não muda.
@@ -190,6 +190,16 @@ tests/           domínio, paridade com o protótipo, permissões, rotas, banco
 - **CSRF:** não se aplica. O token vai no header `Authorization`, não em cookie.
 - **Dependências:** CI com typecheck, lint, formatação, testes, build, contrato OpenAPI e `npm audit --omit=dev`. Dependabot semanal.
 - **LGPD:** não guarda CPF, documento, endereço completo nem renda; a importação de CSV recusa essas colunas. O consentimento é registrado com histórico, e o atleta pode pedir revisão de nota (art. 20). O gestor responde em `PUT /revisoes/:id`, podendo ligar a resposta ao lançamento que a atendeu (`avaliacaoId`); `GET /revisoes` mostra `notaAnterior` e `notaNova`, e o atleta recebe um e-mail só com o aviso e o link.
+
+## Pendências que dependem da CBVela ou do controlador dos dados
+
+- **Regra de pendência do atleta:** hoje conta as perguntas do questionário nunca respondidas, sem olhar o ciclo (`repositories/pendencias.ts`). A CBVela precisa dizer se a pendência é por ciclo (resposta a cada rodada) ou não.
+- **`cf_altura_cm`:** o indicador ainda pontua no Class Fit, embora já exista a faixa de altura da classe (só informativa). A CBVela decide se a altura passa a ser só informativa e o indicador sai do score.
+- **Faixas de altura:** os valores reais por classe e função estão em branco; precisam vir da CBVela (`alturaMinCm`, `alturaMediaCm`, `alturaMaxCm` em `PUT /parametros`).
+- **Tabela de conversão de pontos (`PERF_PONTOS`):** a regra está desligada e sem faixas até a CBVela passar a conversão de pontos do Ranking CBVela em nota de 0 a 5.
+- **Controlador dos dados:** CBVela ou IBVAR, a definir. Quem for precisa validar o que a anonimização apaga e o que mantém (série histórica sem texto livre, data de nascimento generalizada, regata sem link, auditoria sem nome nem VelaID).
+- **Revogação do termo:** hoje só acontece na anonimização. Falta definir se o atleta pode revogar sem ser anonimizado (e o que acontece com o histórico).
+- **Confirmação de e-mail no Supabase:** ligar "Confirm email" no projeto de homologação e de produção. O vínculo de conta por e-mail só vale com o e-mail confirmado no token.
 
 ## Deploy (Render)
 
