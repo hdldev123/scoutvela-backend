@@ -207,7 +207,7 @@ export async function rotasParametros(app: FastifyInstance): Promise<void> {
     },
     async (req) => {
       try {
-        await atualizarParametros(app.db, req.usuario.id, req.body);
+        await atualizarParametros(app.db, req.usuario.id, req.body, app.agora());
       } catch (e) {
         if (e instanceof ErroParametros) throw new ErroApi(400, "requisicao_invalida", e.message);
         throw e;

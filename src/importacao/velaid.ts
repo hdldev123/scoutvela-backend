@@ -81,6 +81,7 @@ export async function importarVelaId(
   cabecalho: string[],
   linhas: string[][],
   hoje: string,
+  agora: Date,
 ): Promise<ResultadoLinhas> {
   const erros: ErroLinha[] = [];
   let linhasOk = 0;
@@ -93,12 +94,23 @@ export async function importarVelaId(
     }
     await tx.query(
       `insert into velaid_registros (codigo, nome, genero, data_nascimento, clube, cidade, uf, ws_id, email, fonte, atualizado_em)
-       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'csv', now())
+       values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'csv', $10)
        on conflict (codigo) do update set
          nome = excluded.nome, genero = excluded.genero, data_nascimento = excluded.data_nascimento,
          clube = excluded.clube, cidade = excluded.cidade, uf = excluded.uf, ws_id = excluded.ws_id,
-         email = excluded.email, fonte = 'csv', atualizado_em = now()`,
-      [r.codigo, r.nome, r.genero, r.dataNascimento, r.clube, r.cidade, r.uf, r.wsId, r.email],
+         email = excluded.email, fonte = 'csv', atualizado_em = excluded.atualizado_em`,
+      [
+        r.codigo,
+        r.nome,
+        r.genero,
+        r.dataNascimento,
+        r.clube,
+        r.cidade,
+        r.uf,
+        r.wsId,
+        r.email,
+        agora,
+      ],
     );
     linhasOk++;
   }

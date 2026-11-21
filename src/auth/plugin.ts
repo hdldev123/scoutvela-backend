@@ -78,7 +78,7 @@ export function registrarAutenticacao(
     let u = await buscarUsuarioPorAuthId(app.db, sub);
     if (!u && email) {
       // Primeiro login de uma conta convidada: amarra o login ao cadastro pelo e-mail do token.
-      u = await vincularContaPorEmail(app.db, sub, email);
+      u = await vincularContaPorEmail(app.db, sub, email, app.agora());
       if (u)
         req.log.info(
           { evento: "conta_vinculada", usuarioId: u.id, papel: u.papel },

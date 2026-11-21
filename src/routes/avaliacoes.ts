@@ -120,6 +120,22 @@ function validarNotas(parametros: Parametros, corpo: Corpo): void {
   }
 }
 
+const umaCasa = (v: number) => Math.round(v * 10) / 10;
+
+/** Peso e altura são `numeric(5,1)` no banco: a prévia e a gravação usam o valor já com 1 casa. */
+function arredondarMedida(corpo: Corpo): Corpo {
+  const m = corpo.medida;
+  if (!m) return corpo;
+  return {
+    ...corpo,
+    medida: {
+      ...m,
+      ...(m.pesoKg !== undefined ? { pesoKg: umaCasa(m.pesoKg) } : {}),
+      ...(m.alturaCm !== undefined ? { alturaCm: umaCasa(m.alturaCm) } : {}),
+    },
+  };
+}
+
 /** Dados do atleta como ficariam depois do lançamento (sem gravar). */
 function aplicarProposta(dados: DadosAtleta, corpo: Corpo, agora: Date): DadosAtleta {
   const notas = new Map(dados.notas.map((n) => [n.indicadorId, n]));
@@ -216,13 +232,14 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
       const base = await buscarAtletaVisivel(app.db, req.usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
-      validarNotas(parametros, req.body);
+      const corpo = arredondarMedida(req.body);
+      validarNotas(parametros, corpo);
 
       const antes = await avaliarUm(app.db, parametros, base, referencia);
       const [depois] = avaliarAtletas(
         parametros,
         [base],
-        new Map([[base.id, aplicarProposta(antes.dados, req.body, referencia)]]),
+        new Map([[base.id, aplicarProposta(antes.dados, corpo, referencia)]]),
         referencia,
       );
       if (!depois) throw naoEncontrado("Atleta não encontrado.");
@@ -269,7 +286,8 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
     },
     async (req, reply) => {
       const referencia = app.agora();
-      const { usuario, body } = req;
+      const { usuario } = req;
+      const body = arredondarMedida(req.body);
       const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);

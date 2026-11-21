@@ -82,6 +82,7 @@ const esquemaExportacao = z.object({
 
 async function auditar(
   db: Db,
+  em: Date,
   usuarioId: string,
   acao: string,
   entidade: string,
@@ -89,8 +90,8 @@ async function auditar(
   detalhes: Record<string, unknown>,
 ): Promise<void> {
   await db.query(
-    `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes) values ($1, $2, $3, $4, $5::jsonb)`,
-    [usuarioId, acao, entidade, entidadeId, JSON.stringify(detalhes)],
+    `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em) values ($1, $2, $3, $4, $5::jsonb, $6)`,
+    [usuarioId, acao, entidade, entidadeId, JSON.stringify(detalhes), em],
   );
 }
 
@@ -308,7 +309,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           .map((c) => ({ nome: c.nome, autonomia: c.autonomia, apoioCbvela: c.apoio_cbvela })),
       }));
 
-      await auditar(app.db, usuario.id, "exportar_dados", "atletas", id, {});
+      await auditar(app.db, app.agora(), usuario.id, "exportar_dados", "atletas", id, {});
       reply.header("Content-Disposition", 'attachment; filename="meus-dados-scout-vela.json"');
       return {
         geradoEm: app.agora().toISOString(),
@@ -375,7 +376,9 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           [atletaId, tipo, descricao, usuario.id, app.agora()],
         );
         const novo = r.rows[0]!.id;
-        await auditar(tx, usuario.id, "pedir_titular", "pedidos_titular", novo, { tipo });
+        await auditar(tx, app.agora(), usuario.id, "pedir_titular", "pedidos_titular", novo, {
+          tipo,
+        });
         return novo;
       });
       return reply.code(201).send({ id, status: "aberto" as const });
@@ -484,6 +487,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         await travarAtletaEditavel(tx, r.rows[0]!.atleta_id);
         await auditar(
           tx,
+          app.agora(),
           usuario.id,
           recusar ? "recusar_exclusao" : "responder_titular",
           "pedidos_titular",

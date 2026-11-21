@@ -129,9 +129,9 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
           [atletaId, alvo.versao, agora, usuarioId],
         );
         await tx.query(
-          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-           values ($1, 'aceitar_termo', 'atletas', $2, $3::jsonb)`,
-          [usuarioId, atletaId, JSON.stringify({ versaoTermo: alvo.versao })],
+          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+           values ($1, 'aceitar_termo', 'atletas', $2, $3::jsonb, $4)`,
+          [usuarioId, atletaId, JSON.stringify({ versaoTermo: alvo.versao }), agora],
         );
       });
       return { ok: true as const };
@@ -218,9 +218,13 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
           [versao, titulo, texto, vigenteDesde, agora],
         );
         await tx.query(
-          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-           values ($1, 'publicar_termo', 'termos_consentimento', null, $2::jsonb)`,
-          [req.usuario.id, JSON.stringify({ versao, vigenteDesde: vigenteDesde.toISOString() })],
+          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+           values ($1, 'publicar_termo', 'termos_consentimento', null, $2::jsonb, $3)`,
+          [
+            req.usuario.id,
+            JSON.stringify({ versao, vigenteDesde: vigenteDesde.toISOString() }),
+            agora,
+          ],
         );
       });
       const item = (await listarTermos(app.db, agora)).find((t) => t.versao === versao);
