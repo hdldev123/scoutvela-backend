@@ -901,7 +901,9 @@ paths:
       summary: Remove a foto de perfil
       tags:
         - sessao
-      description: "Idempotente: sem foto, também responde 204."
+      description: "Idempotente: sem foto, também responde 204. O arquivo sai do
+        Storage antes de o caminho sair do banco: se o Storage falhar, responde
+        503 e a foto continua (tente de novo)."
       security:
         - bearerAuth: []
       responses:
@@ -941,6 +943,31 @@ paths:
                   - mensagem
                 additionalProperties: false
         "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "503":
           description: Default Response
           content:
             application/json:
@@ -1240,8 +1267,9 @@ paths:
       tags:
         - atletas
       description: "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo
-        404. IBVAR: sem indicadores sensíveis, Class Fit, contato e financeiro
-        detalhado."
+        404. IBVAR: sem indicadores sensíveis, Class Fit, contato, financeiro
+        detalhado nem texto de evidência; o motivo do gate G1 vem genérico, sem
+        a diferença em kg."
       parameters:
         - schema:
             type: string
@@ -1960,7 +1988,8 @@ paths:
       summary: Edita classe, treinador, número de vela ou situação do atleta
       tags:
         - usuarios
-      description: Valida classe ativa e treinador ativo. numeroVela vazio limpa o campo.
+      description: "Valida classe ativa e treinador ativo. numeroVela vazio limpa o
+        campo. Atleta anonimizado não pode ser alterado nem reativado: 409."
       requestBody:
         required: true
         content:
@@ -2094,6 +2123,31 @@ paths:
                   - mensagem
                 additionalProperties: false
         "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
           description: Default Response
           content:
             application/json:
@@ -2837,6 +2891,31 @@ paths:
                   - erro
                   - mensagem
                 additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
   /atletas/{id}/gates:
     put:
       summary: Decisão do gestor sobre um gate (nulo ou igual à sugestão volta ao
@@ -3007,6 +3086,31 @@ paths:
                   - mensagem
                 additionalProperties: false
         "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
           description: Default Response
           content:
             application/json:
@@ -3774,9 +3878,10 @@ paths:
       summary: Registra o aceite do termo do piloto recebido do atleta
       tags:
         - cadastro
-      description: "Não concede o compartilhamento com o IBVAR: essa decisão é do
-        atleta (consentimento explícito). Depois do aceite o atleta entra no
-        ranking."
+      description: "Aceita a versão vigente ou a próxima publicada (aceite antecipado,
+        como em POST /termo/aceite). Não concede o compartilhamento com o IBVAR:
+        essa decisão é do atleta (consentimento explícito). Depois do aceite o
+        atleta entra no ranking."
       requestBody:
         required: true
         content:
@@ -4261,7 +4366,8 @@ paths:
                         description: Versão do termo vigente hoje
                       termoPendente:
                         type: boolean
-                        description: true quando o atleta ainda não aceitou a versão vigente
+                        description: true quando o atleta ainda não aceitou a versão vigente (nem uma
+                          mais nova, por aceite antecipado)
                       compartilharIbvar:
                         type: boolean
                       atualizadoEm:
@@ -4276,6 +4382,26 @@ paths:
                       - compartilharIbvar
                       - atualizadoEm
                     additionalProperties: false
+                  termoProxima:
+                    nullable: true
+                    description: Próxima versão do termo, já publicada e ainda sem vigência, que o
+                      atleta não aceitou. O texto vem em GET /termo/proxima e o
+                      aceite antecipado em POST /termo/aceite. Nulo se não
+                      houver ou se já foi aceita.
+                    type: object
+                    properties:
+                      versao:
+                        type: string
+                      titulo:
+                        type: string
+                      vigenteDesde:
+                        type: string
+                        description: Instante ISO em que passa a valer
+                    required:
+                      - versao
+                      - titulo
+                      - vigenteDesde
+                    additionalProperties: false
                 required:
                   - atleta
                   - ciclo
@@ -4285,6 +4411,7 @@ paths:
                   - modulos
                   - pendencias
                   - consentimento
+                  - termoProxima
                 additionalProperties: false
         "401":
           description: Default Response
@@ -4548,7 +4675,8 @@ paths:
                     description: Versão do termo vigente hoje
                   termoPendente:
                     type: boolean
-                    description: true quando o atleta ainda não aceitou a versão vigente
+                    description: true quando o atleta ainda não aceitou a versão vigente (nem uma
+                      mais nova, por aceite antecipado)
                   compartilharIbvar:
                     type: boolean
                   atualizadoEm:
@@ -6775,7 +6903,9 @@ paths:
         - ciclos
       description: Calcula score e faixa de todos os atletas ativos com o termo do
         piloto aceito, grava em scores_ciclo e marca o ciclo como fechado, numa
-        transação. Alimenta o histórico de score da ficha.
+        transação. Alimenta o histórico de score da ficha. Se nenhum atleta
+        tiver o termo aceito mas houver atletas ativos, recusa com 409 (nada a
+        congelar).
       parameters:
         - schema:
             type: string
@@ -7396,6 +7526,31 @@ paths:
                   - mensagem
                 additionalProperties: false
         "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
           description: Default Response
           content:
             application/json:
@@ -8298,11 +8453,14 @@ paths:
       summary: Responde um pedido do titular
       tags:
         - titular
-      description: "Registra a resposta e fecha o pedido. A exclusão de dados NÃO é
-        feita por esta rota: para pedido de exclusão use `POST
-        /atletas/{id}/anonimizar`, que anonimiza o atleta e responde o pedido (a
-        série histórica, que só aceita inserção, é mantida sem identificação
-        direta). Pedido já respondido devolve 409 (código requisicao_invalida)."
+      description: "Registra a resposta e fecha o pedido. Pedido de exclusão NÃO é
+        fechado por aqui: devolve 409 apontando para `POST
+        /atletas/{id}/anonimizar`, que anonimiza o atleta e responde o pedido.
+        Única exceção: a recusa formal, `{ resposta, recusar: true }`, com
+        justificativa de ao menos 20 caracteres; fecha o pedido sem anonimizar e
+        fica na auditoria como `recusar_exclusao`. `recusar` só vale para pedido
+        de exclusão (400 nos demais). Pedido já respondido devolve 409 (código
+        requisicao_invalida)."
       requestBody:
         required: true
         content:
@@ -8314,6 +8472,11 @@ paths:
                   type: string
                   minLength: 3
                   maxLength: 2000
+                recusar:
+                  description: "Só para pedido de exclusão: recusa formal, com justificativa de ao
+                    menos 20 caracteres. Sem isto, o pedido de exclusão é
+                    atendido pela anonimização."
+                  type: boolean
               required:
                 - resposta
       parameters:
@@ -8943,6 +9106,31 @@ paths:
                   - erro
                   - mensagem
                 additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
   /atletas/{id}/evidencias:
     post:
       summary: Anexa uma evidência (PDF, JPEG ou PNG de até 5 MB) ao atleta
@@ -9108,6 +9296,31 @@ paths:
                   - mensagem
                 additionalProperties: false
         "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
           description: Default Response
           content:
             application/json:
@@ -9826,8 +10039,9 @@ paths:
       summary: Edita nome ou ativa/desativa uma conta
       tags:
         - usuarios
-      description: O gestor não desativa a própria conta. Conta inativa perde o acesso
-        na próxima requisição.
+      description: "O gestor não desativa a própria conta. Conta inativa perde o
+        acesso na próxima requisição. Conta ligada a atleta anonimizado não pode
+        ser alterada: 409."
       requestBody:
         required: true
         content:
@@ -9979,6 +10193,31 @@ paths:
                   - mensagem
                 additionalProperties: false
         "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
           description: Default Response
           content:
             application/json:
@@ -10190,7 +10429,8 @@ paths:
       tags:
         - termo
       description: Texto da versão vigente (a de maior vigente_desde que já começou).
-        Qualquer usuário autenticado lê.
+        Qualquer usuário autenticado lê. A próxima versão publicada, ainda sem
+        vigência, vem em GET /termo/proxima.
       security: &a8
         - bearerAuth: []
       responses:
@@ -10266,14 +10506,124 @@ paths:
                   - erro
                   - mensagem
                 additionalProperties: false
-  /termo/aceite:
-    post:
-      summary: O atleta aceita o termo vigente
+  /termo/proxima:
+    get:
+      summary: Próxima versão do termo, já publicada e ainda sem vigência
       tags:
         - termo
-      description: A versão enviada precisa ser a vigente. Não concede o
+      description: A de menor vigente_desde no futuro, com o texto, para o atleta ler
+        e aceitar antes de ela valer (POST /termo/aceite). Só atleta e gestor.
+        404 quando não há versão futura publicada.
+      security: *a8
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  versao:
+                    type: string
+                  titulo:
+                    type: string
+                  texto:
+                    type: string
+                  vigenteDesde:
+                    type: string
+                    description: Instante ISO em que passa a valer
+                required:
+                  - versao
+                  - titulo
+                  - texto
+                  - vigenteDesde
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /termo/aceite:
+    post:
+      summary: O atleta aceita o termo vigente ou a próxima versão publicada
+      tags:
+        - termo
+      description: "A versão enviada precisa ser a vigente ou a próxima publicada
+        (aceite antecipado: com TERMO_EXIGE_REACEITE ligada, quem aceitou a
+        próxima versão não sai do ranking quando ela entra em vigor). Aceitar
+        uma versão mais nova vale também para as anteriores. Não concede o
         compartilhamento com o IBVAR (consentimento separado, em PUT
-        /consentimento).
+        /consentimento)."
       requestBody:
         required: true
         content:
