@@ -11,7 +11,7 @@ import {
   servicoIndisponivel,
 } from "../erros.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
-import { TIPOS_ARQUIVO, decodificarArquivo } from "../servicos/arquivo-base64.js";
+import { TIPOS_ARQUIVO, decodificarArquivo, limparMetadados } from "../servicos/arquivo-base64.js";
 
 const TAMANHO_MAXIMO_BYTES = 5 * 1024 * 1024;
 /** Envios por minuto, por usuário autenticado (não por IP). Conta também as tentativas recusadas. */
@@ -120,10 +120,14 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
       const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
-      const bytes = decodificarArquivo(body.conteudoBase64, body.tipoMime, {
-        bytes: TAMANHO_MAXIMO_BYTES,
-        mensagem: "O arquivo passa de 5 MB.",
-      });
+      // JPEG e PNG saem sem EXIF/GPS; PDF segue como veio.
+      const bytes = limparMetadados(
+        decodificarArquivo(body.conteudoBase64, body.tipoMime, {
+          bytes: TAMANHO_MAXIMO_BYTES,
+          mensagem: "O arquivo passa de 5 MB.",
+        }),
+        body.tipoMime,
+      );
       const tipo = TIPOS_ARQUIVO[body.tipoMime];
 
       if (body.indicadorId) {

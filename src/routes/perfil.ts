@@ -6,7 +6,7 @@ import type { UsuarioAutenticado } from "../auth/plugin.js";
 import { exigirPapel, limitePorIp } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { esquemaErro, requisicaoInvalida, servicoIndisponivel } from "../erros.js";
-import { TIPOS_ARQUIVO, decodificarArquivo } from "../servicos/arquivo-base64.js";
+import { TIPOS_ARQUIVO, decodificarArquivo, limparMetadados } from "../servicos/arquivo-base64.js";
 import { linkDaFoto, removerFotoSemFalhar } from "../servicos/foto-perfil.js";
 
 const TAMANHO_MAXIMO_FOTO = 2 * 1024 * 1024;
@@ -240,10 +240,14 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
     async (req) => {
       const u = req.usuario;
       const { tipoMime, conteudoBase64 } = req.body;
-      const bytes = decodificarArquivo(conteudoBase64, tipoMime, {
-        bytes: TAMANHO_MAXIMO_FOTO,
-        mensagem: "A foto passa de 2 MB.",
-      });
+      // Sem EXIF nem GPS: a foto do perfil é guardada só com a imagem.
+      const bytes = limparMetadados(
+        decodificarArquivo(conteudoBase64, tipoMime, {
+          bytes: TAMANHO_MAXIMO_FOTO,
+          mensagem: "A foto passa de 2 MB.",
+        }),
+        tipoMime,
+      );
       const caminho = `fotos/${u.id}/${randomUUID()}.${TIPOS_ARQUIVO[tipoMime].ext}`;
       try {
         await app.armazenamento.salvar(caminho, bytes, tipoMime);

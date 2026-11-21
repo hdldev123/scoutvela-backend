@@ -1,4 +1,5 @@
 import { requisicaoInvalida } from "../erros.js";
+import { ImagemInvalida, removerMetadadosImagem } from "./metadados-imagem.js";
 
 export const TIPOS_ARQUIVO = {
   "application/pdf": { ext: "pdf", assinatura: [0x25, 0x50, 0x44, 0x46] },
@@ -24,4 +25,17 @@ export function decodificarArquivo(
     throw requisicaoInvalida("O conteúdo do arquivo não corresponde ao tipo informado.");
   }
   return bytes;
+}
+
+/**
+ * JPEG e PNG saem sem EXIF, GPS, XMP nem comentários (a localização e o aparelho do atleta são
+ * dado pessoal). PDF segue como veio. Imagem que não segue a estrutura do formato vira 400.
+ */
+export function limparMetadados(bytes: Buffer, tipoMime: TipoArquivo): Buffer {
+  try {
+    return Buffer.from(removerMetadadosImagem(bytes, tipoMime));
+  } catch (e) {
+    if (e instanceof ImagemInvalida) throw requisicaoInvalida("Imagem inválida ou corrompida.");
+    throw e;
+  }
 }
