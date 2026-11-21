@@ -20,6 +20,8 @@ export function notaSugeridaPorPontos(
 ): SugestaoPontos | null {
   if (!regra.ativa || regra.faixas.length === 0) return null;
   const faixas = [...regra.faixas].sort((a, b) => a.ate - b.ate);
-  const faixa = faixas.find((f) => pontos <= f.ate) ?? faixas[faixas.length - 1]!;
-  return { nota: faixa.nota, pontos };
+  // Mesma precisão dos pontos (2 casas): a comparação com `ate` não depende de erro de float.
+  const p = Math.round(pontos * 100) / 100;
+  const faixa = faixas.find((f) => p <= f.ate) ?? faixas[faixas.length - 1]!;
+  return { nota: faixa.nota, pontos: p };
 }
