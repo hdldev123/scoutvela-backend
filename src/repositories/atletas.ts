@@ -179,7 +179,8 @@ export async function listarAtletasVisiveis(
     return `$${params.length}`;
   };
   const termoAceito = termoSql.aceitoNoPiloto("a.id", param(filtros.agora));
-  if (filtros.somenteTermoAceito) condicoes.push(termoAceito);
+  // IBVAR segue a regra do ranking em toda leitura (ficha, histórico): fora do piloto, 404.
+  if (filtros.somenteTermoAceito || usuario.papel === "ibvar") condicoes.push(termoAceito);
   if (filtros.classeEvento) condicoes.push(`c.evento = ${param(filtros.classeEvento)}`);
   if (filtros.genero) condicoes.push(`a.genero = ${param(filtros.genero)}`);
   if (filtros.atletaId) condicoes.push(`a.id = ${param(filtros.atletaId)}::uuid`);
