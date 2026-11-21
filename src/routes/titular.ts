@@ -26,6 +26,18 @@ const esquemaPedido = z.object({
   criadoEm: z.string(),
   resposta: z.string().nullable(),
   respondidoEm: z.string().nullable(),
+  anonimizacao: z
+    .object({
+      em: z.string().describe("Instante ISO da anonimização"),
+      pendencias: z.object({
+        arquivos: z.number().int().describe("Arquivos do Storage que ainda não saíram"),
+        conta: z.boolean().describe("Conta de login (Supabase Auth) ainda não removida"),
+      }),
+    })
+    .nullable()
+    .describe(
+      "Só nos pedidos de exclusão que anonimizaram o atleta: quando e o que ainda falta limpar. Nulo nos demais.",
+    ),
 });
 
 const registros = z.array(z.record(z.string(), z.unknown()));
@@ -75,13 +87,66 @@ interface LinhaPedido {
   criado_em: Date;
   resposta: string | null;
   respondido_em: Date | null;
+  /** Instante da anonimização, só se ESTE pedido foi o que anonimizou o atleta. */
+  anonimizado_em: Date | null;
 }
 
 const SQL_PEDIDO = `select p.id::text as id, p.atleta_id, a.nome as atleta_nome, p.tipo, p.descricao,
-         p.status, p.criado_em, p.resposta, p.respondido_em
+         p.status, p.criado_em, p.resposta, p.respondido_em,
+         case when a.anonimizado_pedido_id = p.id then a.anonimizado_em end as anonimizado_em
     from pedidos_titular p join atletas a on a.id = p.atleta_id`;
 
-const paraPedido = (l: LinhaPedido) => ({
+interface Pendencias {
+  arquivos: number;
+  conta: boolean;
+}
+
+/**
+ * O que ainda falta limpar depois da anonimização, pelo estado do banco: arquivos que a remoção não
+ * conseguiu apagar (`arquivos_pendentes`, sob a pasta do atleta ou da foto da conta), foto de perfil
+ * ainda registrada e conta de login em `anonimizacoes_pendentes`. Não consulta o Storage.
+ */
+async function pendenciasDaAnonimizacao(
+  db: Db,
+  atletaIds: string[],
+): Promise<Map<string, Pendencias>> {
+  const mapa = new Map<string, Pendencias>();
+  if (atletaIds.length === 0) return mapa;
+  const r = await db.query<{ atleta_id: string; arquivos: string; conta: boolean }>(
+    `select a.id::text as atleta_id,
+            (select count(*) from (
+               select p.caminho from arquivos_pendentes p
+                where left(p.caminho, 37) = a.id::text || '/'
+               union
+               select p.caminho from arquivos_pendentes p
+                 join usuarios u on u.atleta_id = a.id
+                where left(p.caminho, 43) = 'fotos/' || u.id::text || '/'
+               union
+               select u.foto_caminho from usuarios u
+                where u.atleta_id = a.id and u.foto_caminho is not null
+             ) x)::text as arquivos,
+            exists (select 1 from anonimizacoes_pendentes ap where ap.atleta_id = a.id) as conta
+       from atletas a where a.id = any($1::uuid[])`,
+    [atletaIds],
+  );
+  for (const l of r.rows) {
+    mapa.set(l.atleta_id, { arquivos: Number(l.arquivos), conta: l.conta });
+  }
+  return mapa;
+}
+
+async function carregarPedidos(db: Db, filtro: string, params: unknown[]) {
+  const r = await db.query<LinhaPedido>(
+    `${SQL_PEDIDO} ${filtro}
+      order by (p.status = 'aberto') desc, p.criado_em desc, p.id desc`,
+    params,
+  );
+  const anonimizados = [...new Set(r.rows.filter((l) => l.anonimizado_em).map((l) => l.atleta_id))];
+  const pendencias = await pendenciasDaAnonimizacao(db, anonimizados);
+  return r.rows.map((l) => paraPedido(l, pendencias.get(l.atleta_id)));
+}
+
+const paraPedido = (l: LinhaPedido, pendencias?: Pendencias) => ({
   id: l.id,
   atleta: { id: l.atleta_id, nome: l.atleta_nome },
   tipo: l.tipo,
@@ -90,6 +155,12 @@ const paraPedido = (l: LinhaPedido) => ({
   criadoEm: iso(l.criado_em),
   resposta: l.resposta,
   respondidoEm: l.respondido_em ? iso(l.respondido_em) : null,
+  anonimizacao: l.anonimizado_em
+    ? {
+        em: iso(l.anonimizado_em),
+        pendencias: pendencias ?? { arquivos: 0, conta: false },
+      }
+    : null,
 });
 
 export async function rotasTitular(app: FastifyInstance): Promise<void> {
@@ -282,13 +353,11 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
       const usuario = req.usuario;
       const proprio = usuario.papel === "atleta";
       if (proprio && !usuario.atletaId) return [];
-      const r = await app.db.query<LinhaPedido>(
-        `${SQL_PEDIDO}
-          ${proprio ? "where p.atleta_id = $1::uuid" : ""}
-          order by (p.status = 'aberto') desc, p.criado_em desc, p.id desc`,
+      return carregarPedidos(
+        app.db,
+        proprio ? "where p.atleta_id = $1::uuid" : "",
         proprio ? [usuario.atletaId] : [],
       );
-      return r.rows.map(paraPedido);
     },
   );
 
@@ -378,8 +447,8 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           {},
         );
       });
-      const r = await app.db.query<LinhaPedido>(`${SQL_PEDIDO} where p.id = $1::bigint`, [id]);
-      return paraPedido(r.rows[0]!);
+      const [pedido] = await carregarPedidos(app.db, "where p.id = $1::bigint", [id]);
+      return pedido!;
     },
   );
 }

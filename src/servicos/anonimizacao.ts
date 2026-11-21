@@ -335,6 +335,13 @@ async function concluirPendencias(
         { evento: "anonimizacao_pendencia", tipo: "arquivo", erro: nomeDoErro(e) },
         "falha ao remover arquivo na anonimização",
       );
+      // Fica registrado (só o caminho): o estado da pendência vale também depois da resposta
+      // e a retentativa da anonimização o encontra pelo prefixo.
+      await db.query(
+        `insert into arquivos_pendentes (caminho, motivo, criado_em) values ($1, 'anonimizacao', $2)
+         on conflict (caminho) do nothing`,
+        [caminho, agora()],
+      );
     }
   }
   // A conta já está inativa: a foto não aparece mais e o caminho só sai do banco depois de removida.
