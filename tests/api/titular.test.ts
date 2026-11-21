@@ -65,8 +65,8 @@ describe("direitos do titular (LGPD)", () => {
 
   it("atleta registra pedido; gestor lista, responde; segunda resposta dá 409", async () => {
     const c = await chamar(EMAILS_DEMO.atleta, "POST", "/pedidos-titular", {
-      tipo: "exclusao",
-      descricao: "Quero excluir meus dados do piloto.",
+      tipo: "correcao",
+      descricao: "Quero corrigir o clube do meu cadastro.",
     });
     expect(c.status).toBe(201);
     expect(c.corpo.status).toBe("aberto");
@@ -99,7 +99,7 @@ describe("direitos do titular (LGPD)", () => {
     const lista = await chamar(EMAILS_DEMO.gestor, "GET", "/pedidos-titular");
     expect(lista.status).toBe(200);
     expect(lista.corpo[0]).toEqual(
-      expect.objectContaining({ id: c.corpo.id, tipo: "exclusao", status: "aberto" }),
+      expect.objectContaining({ id: c.corpo.id, tipo: "correcao", status: "aberto" }),
     );
     expect((await chamar(EMAILS_DEMO.atleta, "GET", "/pedidos-titular")).corpo).toHaveLength(1);
     expect((await chamar(EMAILS_DEMO.treinadora, "GET", "/pedidos-titular")).status).toBe(403);
@@ -112,7 +112,7 @@ describe("direitos do titular (LGPD)", () => {
       ).status,
     ).toBe(403);
     const ok = await chamar(EMAILS_DEMO.gestor, "PUT", `/pedidos-titular/${c.corpo.id}`, {
-      resposta: "Exclusão feita pelo gestor.",
+      resposta: "Correção feita pelo gestor.",
     });
     expect(ok.status).toBe(200);
     expect(ok.corpo.status).toBe("respondido");
@@ -140,6 +140,6 @@ describe("direitos do titular (LGPD)", () => {
       "select detalhes from auditoria where acao in ('pedir_titular', 'responder_titular')",
     );
     expect(aud.rows).toHaveLength(2);
-    expect(JSON.stringify(aud.rows)).not.toContain("excluir meus dados");
+    expect(JSON.stringify(aud.rows)).not.toContain("corrigir o clube");
   });
 });
