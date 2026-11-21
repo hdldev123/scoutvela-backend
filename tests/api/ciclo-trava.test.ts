@@ -14,10 +14,10 @@ describe("ciclo aberto lido com trava dentro da transação", () => {
     p.db.transacao = (fn) =>
       original((tx) => {
         const consulta = tx.query.bind(tx);
-        tx.query = ((sql: string, params?: unknown[]) => {
+        tx.query = (sql: string, params?: unknown[]) => {
           sqls.push(sql);
           return consulta(sql, params);
-        }) as typeof tx.query;
+        };
         return fn(tx);
       });
   });
