@@ -86,12 +86,9 @@ const mensagemTreinador: Montar = (para, ciclo, prazo, restam, n, url) => ({
 
 const mensagemAtleta: Montar = (para, ciclo, prazo, restam, n, url) => ({
   para,
-  assunto:
-    restam < 0
-      ? `Scout Vela: questionário do ciclo ${ciclo} em atraso`
-      : `Scout Vela: questionário do ciclo ${ciclo} pendente`,
+  assunto: restam < 0 ? "Scout Vela: questionário em atraso" : "Scout Vela: questionário pendente",
   texto:
-    `Olá,\n\nNo ciclo ${ciclo} você tem ${n === 1 ? "1 pergunta" : `${n} perguntas`} sem resposta. ` +
+    `Olá,\n\nVocê tem ${n === 1 ? "1 pergunta" : `${n} perguntas`} do questionário ainda sem resposta (ciclo ${ciclo}). ` +
     `${frasePrazo(prazo, restam)}\n\nResponda em: ${url}/painel\n\nScout Vela`,
 });
 
