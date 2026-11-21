@@ -81,9 +81,9 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
         [usuarioId, authUserId, app.agora()],
       );
       await tx.query(
-        `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-         values ($1, 'convidar_usuario', 'usuarios', $2, '{}'::jsonb)`,
-        [porId, usuarioId],
+        `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+         values ($1, 'convidar_usuario', 'usuarios', $2, '{}'::jsonb, $3)`,
+        [porId, usuarioId, app.agora()],
       );
     });
   }
@@ -196,9 +196,9 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
           );
           const novo = ins.rows[0]!.id;
           await tx.query(
-            `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-             values ($1, 'criar_usuario', 'usuarios', $2, $3::jsonb)`,
-            [porId, novo, JSON.stringify({ papel, atletaId: atletaId ?? null })],
+            `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+             values ($1, 'criar_usuario', 'usuarios', $2, $3::jsonb, $4)`,
+            [porId, novo, JSON.stringify({ papel, atletaId: atletaId ?? null }), app.agora()],
           );
           return novo;
         })
@@ -265,9 +265,9 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
         );
         if (u.rows.length === 0) throw naoEncontrado("Usuário não encontrado.");
         await tx.query(
-          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-           values ($1, 'editar_usuario', 'usuarios', $2, $3::jsonb)`,
-          [req.usuario.id, id, JSON.stringify({ campos })],
+          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+           values ($1, 'editar_usuario', 'usuarios', $2, $3::jsonb, $4)`,
+          [req.usuario.id, id, JSON.stringify({ campos }), app.agora()],
         );
       });
       return paraResposta((await buscarUsuario(app.db, id))!);
@@ -422,9 +422,9 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
           [id, classeId ?? null, treinadorId ?? null, numeroVela ?? null, ativo ?? null],
         );
         await tx.query(
-          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-           values ($1, 'editar_atleta', 'atletas', $2, $3::jsonb)`,
-          [req.usuario.id, id, JSON.stringify({ campos })],
+          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+           values ($1, 'editar_atleta', 'atletas', $2, $3::jsonb, $4)`,
+          [req.usuario.id, id, JSON.stringify({ campos }), app.agora()],
         );
         const l = res.rows[0]!;
         return {

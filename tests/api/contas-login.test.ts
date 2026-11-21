@@ -51,6 +51,28 @@ describe("vínculo da conta no primeiro login", () => {
     );
   });
 
+  it("e-mail marcado como não confirmado no token não vincula; confirmado (ou sem a informação) vincula", async () => {
+    const id = await cadastrar("naoconfirmado@exemplo.com");
+    const sub = crypto.randomUUID();
+    const nao = await me(
+      await tokenPara(sub, { email: "naoconfirmado@exemplo.com", emailVerificado: false }),
+    );
+    expect(nao.statusCode).toBe(403);
+    const vinculo = async () =>
+      (
+        await db.query<{ auth_user_id: string | null }>(
+          "select auth_user_id from usuarios where id = $1",
+          [id],
+        )
+      ).rows[0]!.auth_user_id;
+    expect(await vinculo()).toBeNull();
+    const sim = await me(
+      await tokenPara(sub, { email: "naoconfirmado@exemplo.com", emailVerificado: true }),
+    );
+    expect(sim.statusCode).toBe(200);
+    expect(await vinculo()).toBe(sub);
+  });
+
   it("não vincula sem e-mail no token, com e-mail desconhecido ou usuário inativo", async () => {
     const inativo = await cadastrar("inativo@exemplo.com", "treinador", false);
     expect((await me(await tokenPara(crypto.randomUUID()))).statusCode).toBe(403);

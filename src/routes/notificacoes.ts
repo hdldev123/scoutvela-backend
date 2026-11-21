@@ -21,7 +21,7 @@ export async function rotasNotificacoes(app: FastifyInstance): Promise<void> {
         tags: ["sessao"],
         summary: "Contagens dos balões do menu lateral (itens que pedem atenção)",
         description:
-          "Só as chaves do papel, sempre presentes (0 quando nada pede atenção). Gestor: `revisoes` (pedidos de revisão e do titular abertos) e `cadastro` (atletas ativos sem aceite da versão vigente do termo). Treinador: `revisoes` (pedidos de revisão abertos dos próprios atletas) e `avaliar` (próprios atletas com indicadores pendentes no ciclo aberto; 0 sem ciclo aberto). Atleta: `painel` (perguntas sem resposta no ciclo aberto + 1 se o termo vigente está pendente + respostas a pedidos de revisão e do titular dadas depois da última marcação de visto). IBVAR: objeto vazio. `total` é a soma. Feito para consulta a cada 60 s.",
+          "Só as chaves do papel, sempre presentes (0 quando nada pede atenção). Gestor: `revisoes` (pedidos de revisão e do titular abertos) e `cadastro` (atletas ativos sem aceite da versão vigente do termo). Treinador: `revisoes` (pedidos de revisão abertos dos próprios atletas) e `avaliar` (próprios atletas com indicadores pendentes no ciclo aberto; 0 sem ciclo aberto). Atleta: `painel` (perguntas ainda sem resposta, hoje contadas só com ciclo aberto, + 1 se o termo vigente está pendente + respostas a pedidos de revisão e do titular dadas depois da última marcação de visto). IBVAR: objeto vazio. `total` é a soma. Feito para consulta a cada 60 s.",
         security: seguranca,
         response: {
           200: z.object({

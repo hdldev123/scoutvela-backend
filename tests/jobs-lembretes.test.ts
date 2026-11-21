@@ -45,6 +45,14 @@ describe("lembretes do ciclo", () => {
     expect(b.r.treinadores).toBe(a.r.treinadores);
   });
 
+  it("e-mail do atleta fala em perguntas ainda sem resposta, não em pendência do ciclo", async () => {
+    const { email } = await rodar("2026-11-27");
+    const doAtleta = email.enviadas.find((m) => m.para === EMAILS_DEMO.atleta)!;
+    expect(doAtleta.assunto).toBe("Scout Vela: questionário pendente");
+    expect(doAtleta.texto).toMatch(/do questionário ainda sem resposta/);
+    expect(doAtleta.texto).not.toMatch(/No ciclo/);
+  });
+
   it("não reenvia no mesmo dia", async () => {
     const primeira = await rodar("2026-11-27");
     const segunda = await rodar("2026-11-27");

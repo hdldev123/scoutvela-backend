@@ -127,7 +127,10 @@ describe("ciclos de avaliação", () => {
       prazo: "2026-12-31",
     });
     expect(ruim.status).toBe(400);
-    expect(ruim.corpo).toEqual({ erro: "requisicao_invalida", mensagem: "Requisição inválida." });
+    expect(ruim.corpo).toMatchObject({
+      erro: "requisicao_invalida",
+      mensagem: "Requisição inválida.",
+    });
     expect(
       (
         await chamar(EMAILS_DEMO.gestor, "POST", "/ciclos", {

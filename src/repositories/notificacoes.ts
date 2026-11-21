@@ -70,6 +70,7 @@ export async function contarNotificacoes(
         ),
         cicloAbertoId(db),
       ]);
+      // Perguntas ainda sem resposta (regra de repositories/pendencias.ts: não é por ciclo).
       const perguntas = ciclo
         ? ((await pendenciasDoCiclo(db, ciclo, agora, { atletaId: usuario.atletaId })).atletas[0]
             ?.perguntasSemResposta ?? 0)

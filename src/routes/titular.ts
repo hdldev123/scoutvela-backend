@@ -5,6 +5,7 @@ import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { conflito, esquemaErro, naoEncontrado, requisicaoInvalida } from "../erros.js";
 import { travarAtletaEditavel } from "../repositories/anonimizado.js";
+import { caminhoDaFotoDoAtleta, linkDaFoto } from "../servicos/foto-perfil.js";
 
 /**
  * Direitos do titular (LGPD, art. 18) para o atleta: exportar os próprios dados e
@@ -26,6 +27,18 @@ const esquemaPedido = z.object({
   criadoEm: z.string(),
   resposta: z.string().nullable(),
   respondidoEm: z.string().nullable(),
+  anonimizacao: z
+    .object({
+      em: z.string().describe("Instante ISO da anonimização"),
+      pendencias: z.object({
+        arquivos: z.number().int().describe("Arquivos do Storage que ainda não saíram"),
+        conta: z.boolean().describe("Conta de login (Supabase Auth) ainda não removida"),
+      }),
+    })
+    .nullable()
+    .describe(
+      "Só nos pedidos de exclusão que anonimizaram o atleta: quando e o que ainda falta limpar. Nulo nos demais.",
+    ),
 });
 
 const registros = z.array(z.record(z.string(), z.unknown()));
@@ -49,10 +62,27 @@ const esquemaExportacao = z.object({
   ),
   pedidosRevisao: registros,
   pedidosTitular: registros,
+  foto: z
+    .object({
+      tipoMime: z.string(),
+      url: z
+        .string()
+        .nullable()
+        .describe("Link assinado de 5 minutos para baixar a foto; nulo se o Storage não respondeu"),
+    })
+    .nullable()
+    .describe("Foto de perfil da conta do atleta (o caminho interno não é exportado)"),
+  evidencias: registros.describe(
+    "Evidências anexadas: id, nomeArquivo, tipoMime, tamanhoBytes, enviadoEm, indicador, enviadoPor, removida e removidoEm (o arquivo não vai no JSON; o link de cada um sai por GET /evidencias/{id}/link)",
+  ),
+  plano: registros.describe(
+    "Plano individual: todas as versões registradas, da mais antiga para a mais nova",
+  ),
 });
 
 async function auditar(
   db: Db,
+  em: Date,
   usuarioId: string,
   acao: string,
   entidade: string,
@@ -60,8 +90,8 @@ async function auditar(
   detalhes: Record<string, unknown>,
 ): Promise<void> {
   await db.query(
-    `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes) values ($1, $2, $3, $4, $5::jsonb)`,
-    [usuarioId, acao, entidade, entidadeId, JSON.stringify(detalhes)],
+    `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em) values ($1, $2, $3, $4, $5::jsonb, $6)`,
+    [usuarioId, acao, entidade, entidadeId, JSON.stringify(detalhes), em],
   );
 }
 
@@ -75,13 +105,66 @@ interface LinhaPedido {
   criado_em: Date;
   resposta: string | null;
   respondido_em: Date | null;
+  /** Instante da anonimização, só se ESTE pedido foi o que anonimizou o atleta. */
+  anonimizado_em: Date | null;
 }
 
 const SQL_PEDIDO = `select p.id::text as id, p.atleta_id, a.nome as atleta_nome, p.tipo, p.descricao,
-         p.status, p.criado_em, p.resposta, p.respondido_em
+         p.status, p.criado_em, p.resposta, p.respondido_em,
+         case when a.anonimizado_pedido_id = p.id then a.anonimizado_em end as anonimizado_em
     from pedidos_titular p join atletas a on a.id = p.atleta_id`;
 
-const paraPedido = (l: LinhaPedido) => ({
+interface Pendencias {
+  arquivos: number;
+  conta: boolean;
+}
+
+/**
+ * O que ainda falta limpar depois da anonimização, pelo estado do banco: arquivos que a remoção não
+ * conseguiu apagar (`arquivos_pendentes`, sob a pasta do atleta ou da foto da conta), foto de perfil
+ * ainda registrada e conta de login em `anonimizacoes_pendentes`. Não consulta o Storage.
+ */
+async function pendenciasDaAnonimizacao(
+  db: Db,
+  atletaIds: string[],
+): Promise<Map<string, Pendencias>> {
+  const mapa = new Map<string, Pendencias>();
+  if (atletaIds.length === 0) return mapa;
+  const r = await db.query<{ atleta_id: string; arquivos: string; conta: boolean }>(
+    `select a.id::text as atleta_id,
+            (select count(*) from (
+               select p.caminho from arquivos_pendentes p
+                where left(p.caminho, 37) = a.id::text || '/'
+               union
+               select p.caminho from arquivos_pendentes p
+                 join usuarios u on u.atleta_id = a.id
+                where left(p.caminho, 43) = 'fotos/' || u.id::text || '/'
+               union
+               select u.foto_caminho from usuarios u
+                where u.atleta_id = a.id and u.foto_caminho is not null
+             ) x)::text as arquivos,
+            exists (select 1 from anonimizacoes_pendentes ap where ap.atleta_id = a.id) as conta
+       from atletas a where a.id = any($1::uuid[])`,
+    [atletaIds],
+  );
+  for (const l of r.rows) {
+    mapa.set(l.atleta_id, { arquivos: Number(l.arquivos), conta: l.conta });
+  }
+  return mapa;
+}
+
+async function carregarPedidos(db: Db, filtro: string, params: unknown[]) {
+  const r = await db.query<LinhaPedido>(
+    `${SQL_PEDIDO} ${filtro}
+      order by (p.status = 'aberto') desc, p.criado_em desc, p.id desc`,
+    params,
+  );
+  const anonimizados = [...new Set(r.rows.filter((l) => l.anonimizado_em).map((l) => l.atleta_id))];
+  const pendencias = await pendenciasDaAnonimizacao(db, anonimizados);
+  return r.rows.map((l) => paraPedido(l, pendencias.get(l.atleta_id)));
+}
+
+const paraPedido = (l: LinhaPedido, pendencias?: Pendencias) => ({
   id: l.id,
   atleta: { id: l.atleta_id, nome: l.atleta_nome },
   tipo: l.tipo,
@@ -90,6 +173,12 @@ const paraPedido = (l: LinhaPedido) => ({
   criadoEm: iso(l.criado_em),
   resposta: l.resposta,
   respondidoEm: l.respondido_em ? iso(l.respondido_em) : null,
+  anonimizacao: l.anonimizado_em
+    ? {
+        em: iso(l.anonimizado_em),
+        pendencias: pendencias ?? { arquivos: 0, conta: false },
+      }
+    : null,
 });
 
 export async function rotasTitular(app: FastifyInstance): Promise<void> {
@@ -104,7 +193,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         tags: ["titular"],
         summary: "Exporta em JSON tudo o que o sistema guarda sobre o atleta (LGPD)",
         description:
-          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados, decisões de gate, financeiro, pedidos de revisão e pedidos do titular. Só o atleta logado, só os próprios dados.",
+          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados, decisões de gate, financeiro, pedidos de revisão e pedidos do titular, foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
         security: seguranca,
         response: { 200: esquemaExportacao, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
       },
@@ -127,6 +216,9 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         componentes,
         revisoes,
         pedidos,
+        evidencias,
+        plano,
+        caminhoFoto,
       ] = await Promise.all([
         q<Record<string, unknown>>(
           `select a.velaid_codigo as "velaid", a.nome, a.genero, a.data_nascimento::text as "dataNascimento",
@@ -191,6 +283,22 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           `select tipo, descricao, status, resposta, criado_em as "criadoEm", respondido_em as "respondidoEm"
                from pedidos_titular where atleta_id = $1::uuid order by criado_em, id`,
         ),
+        q<Record<string, unknown>>(
+          `select e.id, e.nome_arquivo as "nomeArquivo", e.tipo_mime as "tipoMime", e.tamanho_bytes as "tamanhoBytes",
+                    e.enviado_em as "enviadoEm", i.nome as indicador, u.nome as "enviadoPor",
+                    (e.removido_em is not null) as removida, e.removido_em as "removidoEm"
+               from evidencias_anexos e
+               left join indicadores i on i.id = e.indicador_id
+               left join usuarios u on u.id = e.enviado_por
+              where e.atleta_id = $1::uuid order by e.enviado_em, e.id`,
+        ),
+        q<Record<string, unknown>>(
+          `select p.forcas, p.lacunas, p.meta_12m as "meta12m", p.meta_24m as "meta24m", p.recomendacao,
+                    u.nome as "registradoPor", p.registrado_em as "registradoEm"
+               from plano_individual p join usuarios u on u.id = p.registrado_por
+              where p.atleta_id = $1::uuid order by p.registrado_em, p.id`,
+        ),
+        caminhoDaFotoDoAtleta(app.db, id),
       ]);
       if (!cadastro[0]) throw naoEncontrado("Atleta não encontrado.");
 
@@ -201,7 +309,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           .map((c) => ({ nome: c.nome, autonomia: c.autonomia, apoioCbvela: c.apoio_cbvela })),
       }));
 
-      await auditar(app.db, usuario.id, "exportar_dados", "atletas", id, {});
+      await auditar(app.db, app.agora(), usuario.id, "exportar_dados", "atletas", id, {});
       reply.header("Content-Disposition", 'attachment; filename="meus-dados-scout-vela.json"');
       return {
         geradoEm: app.agora().toISOString(),
@@ -216,6 +324,14 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         financeiro: financeiroComComponentes,
         pedidosRevisao: revisoes,
         pedidosTitular: pedidos,
+        foto: caminhoFoto
+          ? {
+              tipoMime: caminhoFoto.endsWith(".png") ? "image/png" : "image/jpeg",
+              url: await linkDaFoto(app.armazenamento, caminhoFoto, req.log),
+            }
+          : null,
+        evidencias,
+        plano,
       };
     },
   );
@@ -260,7 +376,9 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           [atletaId, tipo, descricao, usuario.id, app.agora()],
         );
         const novo = r.rows[0]!.id;
-        await auditar(tx, usuario.id, "pedir_titular", "pedidos_titular", novo, { tipo });
+        await auditar(tx, app.agora(), usuario.id, "pedir_titular", "pedidos_titular", novo, {
+          tipo,
+        });
         return novo;
       });
       return reply.code(201).send({ id, status: "aberto" as const });
@@ -282,13 +400,11 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
       const usuario = req.usuario;
       const proprio = usuario.papel === "atleta";
       if (proprio && !usuario.atletaId) return [];
-      const r = await app.db.query<LinhaPedido>(
-        `${SQL_PEDIDO}
-          ${proprio ? "where p.atleta_id = $1::uuid" : ""}
-          order by (p.status = 'aberto') desc, p.criado_em desc, p.id desc`,
+      return carregarPedidos(
+        app.db,
+        proprio ? "where p.atleta_id = $1::uuid" : "",
         proprio ? [usuario.atletaId] : [],
       );
-      return r.rows.map(paraPedido);
     },
   );
 
@@ -371,6 +487,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         await travarAtletaEditavel(tx, r.rows[0]!.atleta_id);
         await auditar(
           tx,
+          app.agora(),
           usuario.id,
           recusar ? "recusar_exclusao" : "responder_titular",
           "pedidos_titular",
@@ -378,8 +495,8 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           {},
         );
       });
-      const r = await app.db.query<LinhaPedido>(`${SQL_PEDIDO} where p.id = $1::bigint`, [id]);
-      return paraPedido(r.rows[0]!);
+      const [pedido] = await carregarPedidos(app.db, "where p.id = $1::bigint", [id]);
+      return pedido!;
     },
   );
 }

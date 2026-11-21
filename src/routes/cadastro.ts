@@ -270,9 +270,9 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
           // o código original na trilha de auditoria.
           const detalhes = JSON.stringify({ classeId, versaoTermo: termo.versao });
           await tx.query(
-            `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-             values ($1, 'cadastrar_atleta', 'atletas', $2, $3::jsonb), ($1, 'enviar_termo', 'atletas', $2, $3::jsonb)`,
-            [usuarioId, id, detalhes],
+            `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+             values ($1, 'cadastrar_atleta', 'atletas', $2, $3::jsonb, $4), ($1, 'enviar_termo', 'atletas', $2, $3::jsonb, $4)`,
+            [usuarioId, id, detalhes, app.agora()],
           );
 
           // Conta do atleta (papel atleta), amarrada ao e-mail do VelaID. E-mail já em uso: não cria.
@@ -287,9 +287,14 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
               );
               contaUsuarioId = u.rows[0]!.id;
               await tx.query(
-                `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-                 values ($1, 'criar_usuario', 'usuarios', $2, $3::jsonb)`,
-                [usuarioId, contaUsuarioId, JSON.stringify({ papel: "atleta", atletaId: id })],
+                `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+                 values ($1, 'criar_usuario', 'usuarios', $2, $3::jsonb, $4)`,
+                [
+                  usuarioId,
+                  contaUsuarioId,
+                  JSON.stringify({ papel: "atleta", atletaId: id }),
+                  app.agora(),
+                ],
               );
             }
           }
@@ -318,9 +323,9 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
                 [criado.contaUsuarioId, authUserId, app.agora()],
               );
               await tx.query(
-                `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-                 values ($1, 'convidar_usuario', 'usuarios', $2, '{}'::jsonb)`,
-                [usuarioId, criado.contaUsuarioId],
+                `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+                 values ($1, 'convidar_usuario', 'usuarios', $2, '{}'::jsonb, $3)`,
+                [usuarioId, criado.contaUsuarioId, app.agora()],
               );
             });
             conta = "convite_enviado";
@@ -538,9 +543,9 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
           [id, alvo.versao, agora, usuarioId],
         );
         await tx.query(
-          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-           values ($1, 'registrar_aceite_termo', 'atletas', $2, $3::jsonb)`,
-          [usuarioId, id, JSON.stringify({ versaoTermo: req.body.versao })],
+          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+           values ($1, 'registrar_aceite_termo', 'atletas', $2, $3::jsonb, $4)`,
+          [usuarioId, id, JSON.stringify({ versaoTermo: req.body.versao }), agora],
         );
       });
       return { ok: true as const };

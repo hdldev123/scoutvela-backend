@@ -93,6 +93,7 @@ const esquemaRevisao = z.object({
 
 async function auditar(
   db: Db,
+  em: Date,
   usuarioId: string,
   acao: string,
   entidade: string,
@@ -100,14 +101,14 @@ async function auditar(
   detalhes: Record<string, unknown>,
 ): Promise<void> {
   await db.query(
-    `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes) values ($1, $2, $3, $4, $5::jsonb)`,
-    [usuarioId, acao, entidade, entidadeId, JSON.stringify(detalhes)],
+    `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em) values ($1, $2, $3, $4, $5::jsonb, $6)`,
+    [usuarioId, acao, entidade, entidadeId, JSON.stringify(detalhes), em],
   );
 }
 
 async function cicloAbertoId(db: Db): Promise<string | null> {
   const r = await db.query<{ id: string }>(
-    `select id from ciclos_avaliacao where status = 'aberto' limit 1`,
+    `select id from ciclos_avaliacao where status = 'aberto' limit 1 for share`,
   );
   return r.rows[0]?.id ?? null;
 }
@@ -328,8 +329,8 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           "A resposta deve ser o texto exato de uma opção. Se a opção tem nota sugerida, ela fica pendente: só entra no score quando o treinador confirmar.",
         security: seguranca,
         body: z.object({
-          indicadorId: z.string().min(1).max(80),
-          resposta: z.string().min(1).max(200),
+          indicadorId: z.string().min(1, "Informe o indicador.").max(80),
+          resposta: z.string().min(1, "Escolha uma resposta.").max(200, "Resposta longa demais."),
         }),
         response: {
           201: z.object({ ok: z.literal(true), notaSugerida: z.number().int().nullable() }),
@@ -382,6 +383,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
         }
         await auditar(
           tx,
+          app.agora(),
           usuario.id,
           "responder_questionario",
           "respostas_atleta",
@@ -427,10 +429,18 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
            values ($1::uuid, 'compartilhar_ibvar', $2, $3, $4::uuid)`,
           [atletaId, compartilharIbvar, app.agora(), usuario.id],
         );
-        await auditar(tx, usuario.id, "alterar_consentimento", "consentimentos", atletaId, {
-          tipo: "compartilhar_ibvar",
-          concedido: compartilharIbvar,
-        });
+        await auditar(
+          tx,
+          app.agora(),
+          usuario.id,
+          "alterar_consentimento",
+          "consentimentos",
+          atletaId,
+          {
+            tipo: "compartilhar_ibvar",
+            concedido: compartilharIbvar,
+          },
+        );
       });
       return lerConsentimento(app.db, atletaId, app.agora());
     },
@@ -503,7 +513,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           [atletaId, pilarId, indicadorId, motivo, usuario.id, app.agora()],
         );
         const novo = r.rows[0]!.id;
-        await auditar(tx, usuario.id, "pedir_revisao", "pedidos_revisao", novo, {
+        await auditar(tx, app.agora(), usuario.id, "pedir_revisao", "pedidos_revisao", novo, {
           pilarId,
           indicadorId,
         });
@@ -677,7 +687,9 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
             where id = $1::bigint`,
           [id, req.body.resposta, usuario.id, app.agora(), avaliacaoId],
         );
-        await auditar(tx, usuario.id, "responder_revisao", "pedidos_revisao", id, { avaliacaoId });
+        await auditar(tx, app.agora(), usuario.id, "responder_revisao", "pedidos_revisao", id, {
+          avaliacaoId,
+        });
         return pedido.atleta_id;
       });
 

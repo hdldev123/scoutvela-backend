@@ -136,7 +136,8 @@ async function auditar(
 
 export async function rotasPerfil(app: FastifyInstance): Promise<void> {
   const rota = app.withTypeProvider<ZodTypeProvider>();
-  const acesso = [app.autenticar, exigirPapel("gestor", "treinador", "atleta")];
+  // Um array novo por rota: o plugin de rate-limit empurra hooks no array da rota e não pode vazar para as outras.
+  const acesso = () => [app.autenticar, exigirPapel("gestor", "treinador", "atleta")];
   const respostasComuns = { 401: esquemaErro, 403: esquemaErro };
   const limpeza = (log: FastifyBaseLogger) => ({
     db: app.db,
@@ -149,7 +150,7 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
   rota.get(
     "/me/perfil",
     {
-      preHandler: acesso,
+      preHandler: acesso(),
       schema: {
         tags: ["sessao"],
         summary: "Meu perfil: dados de contato, foto e, para o atleta, o cadastro",
@@ -164,7 +165,7 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
   rota.put(
     "/me/perfil",
     {
-      preHandler: acesso,
+      preHandler: acesso(),
       schema: {
         tags: ["sessao"],
         summary: "Edita o perfil: nome (treinador e gestor) ou e-mail de contato (atleta)",
@@ -173,8 +174,17 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
         security: [{ bearerAuth: [] }],
         body: z
           .object({
-            nome: z.string().trim().min(2).max(120).optional(),
-            emailContato: z.email().max(254).nullable().optional(),
+            nome: z
+              .string()
+              .trim()
+              .min(2, "O nome precisa ter ao menos 2 caracteres.")
+              .max(120, "O nome pode ter no máximo 120 caracteres.")
+              .optional(),
+            emailContato: z
+              .email("Informe um e-mail válido.")
+              .max(254, "O e-mail pode ter no máximo 254 caracteres.")
+              .nullable()
+              .optional(),
           })
           .strict(),
         response: { 200: esquemaPerfil, 400: esquemaErro, ...respostasComuns },
@@ -295,7 +305,7 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
   rota.delete(
     "/me/foto",
     {
-      preHandler: acesso,
+      preHandler: acesso(),
       schema: {
         tags: ["sessao"],
         summary: "Remove a foto de perfil",

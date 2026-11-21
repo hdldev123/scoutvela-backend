@@ -129,9 +129,9 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
           [atletaId, alvo.versao, agora, usuarioId],
         );
         await tx.query(
-          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-           values ($1, 'aceitar_termo', 'atletas', $2, $3::jsonb)`,
-          [usuarioId, atletaId, JSON.stringify({ versaoTermo: alvo.versao })],
+          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+           values ($1, 'aceitar_termo', 'atletas', $2, $3::jsonb, $4)`,
+          [usuarioId, atletaId, JSON.stringify({ versaoTermo: alvo.versao }), agora],
         );
       });
       return { ok: true as const };
@@ -166,10 +166,20 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
         security: seguranca,
         body: z
           .object({
-            versao: z.string().trim().min(1).max(100),
-            titulo: z.string().trim().min(3).max(200),
-            texto: z.string().min(50).max(50000),
-            vigenteDesde: z.iso.datetime({ offset: true }),
+            versao: z.string().trim().min(1, "Informe a versão.").max(100, "Versão longa demais."),
+            titulo: z
+              .string()
+              .trim()
+              .min(3, "O título precisa ter ao menos 3 caracteres.")
+              .max(200, "O título pode ter no máximo 200 caracteres."),
+            texto: z
+              .string()
+              .min(50, "O texto do termo precisa ter ao menos 50 caracteres.")
+              .max(50000, "O texto do termo pode ter no máximo 50.000 caracteres."),
+            vigenteDesde: z.iso.datetime({
+              offset: true,
+              error: "Informe a vigência em formato ISO (ex.: 2026-12-01T00:00:00-03:00).",
+            }),
           })
           .strict(),
         response: {
@@ -208,9 +218,13 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
           [versao, titulo, texto, vigenteDesde, agora],
         );
         await tx.query(
-          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-           values ($1, 'publicar_termo', 'termos_consentimento', null, $2::jsonb)`,
-          [req.usuario.id, JSON.stringify({ versao, vigenteDesde: vigenteDesde.toISOString() })],
+          `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+           values ($1, 'publicar_termo', 'termos_consentimento', null, $2::jsonb, $3)`,
+          [
+            req.usuario.id,
+            JSON.stringify({ versao, vigenteDesde: vigenteDesde.toISOString() }),
+            agora,
+          ],
         );
       });
       const item = (await listarTermos(app.db, agora)).find((t) => t.versao === versao);

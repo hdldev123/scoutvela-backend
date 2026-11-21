@@ -70,7 +70,7 @@ export async function importarCsv(
   return db.transacao(async (tx) => {
     const r =
       p.tipo === "velaid"
-        ? await importarVelaId(tx, csv.cabecalho, csv.linhas, hoje)
+        ? await importarVelaId(tx, csv.cabecalho, csv.linhas, hoje, p.agora)
         : await importarRanking(tx, csv.cabecalho, csv.linhas, hoje, p.usuarioId);
     const erros = r.erros.slice(0, MAX_ERROS_GUARDADOS);
     const ins = await tx.query<{ id: string }>(
@@ -80,11 +80,12 @@ export async function importarCsv(
     );
     const id = Number(ins.rows[0]!.id);
     await tx.query(
-      `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes) values ($1, 'importar_csv', 'importacoes', $2, $3::jsonb)`,
+      `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em) values ($1, 'importar_csv', 'importacoes', $2, $3::jsonb, $4)`,
       [
         p.usuarioId,
         String(id),
         JSON.stringify({ tipo: p.tipo, linhasOk: r.linhasOk, linhasErro: r.erros.length }),
+        p.agora,
       ],
     );
     return { id, linhasOk: r.linhasOk, linhasErro: r.erros.length, erros };

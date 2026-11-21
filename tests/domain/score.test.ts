@@ -8,6 +8,7 @@ import {
   idadeEm,
   notaPeso,
   notaPilar,
+  notaSugeridaPorPontos,
   notasEfetivas,
   pontosRankingCbvela,
 } from "../../src/domain/index.js";
@@ -151,6 +152,21 @@ describe("pontosRankingCbvela", () => {
       }),
     ];
     expect(pontosRankingCbvela(r, REFERENCIA_TESTE, 52)).toBe(15);
+  });
+  it("soma arredondada em 2 casas: 0,1 + 0,2 vale 0,3 e cai na faixa até 0,3", () => {
+    const r = [nac("2026-08-22", 0.1), nac("2026-05-30", 0.2)];
+    const soma = pontosRankingCbvela(r, REFERENCIA_TESTE, 52);
+    expect(soma).toBe(0.3);
+    const regra = {
+      ativa: true,
+      faixas: [
+        { ate: 0.3, nota: 1 },
+        { ate: 100, nota: 3 },
+      ],
+    };
+    expect(notaSugeridaPorPontos(soma, regra)).toEqual({ nota: 1, pontos: 0.3 });
+    // Mesmo sem passar pela soma, 0,30000000000000004 entra na faixa de 0,3.
+    expect(notaSugeridaPorPontos(0.1 + 0.2, regra)?.nota).toBe(1);
   });
   it("janela de 52 semanas: início exclusivo, fim inclusivo", () => {
     // referência 2026-11-06; 52 semanas = 364 dias → início 2025-11-07 (exclusivo)

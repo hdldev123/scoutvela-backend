@@ -60,6 +60,7 @@ export async function vincularContaPorEmail(
   db: Db,
   authUserId: string,
   email: string,
+  agora: Date,
 ): Promise<UsuarioRegistro | null> {
   try {
     await db.transacao(async (tx) => {
@@ -72,9 +73,9 @@ export async function vincularContaPorEmail(
       const id = r.rows[0]?.id;
       if (!id) return;
       await tx.query(
-        `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-         values ($1, 'vincular_conta', 'usuarios', $2, '{}'::jsonb)`,
-        [id, id],
+        `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+         values ($1, 'vincular_conta', 'usuarios', $2, '{}'::jsonb, $3)`,
+        [id, id, agora],
       );
     });
   } catch (e) {

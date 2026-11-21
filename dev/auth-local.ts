@@ -526,8 +526,12 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
     const corpo = (req.body ?? {}) as Record<string, unknown>;
     if (corpo.factor_type !== "totp")
       return erro(resp, 422, "validation_failed", "Only totp factors are supported");
-    const { usuario } = ctx;
+    const { usuario, claims } = ctx;
     const existentes = fatores.get(usuario.auth_user_id) ?? [];
+    // Como no GoTrue: com um fator já verificado, cadastrar outro exige sessão aal2.
+    if (claims.aal !== "aal2" && existentes.some((f) => f.status === "verified")) {
+      return erro(resp, 403, "insufficient_aal", "AAL2 required to enroll a new factor");
+    }
     if (existentes.length >= MAX_FATORES) {
       return erro(
         resp,

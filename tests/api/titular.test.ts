@@ -1,4 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { jpegValido } from "../apoio/imagens.js";
 import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
 import type { Piloto } from "../apoio/piloto.js";
 
@@ -53,6 +54,75 @@ describe("direitos do titular (LGPD)", () => {
     for (const o of outros) expect(r.texto).not.toContain(o.nome);
     const aud = await p.db.query("select 1 from auditoria where acao = 'exportar_dados'");
     expect(aud.rows).toHaveLength(1);
+  });
+
+  it("exporta também a foto de perfil, as evidências anexadas e o plano individual", async () => {
+    const idAtleta = await p.idDe("SP-T07");
+    const vazio = await chamar(EMAILS_DEMO.atleta, "GET", "/meus-dados");
+    expect(vazio.corpo.foto).toBeNull();
+    expect(vazio.corpo.evidencias).toEqual([]);
+    expect(vazio.corpo.plano).toEqual([]);
+
+    const foto = await p.app.inject({
+      method: "POST",
+      url: "/me/foto",
+      headers: await p.como(EMAILS_DEMO.atleta),
+      payload: { tipoMime: "image/jpeg", conteudoBase64: jpegValido().toString("base64") },
+    });
+    expect(foto.statusCode).toBe(200);
+    const anexo = await p.app.inject({
+      method: "POST",
+      url: `/atletas/${idAtleta}/evidencias`,
+      headers: await p.como(EMAILS_DEMO.gestor),
+      payload: {
+        nomeArquivo: "laudo-pesagem.pdf",
+        tipoMime: "application/pdf",
+        conteudoBase64: Buffer.concat([Buffer.from("%PDF-1.7\n"), Buffer.alloc(64, 0x20)]).toString(
+          "base64",
+        ),
+      },
+    });
+    expect(anexo.statusCode).toBe(201);
+    const plano = await p.app.inject({
+      method: "PUT",
+      url: `/atletas/${idAtleta}/plano`,
+      headers: await p.como(EMAILS_DEMO.gestor),
+      payload: {
+        forcas: "Leitura de vento",
+        lacunas: "Largadas",
+        meta12m: "Top 20",
+        meta24m: "Campanha completa",
+        recomendacao: "Manter o ciclo",
+      },
+    });
+    expect([200, 201]).toContain(plano.statusCode);
+
+    const r = await chamar(EMAILS_DEMO.atleta, "GET", "/meus-dados");
+    expect(r.status).toBe(200);
+    expect(r.corpo.foto).toEqual({
+      tipoMime: "image/jpeg",
+      url: expect.stringContaining("https://"),
+    });
+    expect(r.corpo.evidencias).toEqual([
+      expect.objectContaining({
+        id: anexo.json().id,
+        nomeArquivo: "laudo-pesagem.pdf",
+        tipoMime: "application/pdf",
+        tamanhoBytes: expect.any(Number),
+        enviadoEm: expect.any(String),
+        removida: false,
+        removidoEm: null,
+      }),
+    ]);
+    expect(r.texto).not.toMatch(/[0-9a-f-]{36}\.pdf/);
+    expect(r.corpo.plano).toEqual([
+      expect.objectContaining({
+        forcas: "Leitura de vento",
+        meta12m: "Top 20",
+        registradoPor: expect.any(String),
+        registradoEm: expect.any(String),
+      }),
+    ]);
   });
 
   it("só o atleta exporta", async () => {

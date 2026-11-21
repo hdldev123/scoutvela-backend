@@ -220,9 +220,8 @@ describe("PUT /parametros: faixas, rubricas, regras e classes", () => {
     expect(regra(r.corpo, "P3")).toEqual({ limites: [50, 60, 70, 80, 90] });
     const stamp = (c: { regras: { codigo: string; atualizadoEm: string }[] }, k: string) =>
       c.regras.find((x) => x.codigo === k)!.atualizadoEm;
-    expect(Date.parse(stamp(r.corpo, "G3"))).toBeGreaterThanOrEqual(
-      Date.parse(stamp(antesC, "G3")),
-    );
+    // O carimbo vem do relógio da aplicação (app.agora()), não do now() do banco.
+    expect(stamp(r.corpo, "G3")).toBe(AGORA().toISOString());
     expect(stamp(r.corpo, "G1")).toBe(stamp(antesC, "G1"));
 
     const depois = await ranking();

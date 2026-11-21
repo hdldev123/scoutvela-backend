@@ -257,6 +257,34 @@ export interface AtualizacaoParametros {
     | undefined;
 }
 
+const umaCasa = <T extends number | null | undefined>(v: T): T =>
+  (typeof v === "number" ? Math.round(v * 10) / 10 : v) as T;
+
+/**
+ * Pesos e alturas de classe são `numeric(5,1)`: arredonda para 1 casa antes de validar e gravar,
+ * para o banco e a auditoria (antes/depois) guardarem o mesmo valor.
+ */
+function arredondarClasse<
+  C extends {
+    pesoMinKg?: number | undefined;
+    pesoMedioKg?: number | undefined;
+    pesoMaxKg?: number | undefined;
+    alturaMinCm?: number | null | undefined;
+    alturaMediaCm?: number | null | undefined;
+    alturaMaxCm?: number | null | undefined;
+  },
+>(c: C): C {
+  return {
+    ...c,
+    pesoMinKg: umaCasa(c.pesoMinKg),
+    pesoMedioKg: umaCasa(c.pesoMedioKg),
+    pesoMaxKg: umaCasa(c.pesoMaxKg),
+    alturaMinCm: umaCasa(c.alturaMinCm),
+    alturaMediaCm: umaCasa(c.alturaMediaCm),
+    alturaMaxCm: umaCasa(c.alturaMaxCm),
+  };
+}
+
 /** Erro de validação de negócio ao atualizar parâmetros (a rota converte em 400). */
 export class ErroParametros extends Error {}
 
@@ -268,6 +296,7 @@ export async function atualizarParametros(
   db: Db,
   usuarioId: string,
   dados: AtualizacaoParametros,
+  agora: Date,
 ): Promise<void> {
   await db.transacao(async (tx) => {
     const detalhes: Record<string, unknown> = {};
@@ -415,8 +444,8 @@ export async function atualizarParametros(
         antes[codigo] = atual.valor;
         depois[codigo] = parsed.data;
         await tx.query(
-          "update regras set valor = $2::jsonb, atualizado_em = now(), atualizado_por = $3 where codigo = $1",
-          [codigo, JSON.stringify(parsed.data), usuarioId],
+          "update regras set valor = $2::jsonb, atualizado_em = $4, atualizado_por = $3 where codigo = $1",
+          [codigo, JSON.stringify(parsed.data), usuarioId, agora],
         );
       }
       detalhes.regras = { antes, depois };
@@ -425,7 +454,7 @@ export async function atualizarParametros(
     if (dados.classes) {
       const antes: Record<string, unknown> = {};
       const depois: Record<string, unknown> = {};
-      for (const c of dados.classes) {
+      for (const c of dados.classes.map(arredondarClasse)) {
         const { pesoMinKg: min, pesoMedioKg: medio, pesoMaxKg: max } = c;
         const faixaInformada = [min, medio, max];
         const comFaixa = min !== undefined && medio !== undefined && max !== undefined;
@@ -539,8 +568,8 @@ export async function atualizarParametros(
     }
 
     await tx.query(
-      "insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes) values ($1, 'atualizar_parametros', 'parametros', null, $2::jsonb)",
-      [usuarioId, JSON.stringify(detalhes)],
+      "insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em) values ($1, 'atualizar_parametros', 'parametros', null, $2::jsonb, $3)",
+      [usuarioId, JSON.stringify(detalhes), agora],
     );
   });
 }

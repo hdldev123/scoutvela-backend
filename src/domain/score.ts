@@ -66,7 +66,10 @@ export function pontosRankingCbvela(
 ): number {
   const fim = dataIso(referencia);
   const inicio = menosDias(fim, janelaSemanas * 7);
-  return resultados
+  const soma = resultados
     .filter((r) => !r.internacional && naJanela(r.data, inicio, fim))
     .reduce((s, r) => s + (r.pontosCbvela ?? 0), 0);
+  // Os pontos têm 2 casas: arredonda a soma para não carregar erro de ponto flutuante
+  // (0,1 + 0,2 = 0,30000000000000004), que mudaria a faixa de PERF_PONTOS na fronteira.
+  return Math.round(soma * 100) / 100;
 }

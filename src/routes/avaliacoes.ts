@@ -25,9 +25,17 @@ const faixa = z.object({ id: z.string(), nome: z.string(), nomeCurto: z.string()
 
 const esquemaNota = z
   .object({
-    indicadorId: z.string().min(1).max(64),
-    valor: z.number().int().min(0).max(5),
-    evidencia: z.string().trim().min(3).max(500),
+    indicadorId: z.string().min(1, "Informe o indicador.").max(64),
+    valor: z
+      .number("Informe a nota (0 a 5).")
+      .int("A nota deve ser um número inteiro.")
+      .min(0, "A nota mínima é 0.")
+      .max(5, "A nota máxima é 5."),
+    evidencia: z
+      .string("Informe a evidência da nota.")
+      .trim()
+      .min(3, "A evidência precisa ter ao menos 3 caracteres.")
+      .max(500, "A evidência pode ter no máximo 500 caracteres."),
     /** Evidência anexada antes (POST /atletas/:id/evidencias), do mesmo atleta. A prévia ignora. */
     anexoId: z.uuid().optional(),
   })
@@ -35,9 +43,22 @@ const esquemaNota = z
 
 const esquemaMedida = z
   .object({
-    pesoKg: z.number().min(30).max(160).optional(),
-    alturaCm: z.number().min(120).max(230).optional(),
-    evidencia: z.string().trim().min(3).max(200).optional(),
+    pesoKg: z
+      .number("Informe o peso em kg.")
+      .min(30, "O peso deve ficar entre 30 e 160 kg.")
+      .max(160, "O peso deve ficar entre 30 e 160 kg.")
+      .optional(),
+    alturaCm: z
+      .number("Informe a altura em cm.")
+      .min(120, "A altura deve ficar entre 120 e 230 cm.")
+      .max(230, "A altura deve ficar entre 120 e 230 cm.")
+      .optional(),
+    evidencia: z
+      .string()
+      .trim()
+      .min(3, "A evidência da medida precisa ter ao menos 3 caracteres.")
+      .max(200, "A evidência da medida pode ter no máximo 200 caracteres.")
+      .optional(),
   })
   .strict()
   .refine((m) => m.pesoKg !== undefined || m.alturaCm !== undefined, {
@@ -97,6 +118,22 @@ function validarNotas(parametros: Parametros, corpo: Corpo): void {
       throw requisicaoInvalida(`Indicador repetido no envio: ${n.indicadorId}.`);
     vistos.add(n.indicadorId);
   }
+}
+
+const umaCasa = (v: number) => Math.round(v * 10) / 10;
+
+/** Peso e altura são `numeric(5,1)` no banco: a prévia e a gravação usam o valor já com 1 casa. */
+function arredondarMedida(corpo: Corpo): Corpo {
+  const m = corpo.medida;
+  if (!m) return corpo;
+  return {
+    ...corpo,
+    medida: {
+      ...m,
+      ...(m.pesoKg !== undefined ? { pesoKg: umaCasa(m.pesoKg) } : {}),
+      ...(m.alturaCm !== undefined ? { alturaCm: umaCasa(m.alturaCm) } : {}),
+    },
+  };
 }
 
 /** Dados do atleta como ficariam depois do lançamento (sem gravar). */
@@ -195,13 +232,14 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
       const base = await buscarAtletaVisivel(app.db, req.usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
-      validarNotas(parametros, req.body);
+      const corpo = arredondarMedida(req.body);
+      validarNotas(parametros, corpo);
 
       const antes = await avaliarUm(app.db, parametros, base, referencia);
       const [depois] = avaliarAtletas(
         parametros,
         [base],
-        new Map([[base.id, aplicarProposta(antes.dados, req.body, referencia)]]),
+        new Map([[base.id, aplicarProposta(antes.dados, corpo, referencia)]]),
         referencia,
       );
       if (!depois) throw naoEncontrado("Atleta não encontrado.");
@@ -248,27 +286,30 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
     },
     async (req, reply) => {
       const referencia = app.agora();
-      const { usuario, body } = req;
+      const { usuario } = req;
+      const body = arredondarMedida(req.body);
       const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
       validarNotas(parametros, body);
 
       const anexoIds = [...new Set(body.notas.flatMap((n) => (n.anexoId ? [n.anexoId] : [])))];
-      if (anexoIds.length > 0) {
-        const ok = await app.db.query<{ id: string }>(
-          `select id from evidencias_anexos where atleta_id = $1::uuid and id = any($2::uuid[])`,
-          [base.id, anexoIds],
-        );
-        if (ok.rows.length !== anexoIds.length)
-          throw requisicaoInvalida("Anexo inexistente ou de outro atleta.");
-      }
 
       const resultado = await app.db.transacao(async (tx) => {
         await travarAtletaEditavel(tx, base.id);
+        if (anexoIds.length > 0) {
+          // `for share`: uma remoção do anexo em andamento termina antes; anexo removido não liga.
+          const ok = await tx.query<{ id: string }>(
+            `select id from evidencias_anexos
+              where atleta_id = $1::uuid and id = any($2::uuid[]) and removido_em is null for share`,
+            [base.id, anexoIds],
+          );
+          if (ok.rows.length !== anexoIds.length)
+            throw requisicaoInvalida("Anexo inexistente, removido ou de outro atleta.");
+        }
         const antes = await avaliarUm(tx, parametros, base, referencia);
         const ciclo = await tx.query<{ id: string }>(
-          `select id from ciclos_avaliacao where status = 'aberto' limit 1`,
+          `select id from ciclos_avaliacao where status = 'aberto' limit 1 for share`,
         );
         const cicloId = ciclo.rows[0]?.id ?? null;
 

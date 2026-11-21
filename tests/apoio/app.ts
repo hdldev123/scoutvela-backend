@@ -74,6 +74,8 @@ export interface OpcoesToken {
   email?: string;
   /** Nível de garantia da sessão (claim aal). Padrão: ausente. */
   aal?: "aal1" | "aal2";
+  /** `user_metadata.email_verified` do token. Padrão: ausente. */
+  emailVerificado?: boolean;
 }
 
 /** Assina um JWT no formato do Supabase Auth, só para testes. */
@@ -82,6 +84,9 @@ export async function tokenPara(authUserId: string, opcoes: OpcoesToken = {}): P
   return new SignJWT({
     ...(opcoes.email ? { email: opcoes.email } : {}),
     ...(opcoes.aal ? { aal: opcoes.aal } : {}),
+    ...(opcoes.emailVerificado === undefined
+      ? {}
+      : { user_metadata: { email_verified: opcoes.emailVerificado } }),
   })
     .setProtectedHeader({ alg: "HS256" })
     .setSubject(authUserId)

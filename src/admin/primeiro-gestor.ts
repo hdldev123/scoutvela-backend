@@ -29,6 +29,7 @@ export async function criarPrimeiroGestor(
   db: Db,
   adminAuth: AdminAuth,
   dados: { email: string; nome: string; redirectTo: string },
+  agora: Date = new Date(),
 ): Promise<{ usuarioId: string }> {
   const email = dados.email.trim().toLowerCase();
   const nome = dados.nome.trim();
@@ -51,14 +52,15 @@ export async function criarPrimeiroGestor(
     const usuarioId = rows[0]!.id;
     // Convite dentro da transação: se o Auth recusar, o insert acima é desfeito.
     const { authUserId } = await adminAuth.convidar(email, dados.redirectTo);
-    await tx.query("update usuarios set auth_user_id = $2, convidado_em = now() where id = $1", [
+    await tx.query("update usuarios set auth_user_id = $2, convidado_em = $3 where id = $1", [
       usuarioId,
       authUserId,
+      agora,
     ]);
     await tx.query(
-      `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
-       values (null, 'criar_primeiro_gestor', 'usuarios', $1, '{}'::jsonb)`,
-      [usuarioId],
+      `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
+       values (null, 'criar_primeiro_gestor', 'usuarios', $1, '{}'::jsonb, $2)`,
+      [usuarioId, agora],
     );
     return { usuarioId };
   });
