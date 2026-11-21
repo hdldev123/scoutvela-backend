@@ -5,6 +5,7 @@ import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { conflito, esquemaErro, naoEncontrado, requisicaoInvalida } from "../erros.js";
 import { travarAtletaEditavel } from "../repositories/anonimizado.js";
+import { caminhoDaFotoDoAtleta, linkDaFoto } from "../servicos/foto-perfil.js";
 
 /**
  * Direitos do titular (LGPD, art. 18) para o atleta: exportar os próprios dados e
@@ -61,6 +62,22 @@ const esquemaExportacao = z.object({
   ),
   pedidosRevisao: registros,
   pedidosTitular: registros,
+  foto: z
+    .object({
+      tipoMime: z.string(),
+      url: z
+        .string()
+        .nullable()
+        .describe("Link assinado de 5 minutos para baixar a foto; nulo se o Storage não respondeu"),
+    })
+    .nullable()
+    .describe("Foto de perfil da conta do atleta (o caminho interno não é exportado)"),
+  evidencias: registros.describe(
+    "Evidências anexadas: id, nomeArquivo, tipoMime, tamanhoBytes, enviadoEm, indicador, enviadoPor, removida e removidoEm (o arquivo não vai no JSON; o link de cada um sai por GET /evidencias/{id}/link)",
+  ),
+  plano: registros.describe(
+    "Plano individual: todas as versões registradas, da mais antiga para a mais nova",
+  ),
 });
 
 async function auditar(
@@ -175,7 +192,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         tags: ["titular"],
         summary: "Exporta em JSON tudo o que o sistema guarda sobre o atleta (LGPD)",
         description:
-          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados, decisões de gate, financeiro, pedidos de revisão e pedidos do titular. Só o atleta logado, só os próprios dados.",
+          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados, decisões de gate, financeiro, pedidos de revisão e pedidos do titular, foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
         security: seguranca,
         response: { 200: esquemaExportacao, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
       },
@@ -198,6 +215,9 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         componentes,
         revisoes,
         pedidos,
+        evidencias,
+        plano,
+        caminhoFoto,
       ] = await Promise.all([
         q<Record<string, unknown>>(
           `select a.velaid_codigo as "velaid", a.nome, a.genero, a.data_nascimento::text as "dataNascimento",
@@ -262,6 +282,22 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           `select tipo, descricao, status, resposta, criado_em as "criadoEm", respondido_em as "respondidoEm"
                from pedidos_titular where atleta_id = $1::uuid order by criado_em, id`,
         ),
+        q<Record<string, unknown>>(
+          `select e.id, e.nome_arquivo as "nomeArquivo", e.tipo_mime as "tipoMime", e.tamanho_bytes as "tamanhoBytes",
+                    e.enviado_em as "enviadoEm", i.nome as indicador, u.nome as "enviadoPor",
+                    (e.removido_em is not null) as removida, e.removido_em as "removidoEm"
+               from evidencias_anexos e
+               left join indicadores i on i.id = e.indicador_id
+               left join usuarios u on u.id = e.enviado_por
+              where e.atleta_id = $1::uuid order by e.enviado_em, e.id`,
+        ),
+        q<Record<string, unknown>>(
+          `select p.forcas, p.lacunas, p.meta_12m as "meta12m", p.meta_24m as "meta24m", p.recomendacao,
+                    u.nome as "registradoPor", p.registrado_em as "registradoEm"
+               from plano_individual p join usuarios u on u.id = p.registrado_por
+              where p.atleta_id = $1::uuid order by p.registrado_em, p.id`,
+        ),
+        caminhoDaFotoDoAtleta(app.db, id),
       ]);
       if (!cadastro[0]) throw naoEncontrado("Atleta não encontrado.");
 
@@ -287,6 +323,14 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         financeiro: financeiroComComponentes,
         pedidosRevisao: revisoes,
         pedidosTitular: pedidos,
+        foto: caminhoFoto
+          ? {
+              tipoMime: caminhoFoto.endsWith(".png") ? "image/png" : "image/jpeg",
+              url: await linkDaFoto(app.armazenamento, caminhoFoto, req.log),
+            }
+          : null,
+        evidencias,
+        plano,
       };
     },
   );
