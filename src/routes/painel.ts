@@ -107,7 +107,7 @@ async function auditar(
 
 async function cicloAbertoId(db: Db): Promise<string | null> {
   const r = await db.query<{ id: string }>(
-    `select id from ciclos_avaliacao where status = 'aberto' limit 1`,
+    `select id from ciclos_avaliacao where status = 'aberto' limit 1 for share`,
   );
   return r.rows[0]?.id ?? null;
 }

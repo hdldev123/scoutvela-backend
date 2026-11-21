@@ -291,7 +291,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
         }
         const antes = await avaliarUm(tx, parametros, base, referencia);
         const ciclo = await tx.query<{ id: string }>(
-          `select id from ciclos_avaliacao where status = 'aberto' limit 1`,
+          `select id from ciclos_avaliacao where status = 'aberto' limit 1 for share`,
         );
         const cicloId = ciclo.rows[0]?.id ?? null;
 
