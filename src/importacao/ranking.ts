@@ -102,11 +102,20 @@ export async function importarRanking(
       erros.push({ linha, mensagem: "Resultado já importado (mesmo atleta, evento e data)." });
       continue;
     }
-    await tx.query(
+    // O índice único `resultados_ranking_unico` (migration 0016) é a garantia: se outro envio
+    // simultâneo gravou o mesmo resultado entre o select e este insert, o conflito vira o mesmo erro.
+    const gravado = await tx.query(
       `insert into resultados_regata (atleta_id, nivel, evento, data, posicao, tamanho_frota, internacional, pontos_cbvela, fonte, registrado_por)
-       values ($1, $2, $3, $4::date, $5, $6, false, $7, 'ranking_cbvela', $8)`,
+       values ($1, $2, $3, $4::date, $5, $6, false, $7, 'ranking_cbvela', $8)
+       on conflict (atleta_id, lower(evento), data) where fonte = 'ranking_cbvela' and not anonimizado
+       do nothing
+       returning id`,
       [atletaId, r.nivel, r.evento, r.data, r.posicao, r.tamanhoFrota, r.pontos, registradoPor],
     );
+    if (gravado.rows.length === 0) {
+      erros.push({ linha, mensagem: "Resultado já importado (mesmo atleta, evento e data)." });
+      continue;
+    }
     linhasOk++;
   }
   return { linhasOk, erros };

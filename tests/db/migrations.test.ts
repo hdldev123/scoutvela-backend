@@ -104,5 +104,88 @@ describe("Migrations", () => {
       );
       await recusar(`delete from evidencias_anexos where id = $1`);
     });
+
+    it("recusa removido_em anterior ao envio", async () => {
+      const id = await inserir("a/3.pdf");
+      await expect(
+        db.query(
+          `update evidencias_anexos set removido_em = enviado_em - interval '1 second', nome_arquivo = 'removido' where id = $1`,
+          [id],
+        ),
+      ).rejects.toThrow(/aceita só inserção/);
+      // No mesmo instante do envio vale.
+      await db.query(
+        `update evidencias_anexos set removido_em = enviado_em, nome_arquivo = 'removido' where id = $1`,
+        [id],
+      );
+    });
+
+    it("compara o registro inteiro: coluna criada no futuro também fica protegida", async () => {
+      await db.exec(`alter table evidencias_anexos add column futura text`);
+      try {
+        const id = await inserir("a/4.pdf");
+        await expect(
+          db.query(
+            `update evidencias_anexos set removido_em = now(), nome_arquivo = 'removido', futura = 'x' where id = $1`,
+            [id],
+          ),
+        ).rejects.toThrow(/aceita só inserção/);
+        await db.query(
+          `update evidencias_anexos set removido_em = now(), nome_arquivo = 'removido' where id = $1`,
+          [id],
+        );
+      } finally {
+        await db.exec(`alter table evidencias_anexos drop column futura`);
+      }
+    });
+  });
+
+  describe("funções com search_path fixo (0016)", () => {
+    it("todas as funções do schema public têm search_path definido", async () => {
+      const { rows } = await db.query<{ proname: string }>(
+        `select p.proname from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'public' and p.prokind = 'f'
+            and not exists (select 1 from unnest(coalesce(p.proconfig, '{}')) c where c like 'search_path=%')`,
+      );
+      expect(rows.map((r) => r.proname)).toEqual([]);
+    });
+  });
+
+  describe("resultados do Ranking CBVela (índice único)", () => {
+    const ATLETA = "cccccccc-cccc-4ccc-8ccc-cccccccccccc";
+    beforeAll(async () => {
+      await db.exec(`
+        insert into classes (id, nome, evento, posicao, peso_min_kg, peso_medio_kg, peso_max_kg, ordem)
+          values ('t_cls3', 'Classe teste 3', 'Teste', 'ind', 60, 65, 70, 97);
+        insert into atletas (id, velaid_codigo, nome, genero, data_nascimento, classe_id)
+          values ('${ATLETA}', 'XX-RK1', 'Atleta Rk', 'F', '2000-01-01', 't_cls3');
+      `);
+    });
+    const inserir = (evento: string, fonte: "ranking_cbvela" | "manual" = "ranking_cbvela") =>
+      db.query(
+        `insert into resultados_regata (atleta_id, nivel, evento, data, posicao, tamanho_frota, internacional, pontos_cbvela, fonte, link_oficial)
+         values ($1, 'estadual', $2, '2026-05-30', 1, 10, false, ${fonte === "manual" ? "null" : "10"}, $3, ${fonte === "manual" ? "'https://x.invalid'" : "null"})`,
+        [ATLETA, evento, fonte],
+      );
+
+    it("recusa o mesmo atleta + evento + data (sem diferenciar maiúsculas) na fonte do ranking", async () => {
+      await inserir("Copa Unica");
+      await expect(inserir("COPA UNICA")).rejects.toThrow(/resultados_ranking_unico/);
+    });
+
+    it("não vale para a fonte manual nem para linhas anonimizadas", async () => {
+      await inserir("Copa Manual", "manual");
+      await inserir("Copa Manual", "manual");
+      await inserir("Copa Anon");
+      await db.query(
+        `update resultados_regata set evento = 'Evento anonimizado', anonimizado = true where atleta_id = $1 and evento = 'Copa Anon'`,
+        [ATLETA],
+      );
+      await inserir("Copa Anon");
+      await db.query(
+        `update resultados_regata set evento = 'Evento anonimizado', anonimizado = true where atleta_id = $1 and evento = 'Copa Anon'`,
+        [ATLETA],
+      );
+    });
   });
 });

@@ -220,7 +220,7 @@ export function textoDaResposta(em: Date): string {
  */
 async function marcarEvidenciasRemovidas(tx: Db, atletaId: string, em: Date): Promise<number> {
   const r = await tx.query(
-    `update evidencias_anexos set removido_em = $2, nome_arquivo = 'removido'
+    `update evidencias_anexos set removido_em = greatest($2::timestamptz, enviado_em), nome_arquivo = 'removido'
       where atleta_id = $1::uuid and removido_em is null
   returning id`,
     [atletaId, em],
