@@ -68,16 +68,22 @@ export function registrarAutenticacao(
     let sub: string;
     let email: string | undefined;
     let aal: "aal1" | "aal2" | undefined;
+    let emailVerificado: boolean | undefined;
     try {
-      ({ sub, email, aal } = await verificarToken(m[1]));
+      ({ sub, email, aal, emailVerificado } = await verificarToken(m[1]));
     } catch {
       logarAcessoNegado(req, "token_invalido");
       throw naoAutenticado("Sessão inválida ou expirada.");
     }
 
     let u = await buscarUsuarioPorAuthId(app.db, sub);
-    if (!u && email) {
+    if (!u && email && emailVerificado === false) {
+      // O token diz que o e-mail não foi confirmado: não amarra o login ao cadastro por ele.
+      logarAcessoNegado(req, "email_nao_verificado");
+    } else if (!u && email) {
       // Primeiro login de uma conta convidada: amarra o login ao cadastro pelo e-mail do token.
+      // (Se o token não traz `email_verified`, vale a configuração do projeto Supabase: cadastro
+      // público desligado e confirmação de e-mail ligada. Ver README, "Montar um ambiente".)
       u = await vincularContaPorEmail(app.db, sub, email, app.agora());
       if (u)
         req.log.info(

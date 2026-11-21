@@ -3,6 +3,11 @@ import { createRemoteJWKSet, jwtVerify } from "jose";
 export interface ClaimsVerificados {
   sub: string;
   email?: string;
+  /**
+   * E-mail confirmado, quando o token informa: `user_metadata.email_verified` do Supabase Auth
+   * (ou `email_verified` no topo). Ausente = o token não diz; `false` = o e-mail NÃO foi confirmado.
+   */
+  emailVerificado?: boolean;
   /** Nível de garantia da sessão: aal2 = passou pelo segundo fator. Ausente = aal1. */
   aal?: "aal1" | "aal2";
 }
@@ -36,6 +41,18 @@ export function criarVerificadorSupabase(opcoes: {
     if (typeof payload.sub !== "string" || payload.sub === "") throw new Error("Token sem sub");
     const email = typeof payload.email === "string" ? payload.email : undefined;
     const aal = payload.aal === "aal2" ? "aal2" : "aal1";
-    return email === undefined ? { sub: payload.sub, aal } : { sub: payload.sub, email, aal };
+    const meta = payload.user_metadata;
+    const declarado =
+      typeof payload.email_verified === "boolean"
+        ? payload.email_verified
+        : meta && typeof meta === "object" && "email_verified" in meta
+          ? (meta as { email_verified?: unknown }).email_verified
+          : undefined;
+    return {
+      sub: payload.sub,
+      ...(email === undefined ? {} : { email }),
+      ...(typeof declarado === "boolean" ? { emailVerificado: declarado } : {}),
+      aal,
+    };
   };
 }
