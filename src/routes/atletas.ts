@@ -192,7 +192,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         tags: ["atletas"],
         summary: "Ficha do atleta, conforme a matriz de acesso do papel",
         description:
-          "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo 404. IBVAR: sem indicadores sensíveis, Class Fit, contato, financeiro detalhado nem texto de evidência; o motivo do gate G1 vem genérico, sem a diferença em kg.",
+          "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo 404. IBVAR: só vê quem consentiu E está dentro do piloto (mesma regra do ranking: aceite do termo, que segue TERMO_EXIGE_REACEITE); fora do piloto dá 404, também no histórico do indicador. Gestor, treinador e o próprio atleta mantêm o acesso. IBVAR: sem indicadores sensíveis, Class Fit, contato, financeiro detalhado nem texto de evidência; o motivo do gate G1 vem genérico, sem a diferença em kg.",
         security: [{ bearerAuth: [] }],
         params: z.object({ id: z.uuid() }),
         response: {
