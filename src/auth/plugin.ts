@@ -6,7 +6,7 @@ import type {
 } from "fastify";
 import type { Db } from "../db/db.js";
 import type { Papel } from "../domain/tipos.js";
-import { mfaObrigatorio, naoAutenticado, semAcesso } from "../erros.js";
+import { ErroApi, mfaObrigatorio, naoAutenticado, semAcesso } from "../erros.js";
 import { buscarUsuarioPorAuthId, vincularContaPorEmail } from "../repositories/usuarios.js";
 import { acessoDoPapel } from "./acesso.js";
 import type { VerificadorToken } from "./jwt.js";
@@ -119,6 +119,26 @@ export function exigirPapel(...papeis: Papel[]): preHandlerAsyncHookHandler {
     if (!papeis.includes(req.usuario.papel)) {
       logarAcessoNegado(req, "papel_nao_permitido", req.usuario);
       throw semAcesso();
+    }
+  };
+}
+
+/**
+ * Limite por IP para rotas com corpo grande (upload). Quem define `config.rateLimit` na rota perde o
+ * limite global, então este hook devolve o limite por IP no `onRequest`, antes de o corpo ser lido.
+ * Usa os mesmos limites e a mesma chave do limite global. Depois dele, `app.autenticar` (também no
+ * `onRequest`) recusa quem não tem sessão sem consumir o corpo.
+ */
+export function limitePorIp(app: FastifyInstance): (req: FastifyRequest) => Promise<void> {
+  const aplicar = app.createRateLimit({});
+  return async (req) => {
+    const r = await aplicar(req);
+    if (!r.isAllowed && r.isExceeded) {
+      throw new ErroApi(
+        429,
+        "limite_excedido",
+        "Muitas requisições. Aguarde um pouco e tente de novo.",
+      );
     }
   };
 }

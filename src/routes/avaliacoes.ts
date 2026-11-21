@@ -6,6 +6,7 @@ import type { Db } from "../db/db.js";
 import { INDICADOR_PONTOS_RANKING, notaSugeridaPorPontos } from "../domain/index.js";
 import type { Parametros, ResultadoCalculo, StatusGate, SugestaoPontos } from "../domain/index.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
+import { recusarAtletaAnonimizado, travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
 import type { AtletaBase, DadosAtleta } from "../repositories/atletas.js";
 import { carregarParametros } from "../repositories/parametros.js";
@@ -223,7 +224,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
   rota.post(
     "/atletas/:id/avaliacoes",
     {
-      preHandler: acessoAvaliador,
+      preHandler: [...acessoAvaliador, recusarAtletaAnonimizado(app)],
       schema: {
         tags: ["avaliacoes"],
         summary: "Lança notas e/ou medida do atleta (série histórica: só insere)",
@@ -241,6 +242,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           401: esquemaErro,
           403: esquemaErro,
           404: esquemaErro,
+          409: esquemaErro,
         },
       },
     },
@@ -263,6 +265,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
       }
 
       const resultado = await app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, base.id);
         const antes = await avaliarUm(tx, parametros, base, referencia);
         const ciclo = await tx.query<{ id: string }>(
           `select id from ciclos_avaliacao where status = 'aberto' limit 1`,
@@ -337,7 +340,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
   rota.put(
     "/atletas/:id/gates",
     {
-      preHandler: [app.autenticar, exigirPapel("gestor")],
+      preHandler: [app.autenticar, exigirPapel("gestor"), recusarAtletaAnonimizado(app)],
       schema: {
         tags: ["avaliacoes"],
         summary: "Decisão do gestor sobre um gate (nulo ou igual à sugestão volta ao automático)",
@@ -356,6 +359,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           401: esquemaErro,
           403: esquemaErro,
           404: esquemaErro,
+          409: esquemaErro,
         },
       },
     },
@@ -367,6 +371,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
       const parametros = await carregarParametros(app.db);
 
       const calculo = await app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, base.id);
         const atual = await avaliarUm(tx, parametros, base, referencia);
         const sugestao = atual.calculo.gates[body.gate - 1]?.sugestaoAutomatica;
         if (!sugestao) throw requisicaoInvalida("Gate inexistente.");

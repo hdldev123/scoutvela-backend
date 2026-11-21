@@ -3,11 +3,12 @@ import type { FastifyInstance, FastifyBaseLogger } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { UsuarioAutenticado } from "../auth/plugin.js";
-import { exigirPapel } from "../auth/plugin.js";
+import { exigirPapel, limitePorIp } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { esquemaErro, requisicaoInvalida, servicoIndisponivel } from "../erros.js";
-import { TIPOS_ARQUIVO, decodificarArquivo } from "../servicos/arquivo-base64.js";
-import { linkDaFoto, removerFotoSemFalhar } from "../servicos/foto-perfil.js";
+import { TIPOS_ARQUIVO, decodificarArquivo, limparMetadados } from "../servicos/arquivo-base64.js";
+import { removerOuPendenciar } from "../servicos/arquivos-pendentes.js";
+import { linkDaFoto } from "../servicos/foto-perfil.js";
 
 const TAMANHO_MAXIMO_FOTO = 2 * 1024 * 1024;
 const BASE64_MAXIMO_FOTO = 2_800_000;
@@ -137,6 +138,13 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
   const rota = app.withTypeProvider<ZodTypeProvider>();
   const acesso = [app.autenticar, exigirPapel("gestor", "treinador", "atleta")];
   const respostasComuns = { 401: esquemaErro, 403: esquemaErro };
+  const limpeza = (log: FastifyBaseLogger) => ({
+    db: app.db,
+    armazenamento: app.armazenamento,
+    log,
+    agora: app.agora,
+  });
+  const limiteIp = limitePorIp(app);
 
   rota.get(
     "/me/perfil",
@@ -203,7 +211,9 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
   rota.post(
     "/me/foto",
     {
-      preHandler: acesso,
+      // onRequest: limite por IP e sessão são conferidos ANTES de o corpo (até 3 MB) ser lido.
+      onRequest: [limiteIp, app.autenticar],
+      preHandler: [exigirPapel("gestor", "treinador", "atleta")],
       bodyLimit: 3 * 1024 * 1024,
       config: {
         rateLimit: {
@@ -237,10 +247,14 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
     async (req) => {
       const u = req.usuario;
       const { tipoMime, conteudoBase64 } = req.body;
-      const bytes = decodificarArquivo(conteudoBase64, tipoMime, {
-        bytes: TAMANHO_MAXIMO_FOTO,
-        mensagem: "A foto passa de 2 MB.",
-      });
+      // Sem EXIF nem GPS: a foto do perfil é guardada só com a imagem.
+      const bytes = limparMetadados(
+        decodificarArquivo(conteudoBase64, tipoMime, {
+          bytes: TAMANHO_MAXIMO_FOTO,
+          mensagem: "A foto passa de 2 MB.",
+        }),
+        tipoMime,
+      );
       const caminho = `fotos/${u.id}/${randomUUID()}.${TIPOS_ARQUIVO[tipoMime].ext}`;
       try {
         await app.armazenamento.salvar(caminho, bytes, tipoMime);
@@ -270,10 +284,10 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
           return r.rows[0]?.foto_caminho ?? null;
         });
       } catch (e) {
-        await removerFotoSemFalhar(app.armazenamento, caminho, req.log);
+        await removerOuPendenciar(limpeza(req.log), caminho, "rollback_foto");
         throw e;
       }
-      if (anterior) await removerFotoSemFalhar(app.armazenamento, anterior, req.log);
+      if (anterior) await removerOuPendenciar(limpeza(req.log), anterior, "troca_foto");
       return { fotoUrl: await linkDaFoto(app.armazenamento, caminho, req.log) };
     },
   );
@@ -285,25 +299,38 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
       schema: {
         tags: ["sessao"],
         summary: "Remove a foto de perfil",
-        description: "Idempotente: sem foto, também responde 204.",
+        description:
+          "Idempotente: sem foto, também responde 204. O arquivo sai do Storage antes de o caminho sair do banco: se o Storage falhar, responde 503 e a foto continua (tente de novo).",
         security: [{ bearerAuth: [] }],
-        response: { 204: z.null().describe("Foto removida"), ...respostasComuns },
+        response: {
+          204: z.null().describe("Foto removida"),
+          ...respostasComuns,
+          503: esquemaErro,
+        },
       },
     },
     async (req, reply) => {
       const u = req.usuario;
-      const anterior = await app.db.transacao(async (tx) => {
-        const r = await tx.query<{ foto_caminho: string | null }>(
-          `select foto_caminho from usuarios where id = $1::uuid for update`,
-          [u.id],
+      const atual = await app.db.query<{ foto_caminho: string | null }>(
+        `select foto_caminho from usuarios where id = $1::uuid`,
+        [u.id],
+      );
+      const caminho = atual.rows[0]?.foto_caminho ?? null;
+      if (!caminho) return reply.code(204).send(null);
+      // O arquivo sai primeiro: se a remoção falhar o caminho continua no banco e dá para repetir.
+      try {
+        await app.armazenamento.remover(caminho);
+      } catch (e) {
+        req.log.error({ err: e }, "falha ao remover foto");
+        throw servicoIndisponivel("Não foi possível remover a foto agora. Tente de novo.");
+      }
+      await app.db.transacao(async (tx) => {
+        const r = await tx.query(
+          `update usuarios set foto_caminho = null where id = $1::uuid and foto_caminho = $2 returning id`,
+          [u.id, caminho],
         );
-        const caminho = r.rows[0]?.foto_caminho ?? null;
-        if (!caminho) return null;
-        await tx.query(`update usuarios set foto_caminho = null where id = $1::uuid`, [u.id]);
-        await auditar(tx, u.id, "remover_foto", {}, app.agora());
-        return caminho;
+        if (r.rows.length > 0) await auditar(tx, u.id, "remover_foto", {}, app.agora());
       });
-      if (anterior) await removerFotoSemFalhar(app.armazenamento, anterior, req.log);
       return reply.code(204).send(null);
     },
   );

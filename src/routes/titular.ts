@@ -3,7 +3,8 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
-import { conflito, esquemaErro, naoEncontrado } from "../erros.js";
+import { conflito, esquemaErro, naoEncontrado, requisicaoInvalida } from "../erros.js";
+import { travarAtletaEditavel } from "../repositories/anonimizado.js";
 
 /**
  * Direitos do titular (LGPD, art. 18) para o atleta: exportar os próprios dados e
@@ -252,6 +253,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
       const atletaId = usuario.atletaId;
       const { tipo, descricao } = req.body;
       const id = await app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, atletaId);
         const r = await tx.query<{ id: string }>(
           `insert into pedidos_titular (atleta_id, tipo, descricao, criado_por, criado_em)
            values ($1::uuid, $2, $3, $4::uuid, $5) returning id::text as id`,
@@ -298,7 +300,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         tags: ["titular"],
         summary: "Responde um pedido do titular",
         description:
-          "Registra a resposta e fecha o pedido. A exclusão de dados NÃO é feita por esta rota: para pedido de exclusão use `POST /atletas/{id}/anonimizar`, que anonimiza o atleta e responde o pedido (a série histórica, que só aceita inserção, é mantida sem identificação direta). Pedido já respondido devolve 409 (código requisicao_invalida).",
+          "Registra a resposta e fecha o pedido. Pedido de exclusão NÃO é fechado por aqui: devolve 409 apontando para `POST /atletas/{id}/anonimizar`, que anonimiza o atleta e responde o pedido. Única exceção: a recusa formal, `{ resposta, recusar: true }`, com justificativa de ao menos 20 caracteres; fecha o pedido sem anonimizar e fica na auditoria como `recusar_exclusao`. `recusar` só vale para pedido de exclusão (400 nos demais). Pedido já respondido devolve 409 (código requisicao_invalida).",
         security: seguranca,
         params: z.object({ id: z.string().regex(/^\d{1,18}$/, "Identificador inválido.") }),
         body: z.object({
@@ -307,6 +309,12 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
             .trim()
             .min(3, "A resposta precisa ter ao menos 3 caracteres.")
             .max(2000),
+          recusar: z
+            .boolean()
+            .optional()
+            .describe(
+              "Só para pedido de exclusão: recusa formal, com justificativa de ao menos 20 caracteres. Sem isto, o pedido de exclusão é atendido pela anonimização.",
+            ),
         }),
         response: {
           200: esquemaPedido,
@@ -321,12 +329,35 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
     async (req) => {
       const usuario = req.usuario;
       const { id } = req.params;
+      const recusar = req.body.recusar === true;
       await app.db.transacao(async (tx) => {
-        const r = await tx.query(
+        const atual = await tx.query<{ tipo: string; status: string }>(
+          `select tipo, status from pedidos_titular where id = $1::bigint for update`,
+          [id],
+        );
+        const pedido = atual.rows[0];
+        if (!pedido) throw naoEncontrado("Pedido não encontrado.");
+        if (pedido.status !== "aberto") throw conflito("Este pedido já foi respondido.");
+        if (recusar && pedido.tipo !== "exclusao") {
+          throw requisicaoInvalida("A recusa formal vale só para pedido de exclusão.");
+        }
+        if (pedido.tipo === "exclusao") {
+          if (!recusar) {
+            throw conflito(
+              "Pedido de exclusão não se responde por aqui: use POST /atletas/{id}/anonimizar, que anonimiza o atleta e responde o pedido. Para recusar formalmente, envie recusar: true com a justificativa (ao menos 20 caracteres).",
+            );
+          }
+          if (req.body.resposta.length < 20) {
+            throw requisicaoInvalida(
+              "A recusa de um pedido de exclusão precisa de justificativa com ao menos 20 caracteres.",
+            );
+          }
+        }
+        const r = await tx.query<{ atleta_id: string }>(
           `update pedidos_titular
               set status = 'respondido', resposta = $2, respondido_por = $3::uuid, respondido_em = $4
             where id = $1::bigint and status = 'aberto'
-        returning id`,
+        returning atleta_id`,
           [id, req.body.resposta, usuario.id, app.agora()],
         );
         if (r.rows.length === 0) {
@@ -336,7 +367,16 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           if (existe.rows.length === 0) throw naoEncontrado("Pedido não encontrado.");
           throw conflito("Este pedido já foi respondido.");
         }
-        await auditar(tx, usuario.id, "responder_titular", "pedidos_titular", id, {});
+        // Atleta anonimizado: nada mais é gravado (a resposta da exclusão já ficou na anonimização).
+        await travarAtletaEditavel(tx, r.rows[0]!.atleta_id);
+        await auditar(
+          tx,
+          usuario.id,
+          recusar ? "recusar_exclusao" : "responder_titular",
+          "pedidos_titular",
+          id,
+          {},
+        );
       });
       const r = await app.db.query<LinhaPedido>(`${SQL_PEDIDO} where p.id = $1::bigint`, [id]);
       return paraPedido(r.rows[0]!);

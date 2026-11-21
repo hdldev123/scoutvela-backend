@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import { esquemaErro, naoEncontrado } from "../erros.js";
+import { recusarAtletaAnonimizado, travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
 import { buscarPlanoAtual } from "../repositories/plano.js";
 
@@ -25,7 +26,11 @@ export async function rotasPlano(app: FastifyInstance): Promise<void> {
   app.withTypeProvider<ZodTypeProvider>().put(
     "/atletas/:id/plano",
     {
-      preHandler: [app.autenticar, exigirPapel("gestor", "treinador")],
+      preHandler: [
+        app.autenticar,
+        exigirPapel("gestor", "treinador"),
+        recusarAtletaAnonimizado(app),
+      ],
       schema: {
         tags: ["atletas"],
         summary: "Registra uma nova versão do plano individual (série histórica: só insere)",
@@ -49,6 +54,7 @@ export async function rotasPlano(app: FastifyInstance): Promise<void> {
           401: esquemaErro,
           403: esquemaErro,
           404: esquemaErro,
+          409: esquemaErro,
         },
       },
     },
@@ -59,6 +65,7 @@ export async function rotasPlano(app: FastifyInstance): Promise<void> {
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
       const { primeiro, plano } = await app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, base.id);
         const anterior = await buscarPlanoAtual(tx, base.id);
         await tx.query(
           `insert into plano_individual (atleta_id, forcas, lacunas, meta_12m, meta_24m, recomendacao, registrado_por, registrado_em)

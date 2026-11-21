@@ -26,20 +26,6 @@ export async function linkDaFoto(
   }
 }
 
-export async function removerFotoSemFalhar(
-  armazenamento: ArmazenamentoEvidencias,
-  caminho: string,
-  log: Log,
-): Promise<boolean> {
-  try {
-    await armazenamento.remover(caminho);
-    return true;
-  } catch (e) {
-    log.warn({ evento: "foto_orfa", erro: nomeDoErro(e) }, "falha ao remover foto do Storage");
-    return false;
-  }
-}
-
 export async function caminhoDaFotoDoUsuario(db: Db, usuarioId: string): Promise<string | null> {
   const r = await db.query<{ foto_caminho: string | null }>(
     `select foto_caminho from usuarios where id = $1::uuid`,

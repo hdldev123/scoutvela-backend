@@ -2,8 +2,15 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
-import { conflito, esquemaErro, requisicaoInvalida, semAcesso } from "../erros.js";
-import { buscarTermoVigente, listarTermos } from "../repositories/termo.js";
+import { conflito, esquemaErro, naoEncontrado, requisicaoInvalida, semAcesso } from "../erros.js";
+import { erroAtletaAnonimizado } from "../repositories/anonimizado.js";
+import {
+  buscarTermoProximo,
+  buscarTermoVigente,
+  listarTermos,
+  termoAceitavel,
+  termoSql,
+} from "../repositories/termo.js";
 
 const esquemaItemTermo = z.object({
   versao: z.string(),
@@ -27,7 +34,7 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
         tags: ["termo"],
         summary: "Termo de consentimento vigente",
         description:
-          "Texto da versão vigente (a de maior vigente_desde que já começou). Qualquer usuário autenticado lê.",
+          "Texto da versão vigente (a de maior vigente_desde que já começou). Qualquer usuário autenticado lê. A próxima versão publicada, ainda sem vigência, vem em GET /termo/proxima.",
         security: seguranca,
         response: {
           200: z.object({
@@ -44,15 +51,45 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
     async () => buscarTermoVigente(app.db, app.agora()),
   );
 
+  r.get(
+    "/termo/proxima",
+    {
+      preHandler: [app.autenticar, exigirPapel("atleta", "gestor")],
+      schema: {
+        tags: ["termo"],
+        summary: "Próxima versão do termo, já publicada e ainda sem vigência",
+        description:
+          "A de menor vigente_desde no futuro, com o texto, para o atleta ler e aceitar antes de ela valer (POST /termo/aceite). Só atleta e gestor. 404 quando não há versão futura publicada.",
+        security: seguranca,
+        response: {
+          200: z.object({
+            versao: z.string(),
+            titulo: z.string(),
+            texto: z.string(),
+            vigenteDesde: z.string().describe("Instante ISO em que passa a valer"),
+          }),
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+        },
+      },
+    },
+    async () => {
+      const proxima = await buscarTermoProximo(app.db, app.agora());
+      if (!proxima) throw naoEncontrado("Não há nova versão do termo publicada.");
+      return proxima;
+    },
+  );
+
   r.post(
     "/termo/aceite",
     {
       preHandler: [app.autenticar, exigirPapel("atleta")],
       schema: {
         tags: ["termo"],
-        summary: "O atleta aceita o termo vigente",
+        summary: "O atleta aceita o termo vigente ou a próxima versão publicada",
         description:
-          "A versão enviada precisa ser a vigente. Não concede o compartilhamento com o IBVAR (consentimento separado, em PUT /consentimento).",
+          "A versão enviada precisa ser a vigente ou a próxima publicada (aceite antecipado: com TERMO_EXIGE_REACEITE ligada, quem aceitou a próxima versão não sai do ranking quando ela entra em vigor). Aceitar uma versão mais nova vale também para as anteriores. Não concede o compartilhamento com o IBVAR (consentimento separado, em PUT /consentimento).",
         security: seguranca,
         body: z.object({ versao: z.string().min(1).max(100) }),
         response: {
@@ -70,27 +107,31 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
       const usuarioId = req.usuario.id;
       const agora = app.agora();
       await app.db.transacao(async (tx) => {
-        const vigente = await buscarTermoVigente(tx, agora);
-        if (req.body.versao !== vigente.versao) {
+        const alvo = await termoAceitavel(tx, agora, req.body.versao);
+        if (!alvo) {
           throw requisicaoInvalida(
-            "A versão do termo não é a vigente. Recarregue a página e leia o termo atual.",
+            "A versão do termo não é a vigente nem a próxima publicada. Recarregue a página e leia o termo atual.",
           );
         }
-        await tx.query("select 1 from atletas where id = $1 for update", [atletaId]);
-        const aceito = await tx.query(
-          "select 1 from consentimento_atual where atleta_id = $1 and tipo = 'termo_piloto' and concedido and versao_termo = $2",
-          [atletaId, vigente.versao],
+        const atleta = await tx.query<{ anonimizado_em: Date | null }>(
+          "select anonimizado_em from atletas where id = $1 for update",
+          [atletaId],
         );
-        if (aceito.rows.length > 0) throw conflito("Você já aceitou esta versão do termo.");
+        if (atleta.rows[0]?.anonimizado_em) throw erroAtletaAnonimizado();
+        const aceito = await tx.query<{ ok: boolean }>(
+          `select ${termoSql.aceitoVersao("$1::uuid", "$2")} as ok`,
+          [atletaId, alvo.versao],
+        );
+        if (aceito.rows[0]?.ok) throw conflito("Você já aceitou esta versão do termo.");
         await tx.query(
           `insert into consentimentos (atleta_id, tipo, concedido, versao_termo, registrado_em, registrado_por)
            values ($1, 'termo_piloto', true, $2, $3, $4)`,
-          [atletaId, vigente.versao, agora, usuarioId],
+          [atletaId, alvo.versao, agora, usuarioId],
         );
         await tx.query(
           `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes)
            values ($1, 'aceitar_termo', 'atletas', $2, $3::jsonb)`,
-          [usuarioId, atletaId, JSON.stringify({ versaoTermo: vigente.versao })],
+          [usuarioId, atletaId, JSON.stringify({ versaoTermo: alvo.versao })],
         );
       });
       return { ok: true as const };

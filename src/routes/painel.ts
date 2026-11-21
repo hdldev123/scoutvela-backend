@@ -4,8 +4,9 @@ import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
+import { travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
-import { buscarTermoVigente } from "../repositories/termo.js";
+import { buscarTermoProximo, buscarTermoVigente, termoSql } from "../repositories/termo.js";
 import { lancamentoEhElegivel, listarLancamentosElegiveis } from "../repositories/revisoes.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
@@ -17,7 +18,11 @@ const esquemaConsentimento = z.object({
   termoAceitoEm: z.string().nullable().describe("Instante ISO do aceite do termo do piloto"),
   termoVersao: z.string().nullable().describe("Última versão do termo aceita"),
   termoVigenteVersao: z.string().describe("Versão do termo vigente hoje"),
-  termoPendente: z.boolean().describe("true quando o atleta ainda não aceitou a versão vigente"),
+  termoPendente: z
+    .boolean()
+    .describe(
+      "true quando o atleta ainda não aceitou a versão vigente (nem uma mais nova, por aceite antecipado)",
+    ),
   compartilharIbvar: z.boolean(),
   atualizadoEm: z.string().nullable().describe("Instante ISO da última decisão sobre o IBVAR"),
 });
@@ -55,6 +60,16 @@ const esquemaPainel = z.object({
   ),
   pendencias: z.array(z.string()).describe("nomeCurto dos pilares com resposta faltando"),
   consentimento: esquemaConsentimento,
+  termoProxima: z
+    .object({
+      versao: z.string(),
+      titulo: z.string(),
+      vigenteDesde: z.string().describe("Instante ISO em que passa a valer"),
+    })
+    .nullable()
+    .describe(
+      "Próxima versão do termo, já publicada e ainda sem vigência, que o atleta não aceitou. O texto vem em GET /termo/proxima e o aceite antecipado em POST /termo/aceite. Nulo se não houver ou se já foi aceita.",
+    ),
 });
 
 const esquemaRevisao = z.object({
@@ -99,6 +114,10 @@ async function cicloAbertoId(db: Db): Promise<string | null> {
 
 async function lerConsentimento(db: Db, atletaId: string, agora: Date) {
   const vigente = await buscarTermoVigente(db, agora);
+  const aceitoVigente = await db.query<{ ok: boolean }>(
+    `select ${termoSql.aceitoVigente("$1::uuid", "$2")} as ok`,
+    [atletaId, agora],
+  );
   const r = await db.query<{
     tipo: string;
     concedido: boolean;
@@ -114,10 +133,23 @@ async function lerConsentimento(db: Db, atletaId: string, agora: Date) {
     termoAceitoEm: termo?.concedido ? iso(termo.registrado_em) : null,
     termoVersao: termo?.concedido ? termo.versao_termo : null,
     termoVigenteVersao: vigente.versao,
-    termoPendente: !(termo?.concedido && termo.versao_termo === vigente.versao),
+    // Aceite antecipado de uma versão mais nova também vale para a vigente.
+    termoPendente: !aceitoVigente.rows[0]?.ok,
     compartilharIbvar: ibvar?.concedido ?? false,
     atualizadoEm: ibvar ? iso(ibvar.registrado_em) : null,
   };
+}
+
+/** Próxima versão publicada que o atleta ainda não aceitou (nem ela nem uma mais nova). */
+async function termoProximaPendente(db: Db, atletaId: string, agora: Date) {
+  const proxima = await buscarTermoProximo(db, agora);
+  if (!proxima) return null;
+  const r = await db.query<{ ok: boolean }>(
+    `select ${termoSql.aceitoVersao("$1::uuid", "$2")} as ok`,
+    [atletaId, proxima.versao],
+  );
+  if (r.rows[0]?.ok) return null;
+  return { versao: proxima.versao, titulo: proxima.titulo, vigenteDesde: proxima.vigenteDesde };
 }
 
 interface LinhaRevisao {
@@ -144,6 +176,7 @@ const SQL_REVISAO = `select r.id::text as id, r.atleta_id, a.nome as atleta_nome
          r.avaliacao_id::text as avaliacao_id, av.valor as nota_nova,
          (select ant.valor from avaliacoes ant
            where ant.atleta_id = av.atleta_id and ant.indicador_id = av.indicador_id
+             and ant.origem <> 'resposta_sugerida'
              and (ant.lancado_em < av.lancado_em or (ant.lancado_em = av.lancado_em and ant.id < av.id))
            order by ant.lancado_em desc, ant.id desc limit 1) as nota_anterior
     from pedidos_revisao r
@@ -279,6 +312,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           .filter((m) => m.respostasFeitas < m.respostasTotal)
           .map((m) => m.nomeCurto),
         consentimento,
+        termoProxima: await termoProximaPendente(app.db, base.id, app.agora()),
       };
     },
   );
@@ -332,6 +366,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       const agora = app.agora();
 
       await app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, usuario.atletaId!);
         const cicloId = await cicloAbertoId(tx);
         await tx.query(
           `insert into respostas_atleta (atleta_id, indicador_id, ciclo_id, resposta, respondido_em, respondido_por)
@@ -386,6 +421,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       const atletaId = usuario.atletaId;
       const { compartilharIbvar } = req.body;
       await app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, atletaId);
         await tx.query(
           `insert into consentimentos (atleta_id, tipo, concedido, registrado_em, registrado_por)
            values ($1::uuid, 'compartilhar_ibvar', $2, $3, $4::uuid)`,
@@ -460,6 +496,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       }
 
       const id = await app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, atletaId);
         const r = await tx.query<{ id: string }>(
           `insert into pedidos_revisao (atleta_id, pilar_id, indicador_id, motivo, criado_por, criado_em)
            values ($1::uuid, $2, $3, $4, $5::uuid, $6) returning id::text as id`,
@@ -620,6 +657,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           )
         ).rows[0];
         if (!pedido) throw naoEncontrado("Pedido de revisão não encontrado.");
+        await travarAtletaEditavel(tx, pedido.atleta_id);
         if (pedido.status !== "aberto")
           throw new ErroApi(409, "requisicao_invalida", "Este pedido já foi respondido.");
 

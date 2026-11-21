@@ -106,6 +106,19 @@ export function gatesAutomaticos(
   return [g1, g2, g3, g4];
 }
 
+/**
+ * Motivo do gate para quem não pode ver o peso (IBVAR). O motivo do G1 traz a diferença em kg da
+ * média da classe, e com a faixa da classe (parâmetro público) isso revelaria o peso do atleta.
+ * Aqui o G1 vira um texto sem número; os demais gates não trazem dado sensível e seguem iguais.
+ */
+export function motivoSemPeso(g: Pick<Gate, "gate" | "sugestaoAutomatica" | "motivo">): string {
+  if (g.gate !== 1) return g.motivo;
+  if (g.motivo === "Sem pesagem registrada") return g.motivo;
+  if (g.sugestaoAutomatica === "apto") return "Dentro da faixa da classe";
+  if (g.sugestaoAutomatica === "condicional") return "Leve desvio da faixa da classe";
+  return "Fora da faixa da classe";
+}
+
 /** Decisão do gestor substitui o status; motivo e sugestão automática ficam preservados. */
 export function aplicarDecisoes(
   sugestoes: SugestaoGate[],

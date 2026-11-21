@@ -100,7 +100,10 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
 export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
   const { config } = deps;
   const app = Fastify({
-    trustProxy: true, // atrás do proxy do Render: IP real do cliente
+    // Só os saltos de proxy configurados são confiáveis (Render = 1): o resto do X-Forwarded-For
+    // vem do cliente e não pode definir o IP usado no limite de requisições.
+    trustProxy:
+      config.TRUST_PROXY_HOPS > 0 ? (_endereco, salto) => salto < config.TRUST_PROXY_HOPS : false,
     bodyLimit: 1024 * 1024,
     logger:
       deps.logger === false

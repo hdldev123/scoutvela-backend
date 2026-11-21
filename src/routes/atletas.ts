@@ -7,6 +7,7 @@ import {
   situacaoAltura,
   funcaoNaClasse,
   idadeEm,
+  motivoSemPeso,
   notaPeso,
   notaSugeridaPorPontos,
   sugerirPlano,
@@ -191,7 +192,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         tags: ["atletas"],
         summary: "Ficha do atleta, conforme a matriz de acesso do papel",
         description:
-          "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo 404. IBVAR: sem indicadores sensíveis, Class Fit, contato e financeiro detalhado.",
+          "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo 404. IBVAR: sem indicadores sensíveis, Class Fit, contato, financeiro detalhado nem texto de evidência; o motivo do gate G1 vem genérico, sem a diferença em kg.",
         security: [{ bearerAuth: [] }],
         params: z.object({ id: z.uuid() }),
         response: {
@@ -252,7 +253,8 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                 return {
                   ...base,
                   nota,
-                  evidencia: nota == null ? null : m.pesoEvidencia,
+                  // IBVAR não recebe texto de evidência (pode citar a pesagem).
+                  evidencia: ibvar || nota == null ? null : m.pesoEvidencia,
                   origem: nota == null ? null : ("calculado" as const),
                   avaliador: nota == null ? null : m.pesoRegistradoPor,
                   lancadoEm: nota == null ? null : m.pesoMedidoEm,
@@ -265,7 +267,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
               return {
                 ...base,
                 nota,
-                evidencia: lancada?.evidencia ?? null,
+                evidencia: ibvar ? null : (lancada?.evidencia ?? null),
                 origem: lancada?.origem ?? null,
                 // IBVAR não recebe quem avaliou (seria o treinador) nem a resposta do atleta.
                 avaliador: ibvar ? null : (lancada?.avaliador ?? null),
@@ -389,7 +391,8 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
             gate: g.gate,
             nome: NOMES_GATES[g.gate] ?? `G${g.gate}`,
             status: g.status,
-            motivo: g.motivo,
+            // IBVAR não recebe a diferença em kg do G1 (daria para deduzir o peso).
+            motivo: ibvar ? motivoSemPeso(g) : g.motivo,
             sugestaoAutomatica: g.sugestaoAutomatica,
             ajustadoPeloGestor: g.ajustadoPeloGestor,
           })),

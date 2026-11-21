@@ -1,4 +1,4 @@
-import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, unlink, writeFile } from "node:fs/promises";
 import { dirname, join, normalize, resolve, sep } from "node:path";
 import type { Config } from "../config.js";
 
@@ -18,6 +18,11 @@ export interface ArmazenamentoEvidencias {
   ): Promise<Map<string, LinkTemporario>>;
   /** Apaga o arquivo. Idempotente: arquivo que não existe não é erro. */
   remover(caminho: string): Promise<void>;
+  /**
+   * Caminhos completos dos arquivos sob o prefixo (`${atletaId}/` ou `fotos/${usuarioId}/`).
+   * Prefixo sem arquivos devolve lista vazia. Usado na anonimização para achar o que sobrou.
+   */
+  listar(prefixo: string): Promise<string[]>;
 }
 
 export const VALIDADE_LINK_SEGUNDOS = 300;
@@ -34,6 +39,14 @@ function caminhoSeguro(caminho: string): string {
     throw new ErroArmazenamento("Caminho de arquivo inválido.");
   }
   return caminho;
+}
+
+/** Prefixo de pasta válido: `${uuid}/` ou `fotos/${uuid}/`. */
+function prefixoSeguro(prefixo: string): string {
+  if (!/^(fotos\/)?[0-9a-f-]{36}\/$/.test(prefixo)) {
+    throw new ErroArmazenamento("Prefixo de arquivo inválido.");
+  }
+  return prefixo;
 }
 
 /** Disco local: só desenvolvimento. O link é uma data URL com o conteúdo. */
@@ -63,6 +76,18 @@ export function criarArmazenamentoLocal(dir: string): ArmazenamentoEvidencias {
         links.set(caminho, await this.linkTemporario(caminho, tipoMime, "arquivo"));
       }
       return links;
+    },
+    async listar(prefixo) {
+      const pasta = resolve(join(raiz, normalize(prefixoSeguro(prefixo))));
+      if (!pasta.startsWith(raiz + sep))
+        throw new ErroArmazenamento("Prefixo de arquivo inválido.");
+      try {
+        const nomes = await readdir(pasta, { withFileTypes: true });
+        return nomes.filter((n) => n.isFile()).map((n) => `${prefixo}${n.name}`);
+      } catch (e) {
+        if ((e as NodeJS.ErrnoException).code === "ENOENT") return [];
+        throw e;
+      }
     },
     async remover(caminho) {
       try {
@@ -121,6 +146,24 @@ export function criarArmazenamentoSupabase(o: OpcoesSupabase): ArmazenamentoEvid
         body: JSON.stringify({ prefixes: [caminhoSeguro(caminho)] }),
       });
       if (!r.ok) throw new ErroArmazenamento(`Storage recusou a remoção (HTTP ${r.status}).`);
+    },
+    async listar(prefixo) {
+      const pasta = prefixoSeguro(prefixo);
+      const caminhos: string[] = [];
+      const porPagina = 100;
+      for (let offset = 0; ; offset += porPagina) {
+        const r = await f(`${base}/storage/v1/object/list/${encodeURIComponent(o.bucket)}`, {
+          method: "POST",
+          headers: { ...cabecalho, "Content-Type": "application/json" },
+          body: JSON.stringify({ prefix: pasta.replace(/\/$/, ""), limit: porPagina, offset }),
+        });
+        if (!r.ok) throw new ErroArmazenamento(`Storage recusou a listagem (HTTP ${r.status}).`);
+        const itens = (await r.json()) as { name?: string; id?: string | null }[];
+        if (!Array.isArray(itens)) throw new ErroArmazenamento("Resposta do Storage inválida.");
+        // Pasta aparece sem id; só arquivos interessam.
+        for (const i of itens) if (i.name && i.id) caminhos.push(`${pasta}${i.name}`);
+        if (itens.length < porPagina) return caminhos;
+      }
     },
     async linkTemporario(caminho) {
       const r = await f(

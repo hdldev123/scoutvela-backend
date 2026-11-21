@@ -7,6 +7,8 @@ export interface ArmazenamentoFake extends ArmazenamentoEvidencias {
   falharRemocao: boolean;
   /** Caminhos cuja remoção falha (os demais seguem normais). */
   falharCaminhos: Set<string>;
+  /** Quando true, listar lança erro. */
+  falharListagem: boolean;
   /** Registro das chamadas em lote de linksTemporarios. */
   chamadasEmLote: { caminho: string; tipoMime: string }[][];
 }
@@ -19,6 +21,7 @@ export function criarArmazenamentoFake(): ArmazenamentoFake {
     falhar: false,
     falharRemocao: false,
     falharCaminhos: new Set(),
+    falharListagem: false,
     chamadasEmLote: [],
     async salvar(caminho, bytes, tipoMime) {
       if (fake.falhar) throw new Error("storage fora do ar");
@@ -43,6 +46,10 @@ export function criarArmazenamentoFake(): ArmazenamentoFake {
           },
         ]),
       );
+    },
+    async listar(prefixo) {
+      if (fake.falharListagem) throw new Error("storage fora do ar");
+      return [...arquivos.keys()].filter((c) => c.startsWith(prefixo));
     },
     async remover(caminho) {
       if (fake.falharRemocao || fake.falharCaminhos.has(caminho))

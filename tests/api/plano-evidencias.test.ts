@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
 import type { Piloto } from "../apoio/piloto.js";
+import { jpegValido, pngValido } from "../apoio/imagens.js";
 
 const AGORA = () => new Date("2026-11-06T12:00:00-03:00");
 
@@ -13,8 +14,8 @@ const PLANO = {
 };
 
 const pdf = (extra = 64) => Buffer.concat([Buffer.from("%PDF-1.7\n"), Buffer.alloc(extra, 0x20)]);
-const png = () => Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 0]);
-const jpeg = () => Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0, 0x10, 0x4a, 0x46]);
+const png = () => pngValido();
+const jpeg = () => jpegValido();
 
 describe("plano individual", () => {
   let p: Piloto;

@@ -4,6 +4,7 @@ import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import { dataIso } from "../domain/datas.js";
 import { conflito, esquemaErro, naoEncontrado, requisicaoInvalida } from "../erros.js";
+import { recusarAtletaAnonimizado, travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { buscarAtletaVisivel, carregarDadosAtletas } from "../repositories/atletas.js";
 
 const esquemaFinanceiro = z.object({
@@ -51,7 +52,7 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
   rota.put(
     "/atletas/:id/financeiro",
     {
-      preHandler: [app.autenticar, exigirPapel("gestor")],
+      preHandler: [app.autenticar, exigirPapel("gestor"), recusarAtletaAnonimizado(app)],
       schema: {
         tags: ["campanha"],
         summary:
@@ -84,6 +85,7 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
           401: esquemaErro,
           403: esquemaErro,
           404: esquemaErro,
+          409: esquemaErro,
         },
       },
     },
@@ -106,6 +108,7 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
         throw requisicaoInvalida(`Componente de custo inexistente: ${desconhecido}.`);
 
       return app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, base.id);
         // informado_em usa o relógio do banco (como o seed): o último lançamento é o atual.
         const r = await tx.query<{ id: string }>(
           `insert into financeiro_campanha (atleta_id, perfil_suporte, meses_assegurados, patrocinio_privado, informado_por)
@@ -144,7 +147,11 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
   rota.post(
     "/atletas/:id/resultados",
     {
-      preHandler: [app.autenticar, exigirPapel("gestor", "treinador")],
+      preHandler: [
+        app.autenticar,
+        exigirPapel("gestor", "treinador"),
+        recusarAtletaAnonimizado(app),
+      ],
       schema: {
         tags: ["campanha"],
         summary: "Lança à mão um resultado internacional, com o link do resultado oficial",
@@ -174,6 +181,7 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
       const resultado = await app.db.transacao(async (tx) => {
+        await travarAtletaEditavel(tx, base.id);
         const repetido = await tx.query(
           `select 1 from resultados_regata where atleta_id = $1 and data = $2 and lower(evento) = lower($3)`,
           [base.id, body.data, body.evento],
