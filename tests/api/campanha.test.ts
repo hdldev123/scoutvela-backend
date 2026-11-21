@@ -71,7 +71,10 @@ describe("financeiro da campanha e resultados internacionais", () => {
       const url = `/atletas/${idAna}/financeiro`;
       const ruim = await chamar(g, "PUT", url, corpo({ perfilSuporte: "E" }));
       expect(ruim.status).toBe(400);
-      expect(ruim.corpo).toEqual({ erro: "requisicao_invalida", mensagem: "Requisição inválida." });
+      expect(ruim.corpo).toMatchObject({
+        erro: "requisicao_invalida",
+        mensagem: "Requisição inválida.",
+      });
       expect((await chamar(g, "PUT", url, corpo({ mesesAssegurados: 121 }))).status).toBe(400);
       const inexistente = [{ componenteId: "nao_existe", autonomia: "alta", apoioCbvela: "baixa" }];
       expect((await chamar(g, "PUT", url, corpo({ componentes: inexistente }))).status).toBe(400);
@@ -176,7 +179,10 @@ describe("financeiro da campanha e resultados internacionais", () => {
       const g = EMAILS_DEMO.gestor;
       const ruim = await chamar(g, "POST", u, corpo({ nivel: "brasileiro" }));
       expect(ruim.status).toBe(400);
-      expect(ruim.corpo).toEqual({ erro: "requisicao_invalida", mensagem: "Requisição inválida." });
+      expect(ruim.corpo).toMatchObject({
+        erro: "requisicao_invalida",
+        mensagem: "Requisição inválida.",
+      });
       for (const extra of [
         { evento: "ab" },
         { data: "2026-11-07" },

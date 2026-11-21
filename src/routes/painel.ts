@@ -328,8 +328,8 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
           "A resposta deve ser o texto exato de uma opção. Se a opção tem nota sugerida, ela fica pendente: só entra no score quando o treinador confirmar.",
         security: seguranca,
         body: z.object({
-          indicadorId: z.string().min(1).max(80),
-          resposta: z.string().min(1).max(200),
+          indicadorId: z.string().min(1, "Informe o indicador.").max(80),
+          resposta: z.string().min(1, "Escolha uma resposta.").max(200, "Resposta longa demais."),
         }),
         response: {
           201: z.object({ ok: z.literal(true), notaSugerida: z.number().int().nullable() }),

@@ -166,10 +166,20 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
         security: seguranca,
         body: z
           .object({
-            versao: z.string().trim().min(1).max(100),
-            titulo: z.string().trim().min(3).max(200),
-            texto: z.string().min(50).max(50000),
-            vigenteDesde: z.iso.datetime({ offset: true }),
+            versao: z.string().trim().min(1, "Informe a versão.").max(100, "Versão longa demais."),
+            titulo: z
+              .string()
+              .trim()
+              .min(3, "O título precisa ter ao menos 3 caracteres.")
+              .max(200, "O título pode ter no máximo 200 caracteres."),
+            texto: z
+              .string()
+              .min(50, "O texto do termo precisa ter ao menos 50 caracteres.")
+              .max(50000, "O texto do termo pode ter no máximo 50.000 caracteres."),
+            vigenteDesde: z.iso.datetime({
+              offset: true,
+              error: "Informe a vigência em formato ISO (ex.: 2026-12-01T00:00:00-03:00).",
+            }),
           })
           .strict(),
         response: {

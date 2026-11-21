@@ -1,6 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { camposDoErro, configurarMensagensZod } from "./validacao.js";
 
 export const codigosDeErro = [
   "nao_autenticado",
@@ -22,6 +23,8 @@ export type CodigoDeErro = (typeof codigosDeErro)[number];
 export const esquemaErro = z.object({
   erro: z.enum(codigosDeErro),
   mensagem: z.string(),
+  /** Só no 400 de validação: um item por campo inválido, com o caminho (ex.: `notas.0.evidencia`). */
+  campos: z.array(z.object({ campo: z.string(), mensagem: z.string() })).optional(),
 });
 
 /** Erro esperado, com status e mensagem seguros para o cliente. */
@@ -54,6 +57,7 @@ export const servicoIndisponivel = (m = "Serviço indisponível no momento.") =>
   new ErroApi(503, "servico_indisponivel", m);
 
 export function registrarTratamentoDeErros(app: FastifyInstance): void {
+  configurarMensagensZod();
   app.setNotFoundHandler((_req, reply) => {
     return reply.code(404).send({ erro: "nao_encontrado", mensagem: "Rota não encontrada." });
   });
@@ -63,9 +67,11 @@ export function registrarTratamentoDeErros(app: FastifyInstance): void {
       return reply.code(err.status).send({ erro: err.codigo, mensagem: err.message });
     }
     if (hasZodFastifySchemaValidationErrors(err)) {
-      return reply
-        .code(400)
-        .send({ erro: "requisicao_invalida", mensagem: "Requisição inválida." });
+      return reply.code(400).send({
+        erro: "requisicao_invalida",
+        mensagem: "Requisição inválida.",
+        campos: camposDoErro(err.validation),
+      });
     }
     // Gatilho do banco: escrita em atleta anonimizado (migration 0015). As rotas já recusam antes.
     if ((err as { code?: string }).code === "SV409") {

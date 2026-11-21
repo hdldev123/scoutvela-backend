@@ -25,9 +25,17 @@ const faixa = z.object({ id: z.string(), nome: z.string(), nomeCurto: z.string()
 
 const esquemaNota = z
   .object({
-    indicadorId: z.string().min(1).max(64),
-    valor: z.number().int().min(0).max(5),
-    evidencia: z.string().trim().min(3).max(500),
+    indicadorId: z.string().min(1, "Informe o indicador.").max(64),
+    valor: z
+      .number("Informe a nota (0 a 5).")
+      .int("A nota deve ser um número inteiro.")
+      .min(0, "A nota mínima é 0.")
+      .max(5, "A nota máxima é 5."),
+    evidencia: z
+      .string("Informe a evidência da nota.")
+      .trim()
+      .min(3, "A evidência precisa ter ao menos 3 caracteres.")
+      .max(500, "A evidência pode ter no máximo 500 caracteres."),
     /** Evidência anexada antes (POST /atletas/:id/evidencias), do mesmo atleta. A prévia ignora. */
     anexoId: z.uuid().optional(),
   })
@@ -35,9 +43,22 @@ const esquemaNota = z
 
 const esquemaMedida = z
   .object({
-    pesoKg: z.number().min(30).max(160).optional(),
-    alturaCm: z.number().min(120).max(230).optional(),
-    evidencia: z.string().trim().min(3).max(200).optional(),
+    pesoKg: z
+      .number("Informe o peso em kg.")
+      .min(30, "O peso deve ficar entre 30 e 160 kg.")
+      .max(160, "O peso deve ficar entre 30 e 160 kg.")
+      .optional(),
+    alturaCm: z
+      .number("Informe a altura em cm.")
+      .min(120, "A altura deve ficar entre 120 e 230 cm.")
+      .max(230, "A altura deve ficar entre 120 e 230 cm.")
+      .optional(),
+    evidencia: z
+      .string()
+      .trim()
+      .min(3, "A evidência da medida precisa ter ao menos 3 caracteres.")
+      .max(200, "A evidência da medida pode ter no máximo 200 caracteres.")
+      .optional(),
   })
   .strict()
   .refine((m) => m.pesoKg !== undefined || m.alturaCm !== undefined, {

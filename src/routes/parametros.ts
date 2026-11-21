@@ -67,16 +67,38 @@ const esquemaParametros = z.object({
   componentesCusto: z.array(z.object({ id: z.string(), nome: z.string() })),
 });
 
-const pesoKg = z.number().min(0).max(400);
-const alturaCm = z.number().min(120).max(230).nullable();
+const pesoKg = z
+  .number("Informe o peso em kg.")
+  .min(0, "O peso da classe deve ficar entre 0 e 400 kg.")
+  .max(400, "O peso da classe deve ficar entre 0 e 400 kg.");
+const alturaCm = z
+  .number("Informe a altura em cm.")
+  .min(120, "A altura deve ficar entre 120 e 230 cm.")
+  .max(230, "A altura deve ficar entre 120 e 230 cm.")
+  .nullable();
 const esquemaAtualizacao = z
   .object({
     pesos: z
-      .record(z.string().min(1).max(40), z.number().int().min(0).max(100))
+      .record(
+        z.string().min(1).max(40),
+        z
+          .number("O peso do pilar deve ser um número.")
+          .int("O peso do pilar deve ser um número inteiro.")
+          .min(0, "O peso do pilar deve ficar entre 0 e 100.")
+          .max(100, "O peso do pilar deve ficar entre 0 e 100."),
+      )
       .optional()
       .describe("Peso de cada um dos 9 pilares; a soma precisa ser 100"),
     faixas: z
-      .array(z.object({ id: z.string().min(1).max(40), scoreMin: z.number().min(0).max(100) }))
+      .array(
+        z.object({
+          id: z.string().min(1).max(40),
+          scoreMin: z
+            .number("Informe o score mínimo da faixa.")
+            .min(0, "O score mínimo deve ficar entre 0 e 100.")
+            .max(100, "O score mínimo deve ficar entre 0 e 100."),
+        }),
+      )
       .max(10)
       .optional()
       .describe(
@@ -86,8 +108,16 @@ const esquemaAtualizacao = z
       .array(
         z.object({
           pilarId: z.string().min(1).max(40).nullable().describe("Nulo = escala geral de 0 a 5"),
-          nota: z.number().int().min(0).max(5),
-          descricao: z.string().trim().min(3).max(300),
+          nota: z
+            .number("Informe a nota da rubrica.")
+            .int("A nota da rubrica deve ser inteira.")
+            .min(0, "A nota da rubrica deve ficar entre 0 e 5.")
+            .max(5, "A nota da rubrica deve ficar entre 0 e 5."),
+          descricao: z
+            .string()
+            .trim()
+            .min(3, "A descrição da rubrica precisa ter ao menos 3 caracteres.")
+            .max(300, "A descrição da rubrica pode ter no máximo 300 caracteres."),
         }),
       )
       .max(100)
