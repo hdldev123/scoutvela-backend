@@ -210,12 +210,12 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
     },
   );
 
-  const acessoLeitura = [app.autenticar, exigirPapel("gestor", "treinador", "atleta")];
+  const acessoLeitura = () => [app.autenticar, exigirPapel("gestor", "treinador", "atleta")];
 
   rota.get(
     "/atletas/:id/evidencias",
     {
-      preHandler: acessoLeitura,
+      preHandler: acessoLeitura(),
       schema: {
         tags: ["evidencias"],
         summary: "Lista as evidências anexadas ao atleta (mais recentes primeiro)",
@@ -240,7 +240,7 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
   rota.get(
     "/evidencias/:id/link",
     {
-      preHandler: acessoLeitura,
+      preHandler: acessoLeitura(),
       schema: {
         tags: ["evidencias"],
         summary: "Link temporário (5 minutos) para abrir a evidência",

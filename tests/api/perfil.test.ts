@@ -241,6 +241,17 @@ describe("perfil do usuário (/me/perfil e /me/foto)", () => {
       expect((await enviarFoto(outro, "image/jpeg", png())).status).toBe(400);
     });
 
+    it("o limite do envio da foto não vaza para GET/PUT /me/perfil nem DELETE /me/foto", async () => {
+      const u = await novo("gestor");
+      for (let i = 0; i < 11; i++) await enviarFoto(u, "image/jpeg", png());
+      expect((await enviarFoto(u, "image/jpeg", png())).status).toBe(429);
+      for (let i = 0; i < 12; i++) {
+        expect((await chamar(u, "GET", "/me/perfil")).status, `GET ${i}`).toBe(200);
+      }
+      expect((await chamar(u, "PUT", "/me/perfil", { nome: "Nome Novo" })).status).toBe(200);
+      expect((await chamar(u, "DELETE", "/me/foto")).status).toBe(204);
+    });
+
     it("DELETE remove do Storage e do banco; sem foto responde 204", async () => {
       const u = await novo("atleta");
       await enviarFoto(u, "image/jpeg", jpeg());
