@@ -37,6 +37,12 @@ const esquemaConfig = z
           .map((s) => s.trim())
           .filter(Boolean),
       ),
+    /**
+     * Quantos proxies confiáveis ficam entre a internet e a API (lê o IP do cliente do X-Forwarded-For
+     * a partir da direita). Padrão: 0 em desenvolvimento, 1 em homologação e produção (Render).
+     * Valor alto demais deixa o cliente forjar o IP e burlar o limite por IP.
+     */
+    TRUST_PROXY_HOPS: z.coerce.number().int().min(0).max(5).optional(),
     /** Endereço do front, usado nos links dos e-mails (convite, termo, lembretes, redefinição de senha). */
     FRONT_URL: z.url("FRONT_URL precisa ser uma URL").default("http://localhost:8080"),
     /** Exige segundo fator (aal2) para gestor e IBVAR. Ligado em homologação e produção. */
@@ -77,7 +83,11 @@ const esquemaConfig = z
         message: "obrigatório com EMAIL_PROVEDOR=smtp",
       });
     }
-  });
+  })
+  .transform((c) => ({
+    ...c,
+    TRUST_PROXY_HOPS: c.TRUST_PROXY_HOPS ?? (c.APP_ENV === "desenvolvimento" ? 0 : 1),
+  }));
 
 export type Config = z.infer<typeof esquemaConfig>;
 

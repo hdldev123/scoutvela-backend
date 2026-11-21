@@ -2,7 +2,7 @@ import { createHash, randomUUID } from "node:crypto";
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { exigirPapel } from "../auth/plugin.js";
+import { exigirPapel, limitePorIp } from "../auth/plugin.js";
 import {
   esquemaErro,
   evidenciaRemovida,
@@ -68,13 +68,16 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
   const rota = app.withTypeProvider<ZodTypeProvider>();
   const params = z.object({ id: z.uuid() });
   const respostasComuns = { 401: esquemaErro, 403: esquemaErro, 404: esquemaErro };
+  const limiteIp = limitePorIp(app);
 
   rota.post(
     "/atletas/:id/evidencias",
     {
-      preHandler: [app.autenticar, exigirPapel("gestor", "treinador")],
+      // onRequest: limite por IP e sessão são conferidos ANTES de o corpo (até 8 MB) ser lido.
+      onRequest: [limiteIp, app.autenticar],
+      preHandler: [exigirPapel("gestor", "treinador")],
       bodyLimit: 8 * 1024 * 1024,
-      // preHandler: roda depois de autenticar, então req.usuario já existe e 401 não gasta a cota.
+      // Limite por usuário no preHandler: roda depois de autenticar, então 401 não gasta a cota.
       config: {
         rateLimit: {
           max: LIMITE_ENVIOS,

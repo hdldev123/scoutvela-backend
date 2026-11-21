@@ -3,7 +3,7 @@ import type { FastifyInstance, FastifyBaseLogger } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import type { UsuarioAutenticado } from "../auth/plugin.js";
-import { exigirPapel } from "../auth/plugin.js";
+import { exigirPapel, limitePorIp } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { esquemaErro, requisicaoInvalida, servicoIndisponivel } from "../erros.js";
 import { TIPOS_ARQUIVO, decodificarArquivo } from "../servicos/arquivo-base64.js";
@@ -137,6 +137,7 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
   const rota = app.withTypeProvider<ZodTypeProvider>();
   const acesso = [app.autenticar, exigirPapel("gestor", "treinador", "atleta")];
   const respostasComuns = { 401: esquemaErro, 403: esquemaErro };
+  const limiteIp = limitePorIp(app);
 
   rota.get(
     "/me/perfil",
@@ -203,7 +204,9 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
   rota.post(
     "/me/foto",
     {
-      preHandler: acesso,
+      // onRequest: limite por IP e sessão são conferidos ANTES de o corpo (até 3 MB) ser lido.
+      onRequest: [limiteIp, app.autenticar],
+      preHandler: [exigirPapel("gestor", "treinador", "atleta")],
       bodyLimit: 3 * 1024 * 1024,
       config: {
         rateLimit: {
