@@ -541,6 +541,22 @@ describe("MFA TOTP no emulador", () => {
     expect((await c.auth.mfa.listFactors()).data!.totp).toHaveLength(0);
   });
 
+  it("com fator verificado, cadastrar outro com sessão aal1 dá insufficient_aal; com aal2 vale", async () => {
+    const c = await entrar("ibvar@scoutvela.dev", "ibvar123");
+    const { id, segredo } = await cadastrar(c);
+    expect((await verificar(c, id, totp(segredo, Date.now()))).error).toBeNull(); // c agora é aal2
+
+    const aal1 = await entrar("ibvar@scoutvela.dev", "ibvar123");
+    const recusado = await aal1.auth.mfa.enroll({ factorType: "totp", friendlyName: "Segundo" });
+    expect(recusado.error?.code).toBe("insufficient_aal");
+    expect((await c.auth.mfa.listFactors()).data!.all).toHaveLength(1);
+
+    const segundo = await c.auth.mfa.enroll({ factorType: "totp", friendlyName: "Segundo" });
+    expect(segundo.error).toBeNull();
+    expect((await c.auth.mfa.unenroll({ factorId: segundo.data!.id })).error).toBeNull();
+    expect((await c.auth.mfa.unenroll({ factorId: id })).error).toBeNull();
+  });
+
   it("código errado falha sem gastar o desafio; reuso do mesmo código é recusado", async () => {
     const c = await entrar("atleta@scoutvela.dev", "atleta123");
     const { id, segredo } = await cadastrar(c);
