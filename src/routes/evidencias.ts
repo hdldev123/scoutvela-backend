@@ -6,13 +6,17 @@ import { exigirPapel, limitePorIp } from "../auth/plugin.js";
 import {
   esquemaErro,
   evidenciaRemovida,
+  conflito,
   naoEncontrado,
   requisicaoInvalida,
+  semAcesso,
   servicoIndisponivel,
 } from "../erros.js";
 import { recusarAtletaAnonimizado, travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
+import { removerAnexoNaoVinculado } from "../servicos/anexos.js";
 import { removerOuPendenciar } from "../servicos/arquivos-pendentes.js";
+import { ErroArmazenamento } from "../storage/index.js";
 import { TIPOS_ARQUIVO, decodificarArquivo, limparMetadados } from "../servicos/arquivo-base64.js";
 
 const TAMANHO_MAXIMO_BYTES = 5 * 1024 * 1024;
@@ -291,6 +295,64 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
         [usuario.id, base.id, JSON.stringify({ anexoId: req.params.id }), app.agora()],
       );
       return link;
+    },
+  );
+
+  rota.delete(
+    "/evidencias/:id",
+    {
+      preHandler: [app.autenticar, exigirPapel("gestor", "treinador")],
+      schema: {
+        tags: ["evidencias"],
+        summary: "Remove um anexo que ainda não foi ligado a nenhuma avaliação",
+        description:
+          "Gestor, ou quem enviou o anexo (treinador) desde que ainda tenha acesso ao atleta. Só vale para anexo sem avaliação ligada (`anexoId`): anexo já ligado responde 409; inexistente ou de atleta fora do acesso, 404; já removido, 410. O arquivo sai do Storage primeiro (falha = 503 e nada muda). O registro não é apagado: fica marcado como removido (`removidoEm`, nome `removido`), a mesma marcação da anonimização. Auditoria `remover_anexo` só com ids.",
+        security: [{ bearerAuth: [] }],
+        params,
+        response: {
+          204: z.null(),
+          ...respostasComuns,
+          409: esquemaErro,
+          410: esquemaErro,
+          503: esquemaErro,
+        },
+      },
+    },
+    async (req, reply) => {
+      const { usuario } = req;
+      const r = await app.db.query<{ atleta_id: string; enviado_por: string }>(
+        `select atleta_id, enviado_por from evidencias_anexos where id = $1::uuid`,
+        [req.params.id],
+      );
+      const anexo = r.rows[0];
+      const base = anexo
+        ? await buscarAtletaVisivel(app.db, usuario, anexo.atleta_id, app.agora())
+        : null;
+      if (!anexo || !base) throw naoEncontrado("Evidência não encontrada.");
+      if (usuario.papel !== "gestor" && anexo.enviado_por !== usuario.id) {
+        throw semAcesso("Só o gestor ou quem enviou o anexo pode removê-lo.");
+      }
+
+      let resultado;
+      try {
+        resultado = await removerAnexoNaoVinculado(
+          { db: app.db, armazenamento: app.armazenamento, agora: app.agora },
+          req.params.id,
+          usuario.id,
+        );
+      } catch (e) {
+        if (e instanceof ErroArmazenamento) {
+          req.log.error({ err: e }, "falha ao remover evidência do Storage");
+          throw servicoIndisponivel("Não foi possível remover o arquivo agora.");
+        }
+        throw e;
+      }
+      if (resultado === "inexistente") throw naoEncontrado("Evidência não encontrada.");
+      if (resultado === "ja_removido") throw evidenciaRemovida();
+      if (resultado === "vinculado") {
+        throw conflito("Este anexo já está ligado a uma avaliação e não pode ser removido.");
+      }
+      return reply.code(204).send(null);
     },
   );
 }

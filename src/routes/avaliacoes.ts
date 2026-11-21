@@ -276,17 +276,19 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
       validarNotas(parametros, body);
 
       const anexoIds = [...new Set(body.notas.flatMap((n) => (n.anexoId ? [n.anexoId] : [])))];
-      if (anexoIds.length > 0) {
-        const ok = await app.db.query<{ id: string }>(
-          `select id from evidencias_anexos where atleta_id = $1::uuid and id = any($2::uuid[])`,
-          [base.id, anexoIds],
-        );
-        if (ok.rows.length !== anexoIds.length)
-          throw requisicaoInvalida("Anexo inexistente ou de outro atleta.");
-      }
 
       const resultado = await app.db.transacao(async (tx) => {
         await travarAtletaEditavel(tx, base.id);
+        if (anexoIds.length > 0) {
+          // `for share`: uma remoção do anexo em andamento termina antes; anexo removido não liga.
+          const ok = await tx.query<{ id: string }>(
+            `select id from evidencias_anexos
+              where atleta_id = $1::uuid and id = any($2::uuid[]) and removido_em is null for share`,
+            [base.id, anexoIds],
+          );
+          if (ok.rows.length !== anexoIds.length)
+            throw requisicaoInvalida("Anexo inexistente, removido ou de outro atleta.");
+        }
         const antes = await avaliarUm(tx, parametros, base, referencia);
         const ciclo = await tx.query<{ id: string }>(
           `select id from ciclos_avaliacao where status = 'aberto' limit 1`,

@@ -21,6 +21,8 @@
     "gestor:criar": "tsx src/admin/cli-primeiro-gestor.ts",
     "job:lembretes": "tsx src/jobs/cli-lembretes.ts",
     "job:lembretes:prod": "node dist/src/jobs/cli-lembretes.js",
+    "job:limpar-anexos": "tsx src/jobs/cli-limpar-anexos.ts",
+    "job:limpar-anexos:prod": "node dist/src/jobs/cli-limpar-anexos.js",
     "db:seed": "tsx seed/cli-seed.ts",
     "seed:auth": "tsx seed/cli-auth.ts",
     "openapi": "tsx src/cli-openapi.ts",
