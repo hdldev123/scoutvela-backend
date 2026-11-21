@@ -12,8 +12,10 @@ export interface PedidoParaVinculo {
  * Regra única de "lançamento elegível para o pedido". Usada na validação do PUT e na listagem
  * (GET /revisoes/:id/lancamentos), para as duas nunca divergirem. Espera os aliases
  * `a` (avaliacoes) e `i` (indicadores) e os parâmetros $1 a $4 de `paramsElegibilidade`.
+ * Sugestão gerada pela resposta do atleta (`resposta_sugerida`) não é nota de avaliador: não conta.
  */
 export const SQL_LANCAMENTO_ELEGIVEL = `a.atleta_id = $1::uuid
+  and a.origem <> 'resposta_sugerida'
   and a.lancado_em > $4::timestamptz
   and case when $3::text is not null then a.indicador_id = $3::text
            when $2::text is not null then i.pilar_id = $2::text

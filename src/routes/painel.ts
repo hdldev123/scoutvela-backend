@@ -144,6 +144,7 @@ const SQL_REVISAO = `select r.id::text as id, r.atleta_id, a.nome as atleta_nome
          r.avaliacao_id::text as avaliacao_id, av.valor as nota_nova,
          (select ant.valor from avaliacoes ant
            where ant.atleta_id = av.atleta_id and ant.indicador_id = av.indicador_id
+             and ant.origem <> 'resposta_sugerida'
              and (ant.lancado_em < av.lancado_em or (ant.lancado_em = av.lancado_em and ant.id < av.id))
            order by ant.lancado_em desc, ant.id desc limit 1) as nota_anterior
     from pedidos_revisao r
