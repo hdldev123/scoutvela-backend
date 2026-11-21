@@ -14,7 +14,7 @@ export const codigosDeErro = [
   "mfa_obrigatorio",
   /** 503: recurso depende de integração não configurada (ex.: convite sem chave de servidor). */
   "servico_indisponivel",
-  /** 410: a evidência foi removida (anonimização); o registro fica, o arquivo não. */
+  /** 410: anexo removido de atleta ainda visível (ex.: DELETE /evidencias/:id); o registro fica, o arquivo não. */
   "evidencia_removida",
 ] as const;
 export type CodigoDeErro = (typeof codigosDeErro)[number];

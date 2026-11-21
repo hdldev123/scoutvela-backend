@@ -36,7 +36,9 @@ const esquemaAnexo = z.object({
   removidoEm: z
     .string()
     .nullable()
-    .describe("Instante ISO em que o arquivo foi removido (anonimização); nulo = disponível"),
+    .describe(
+      "Instante ISO em que o arquivo foi removido (DELETE /evidencias/{id} ou limpeza de anexo não vinculado); nulo = disponível. Atleta anonimizado não aparece na API (404)",
+    ),
 });
 
 interface LinhaAnexo {
@@ -245,7 +247,7 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
         tags: ["evidencias"],
         summary: "Link temporário (5 minutos) para abrir a evidência",
         description:
-          "Mesmo acesso da listagem, pelo atleta do anexo. Anexo removido (anonimização) devolve 410 `evidencia_removida`. Cada geração de link fica na auditoria.",
+          "Mesmo acesso da listagem, pelo atleta do anexo. Anexo removido de atleta ainda visível (ex.: removido por `DELETE /evidencias/{id}`) devolve 410 `evidencia_removida`; o atleta anonimizado já responde 404 antes disso. Cada geração de link fica na auditoria.",
         security: [{ bearerAuth: [] }],
         params,
         response: {
