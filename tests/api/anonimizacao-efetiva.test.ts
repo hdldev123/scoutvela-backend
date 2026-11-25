@@ -144,6 +144,51 @@ describe("anonimização efetiva (de fato)", () => {
     });
     expect(lanc.status).toBe(201);
 
+    // D9: autoavaliação corrigida (a justificativa cita o nome) e pesagens do atleta (uma recusada com
+    // motivo citando o nome, outra pendente). Tudo some ou vira marcador na anonimização.
+    expect(
+      (
+        await chamar(atleta, "POST", "/autoavaliacoes", {
+          notas: [{ indicadorId: "tec_largada", valor: 2 }],
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await gestor("POST", `/atletas/${atletaId}/avaliacoes`, {
+          notas: [{ indicadorId: "tec_largada", valor: 4, justificativa: `${NOME} larga mal` }],
+        })
+      ).status,
+    ).toBe(201);
+    const balanca = () =>
+      chamar(atleta, "POST", `/atletas/${atletaId}/evidencias`, {
+        nomeArquivo: `balanca ${NOME}.jpg`,
+        tipoMime: "image/jpeg",
+        conteudoBase64: jpegValido().toString("base64"),
+        categoria: "balanca",
+      });
+    const recusada = await chamar(atleta, "POST", "/me/pesagens", {
+      pesoKg: 71.3,
+      anexoId: (await balanca()).corpo.id,
+    });
+    expect(recusada.status).toBe(201);
+    expect(
+      (
+        await gestor("PUT", `/pesagens/${recusada.corpo.id}/validacao`, {
+          decisao: "recusar",
+          motivo: `Foto de ${NOME} ilegível`,
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await chamar(atleta, "POST", "/me/pesagens", {
+          pesoKg: 70.9,
+          anexoId: (await balanca()).corpo.id,
+        })
+      ).status,
+    ).toBe(201);
+
     expect(
       (
         await gestor("PUT", `/atletas/${atletaId}/gates`, {
@@ -281,9 +326,14 @@ describe("anonimização efetiva (de fato)", () => {
       (await p.db.query<Record<string, unknown>>(sql, [atletaId])).rows;
     expect(
       (await q("select evidencia from avaliacoes where atleta_id = $1")).every(
-        (l) => l.evidencia === MARCADOR,
+        (l) => l.evidencia === MARCADOR || l.evidencia === null,
       ),
     ).toBe(true);
+    const justificativas = await q(
+      "select justificativa from avaliacoes where atleta_id = $1 and justificativa is not null",
+    );
+    expect(justificativas).toEqual([{ justificativa: MARCADOR }]);
+    expect(await q("select id from pesagens_atleta where atleta_id = $1")).toEqual([]);
     const medidas = await q(
       "select peso_kg::float8 as peso, evidencia from medidas_corporais where atleta_id = $1",
     );

@@ -13,6 +13,7 @@ import {
 } from "../domain/index.js";
 import { esquemaErro, naoEncontrado, semAcesso } from "../erros.js";
 import { historicoDeNotas, historicoDePesagens } from "../repositories/historico.js";
+import { ehSugestao } from "../repositories/origens.js";
 import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
 import { lerContatoSensivel } from "../repositories/contato-sensivel.js";
 import { ultimoLancamento } from "../repositories/investimento.js";
@@ -54,11 +55,27 @@ const esquemaIndicador = z.object({
     .string()
     .nullable()
     .describe("Link https de vídeo ou outro conteúdo externo da nota; nulo para o IBVAR"),
-  origem: z.enum(["avaliacao", "resposta_confirmada", "calculado"]).nullable(),
+  origem: z
+    .enum(["avaliacao", "resposta_confirmada", "autoavaliacao_aprovada", "calculado"])
+    .nullable()
+    .describe(
+      "autoavaliacao_aprovada: o treinador manteve a nota sugerida pelo atleta. Para o IBVAR vem sempre `avaliacao` (nada de autoavaliação)",
+    ),
+  justificativa: z
+    .string()
+    .nullable()
+    .describe(
+      "Justificativa do treinador ao corrigir a sugestão do atleta; sempre nula para o IBVAR",
+    ),
   avaliador: pessoa.nullable(),
   lancadoEm: z.string().nullable().describe("Instante ISO"),
   resposta: z.string().nullable(),
-  sugestaoPendente: z.object({ valor: z.number().int(), lancadoEm: z.string() }).nullable(),
+  sugestaoPendente: z
+    .object({ valor: z.number().int(), lancadoEm: z.string() })
+    .nullable()
+    .describe(
+      "Sugestão do atleta (resposta do questionário ou autoavaliação) ainda sem nota do treinador; nula para o IBVAR. O detalhe da autoavaliação vem em GET /atletas/:id/autoavaliacao",
+    ),
   sugestaoPontos: esquemaSugestaoPontos
     .nullable()
     .describe(
@@ -292,6 +309,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                   evidencia: ibvar || nota == null ? null : m.pesoEvidencia,
                   link: null,
                   origem: nota == null ? null : ("calculado" as const),
+                  justificativa: null,
                   avaliador: nota == null ? null : m.pesoRegistradoPor,
                   lancadoEm: nota == null ? null : m.pesoMedidoEm,
                   resposta: dados.respostas[i.id] ?? null,
@@ -305,7 +323,12 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                 nota,
                 evidencia: ibvar ? null : (lancada?.evidencia ?? null),
                 link: ibvar ? null : (lancada?.link ?? null),
-                origem: lancada?.origem ?? null,
+                // IBVAR não sabe que houve autoavaliação: a aprovação aparece como nota comum.
+                origem:
+                  ibvar && lancada?.origem === "autoavaliacao_aprovada"
+                    ? ("avaliacao" as const)
+                    : (lancada?.origem ?? null),
+                justificativa: ibvar ? null : (lancada?.justificativa ?? null),
                 // IBVAR não recebe quem avaliou (seria o treinador) nem a resposta do atleta.
                 avaliador: ibvar ? null : (lancada?.avaliador ?? null),
                 lancadoEm: lancada?.lancadoEm ?? null,
@@ -456,7 +479,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         tags: ["atletas"],
         summary: "Histórico de lançamentos de um indicador, do mais novo para o mais antigo",
         description:
-          "Mesma matriz de acesso da ficha: gestor vê todos, treinador só os próprios atletas, atleta só a si. Inclui a sugestão do atleta ainda pendente (pendente: true, origem resposta_sugerida). cf_peso_kg (calculado) traz as pesagens, com a nota pela regra P3 atual. IBVAR: pilar sensível dá 403; nos demais, sem evidência, avaliador, anexo nem sugestão pendente. Atleta fora do acesso ou indicador inexistente: 404.",
+          "Mesma matriz de acesso da ficha: gestor vê todos, treinador só os próprios atletas, atleta só a si. Inclui a sugestão do atleta ainda pendente (pendente: true, origem resposta_sugerida ou autoavaliacao) e a justificativa da nota do treinador. cf_peso_kg (calculado) traz as pesagens, com a nota pela regra P3 atual. IBVAR: pilar sensível dá 403; nos demais, sem evidência, avaliador, anexo, justificativa nem sugestão pendente (a aprovação aparece como `avaliacao`). Atleta fora do acesso ou indicador inexistente: 404.",
         security: [{ bearerAuth: [] }],
         params: z.object({ id: z.uuid(), indicadorId: z.string().min(1).max(64) }),
         response: {
@@ -470,8 +493,14 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                 "avaliacao",
                 "resposta_confirmada",
                 "resposta_sugerida",
+                "autoavaliacao",
+                "autoavaliacao_aprovada",
                 "calculado",
               ]),
+              justificativa: z
+                .string()
+                .nullable()
+                .describe("Justificativa do treinador ao corrigir a sugestão; nula para o IBVAR"),
               pendente: z.boolean().describe("Sugestão do atleta aguardando o avaliador"),
               avaliador: pessoa.nullable(),
               cicloNome: z.string().nullable(),
@@ -512,6 +541,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
           evidencia: m.evidencia,
           link: null,
           origem: "calculado" as const,
+          justificativa: null,
           pendente: false,
           avaliador: m.registradoPor,
           cicloNome: null,
@@ -522,15 +552,17 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
 
       const notas = await historicoDeNotas(app.db, base.id, indicador.id);
       return notas
-        .filter((n) => !(ibvar && n.origem === "resposta_sugerida"))
+        .filter((n) => !(ibvar && ehSugestao(n.origem)))
         .map((n) => ({
           valor: n.valor,
           pesoKg: null,
           // IBVAR: sem evidência, sem quem avaliou e sem anexo (como na ficha).
           evidencia: ibvar ? null : n.evidencia,
           link: ibvar ? null : n.link,
-          origem: n.origem,
-          pendente: n.origem === "resposta_sugerida",
+          origem:
+            ibvar && n.origem === "autoavaliacao_aprovada" ? ("avaliacao" as const) : n.origem,
+          justificativa: ibvar ? null : n.justificativa,
+          pendente: ehSugestao(n.origem),
           avaliador: ibvar ? null : n.avaliador,
           cicloNome: n.cicloNome,
           lancadoEm: n.lancadoEm,

@@ -23,7 +23,7 @@ const esquemaAviso = z.object({
   referencia: z
     .record(z.string(), z.unknown())
     .describe(
-      "Só ids e nomes de campo: `{ indicadorId }`, `{ anexoId, categoria }`, `{ campos }`, `{ pedidoAjusteId }`, `{ sugestaoId, status }`",
+      "Só ids e nomes de campo: `{ indicadorId }`, `{ anexoId, categoria }`, `{ campos }`, `{ pedidoAjusteId }`, `{ sugestaoId, status }`, `{ quantidade }` (atleta_autoavaliou), `{ pesagemId }` (pesagens)",
     ),
   criadoPor: z.object({ nome: z.string(), papel: z.string() }).nullable(),
   mensagem: z

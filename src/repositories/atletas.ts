@@ -46,7 +46,9 @@ export interface NotaAtual {
   valor: number;
   evidencia: string | null;
   link: string | null;
-  origem: "avaliacao" | "resposta_confirmada";
+  origem: "avaliacao" | "resposta_confirmada" | "autoavaliacao_aprovada";
+  /** Justificativa do treinador ao corrigir a sugestão do atleta; nula se não houve. */
+  justificativa: string | null;
   avaliador: { id: string; nome: string } | null;
   lancadoEm: string;
   anexo: { id: string; nomeArquivo: string } | null;
@@ -428,14 +430,15 @@ export async function carregarDadosAtletas(
         valor: number;
         evidencia: string | null;
         link: string | null;
-        origem: "avaliacao" | "resposta_confirmada";
+        origem: NotaAtual["origem"];
+        justificativa: string | null;
         avaliador_id: string | null;
         avaliador_nome: string | null;
         lancado_em: Date;
         anexo_id: string | null;
         anexo_nome: string | null;
       }>(
-        `select n.atleta_id, n.indicador_id, n.valor, n.evidencia, n.link, n.origem, n.avaliador_id,
+        `select n.atleta_id, n.indicador_id, n.valor, n.evidencia, n.link, n.origem, n.justificativa, n.avaliador_id,
               u.nome as avaliador_nome, n.lancado_em, n.anexo_id, ea.nome_arquivo as anexo_nome
          from avaliacao_atual n
          left join usuarios u on u.id = n.avaliador_id
@@ -510,6 +513,7 @@ export async function carregarDadosAtletas(
       evidencia: l.evidencia,
       link: l.link,
       origem: l.origem,
+      justificativa: l.justificativa,
       avaliador: l.avaliador_id ? { id: l.avaliador_id, nome: l.avaliador_nome ?? "" } : null,
       lancadoEm: iso(l.lancado_em),
       anexo: l.anexo_id ? { id: l.anexo_id, nomeArquivo: l.anexo_nome ?? "" } : null,

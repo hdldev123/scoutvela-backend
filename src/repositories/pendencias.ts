@@ -1,5 +1,6 @@
 import type { Db } from "../db/db.js";
 import { cadastroCompletoSql } from "./atletas.js";
+import { sqlNotaDoAvaliador } from "./origens.js";
 import { termoSql } from "./termo.js";
 
 /**
@@ -7,7 +8,7 @@ import { termoSql } from "./termo.js";
  * (GET /ciclos/:id/pendencias). Só entram atletas ativos, com o cadastro completo e o termo do piloto aceito.
  *
  * - Treinador: treinador ativo com atleta sem nota, no ciclo, em algum indicador T não calculado
- *   (a nota sugerida pela resposta do atleta não conta).
+ *   (a sugestão do atleta, por resposta ou autoavaliação, não conta).
  * - Atleta: perguntas do questionário ainda sem resposta.
  */
 
@@ -90,7 +91,7 @@ export async function pendenciasDoCiclo(
                 where i.tipo = 'T' and not i.calculado
                   and not exists (select 1 from avaliacoes n
                                    where n.atleta_id = a.id and n.indicador_id = i.id
-                                     and n.ciclo_id = $1::uuid and n.origem <> 'resposta_sugerida'))::text as faltam
+                                     and n.ciclo_id = $1::uuid and ${sqlNotaDoAvaliador("n")}))::text as faltam
          from usuarios u
          join atletas a on a.treinador_id = u.id and a.ativo
         where u.papel = 'treinador' and u.ativo

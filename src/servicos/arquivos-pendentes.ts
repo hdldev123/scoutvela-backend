@@ -18,7 +18,7 @@ const nomeDoErro = (e: unknown): string => {
 export async function removerOuPendenciar(
   deps: { db: Db; armazenamento: ArmazenamentoEvidencias; log: Log; agora: () => Date },
   caminho: string,
-  motivo: "troca_foto" | "rollback_foto" | "rollback_evidencia",
+  motivo: "troca_foto" | "rollback_foto" | "rollback_evidencia" | "pesagem_decidida",
 ): Promise<boolean> {
   try {
     await deps.armazenamento.remover(caminho);

@@ -238,7 +238,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
                from consentimentos where atleta_id = $1::uuid order by registrado_em, id`,
         ),
         q<Record<string, unknown>>(
-          `select i.nome as indicador, n.valor, n.evidencia, n.link, n.origem, u.nome as avaliador,
+          `select i.nome as indicador, n.valor, n.evidencia, n.link, n.origem, n.justificativa, u.nome as avaliador,
                     ci.nome as ciclo, n.lancado_em as "lancadoEm"
                from avaliacoes n join indicadores i on i.id = n.indicador_id
                left join usuarios u on u.id = n.avaliador_id

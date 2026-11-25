@@ -36,6 +36,8 @@ export interface Indicador {
   evidencia: "obrigatoria" | "opcional";
   /** A nota depende de um arquivo anexado (ex.: a foto da balança no peso). */
   exigeAnexo: boolean;
+  /** O atleta pode sugerir a nota deste indicador (autoavaliação). Editável pelo gestor em Parâmetros. */
+  autoavaliacao: boolean;
 }
 
 export interface Pilar {

@@ -262,7 +262,18 @@ async function removerTextosLivres(
   // `pedidos_ajuste` é só de inserção; o gatilho aceita este DELETE pela mesma variável da aptidão.
   await tx.query(`delete from pedidos_ajuste where atleta_id = $1::uuid`, [atletaId]);
   await tx.query(`delete from avisos where atleta_id = $1::uuid`, [atletaId]);
-  await q(`update avaliacoes set evidencia = $2 where atleta_id = $1::uuid and evidencia <> $2`);
+  // Pesagens informadas pelo atleta (peso é dado sensível): as linhas saem; a tabela só aceita este
+  // DELETE com a variável da anonimização igual ao atleta. A medida validada fica em `medidas_corporais`.
+  await tx.query(`delete from pesagens_atleta where atleta_id = $1::uuid`, [atletaId]);
+  // Evidência e justificativa do treinador na mesma atualização (o gatilho confere a linha inteira).
+  await q(
+    `update avaliacoes
+        set evidencia = case when evidencia is null then null else $2 end,
+            justificativa = case when justificativa is null then null else $2 end
+      where atleta_id = $1::uuid
+        and ((evidencia is not null and evidencia <> $2)
+             or (justificativa is not null and justificativa <> $2))`,
+  );
   await q(
     `update medidas_corporais set evidencia = $2 where atleta_id = $1::uuid and evidencia <> $2`,
   );

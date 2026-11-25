@@ -1,11 +1,19 @@
 import type { Db } from "../db/db.js";
+import { sqlNotaDoAvaliador } from "./origens.js";
 
 /** Um lançamento da série histórica de um indicador, do jeito que o banco guarda. */
 export interface LancamentoNota {
   valor: number;
   evidencia: string | null;
   link: string | null;
-  origem: "avaliacao" | "resposta_confirmada" | "resposta_sugerida";
+  origem:
+    | "avaliacao"
+    | "resposta_confirmada"
+    | "resposta_sugerida"
+    | "autoavaliacao"
+    | "autoavaliacao_aprovada";
+  /** Justificativa do treinador ao corrigir a sugestão do atleta. */
+  justificativa: string | null;
   avaliador: { id: string; nome: string } | null;
   cicloNome: string | null;
   lancadoEm: string;
@@ -24,7 +32,7 @@ const iso = (v: unknown): string =>
 
 /**
  * Notas lançadas de um indicador, da mais nova para a mais antiga. Inclui só a sugestão do atleta
- * que ainda está pendente (view sugestao_pendente); as já confirmadas viraram outro lançamento.
+ * (resposta ou autoavaliação) que ainda está pendente (view sugestao_pendente); as já confirmadas viraram outro lançamento.
  * O atleta deve vir de `buscarAtletaVisivel` (filtro de acesso já aplicado).
  */
 export async function historicoDeNotas(
@@ -37,6 +45,7 @@ export async function historicoDeNotas(
     evidencia: string | null;
     link: string | null;
     origem: LancamentoNota["origem"];
+    justificativa: string | null;
     avaliador_id: string | null;
     avaliador_nome: string | null;
     ciclo_nome: string | null;
@@ -44,14 +53,14 @@ export async function historicoDeNotas(
     anexo_id: string | null;
     anexo_nome: string | null;
   }>(
-    `select n.valor, n.evidencia, n.link, n.origem, n.avaliador_id, u.nome as avaliador_nome,
+    `select n.valor, n.evidencia, n.link, n.origem, n.justificativa, n.avaliador_id, u.nome as avaliador_nome,
             c.nome as ciclo_nome, n.lancado_em, n.anexo_id, ea.nome_arquivo as anexo_nome
        from avaliacoes n
        left join usuarios u on u.id = n.avaliador_id
        left join ciclos_avaliacao c on c.id = n.ciclo_id
        left join evidencias_anexos ea on ea.id = n.anexo_id
       where n.atleta_id = $1::uuid and n.indicador_id = $2
-        and (n.origem <> 'resposta_sugerida'
+        and (${sqlNotaDoAvaliador("n")}
              or exists (select 1 from sugestao_pendente sp where sp.id = n.id))
       order by n.lancado_em desc, n.id desc`,
     [atletaId, indicadorId],
@@ -61,6 +70,7 @@ export async function historicoDeNotas(
     evidencia: l.evidencia,
     link: l.link,
     origem: l.origem,
+    justificativa: l.justificativa,
     avaliador: l.avaliador_id ? { id: l.avaliador_id, nome: l.avaliador_nome ?? "" } : null,
     cicloNome: l.ciclo_nome,
     lancadoEm: iso(l.lancado_em),

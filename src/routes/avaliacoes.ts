@@ -10,6 +10,9 @@ import { esquemaLinkHttps } from "../validacao.js";
 import { recusarAtletaAnonimizado, travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
 import type { AtletaBase, DadosAtleta } from "../repositories/atletas.js";
+import { sugestoesDoCicloAberto } from "../repositories/autoavaliacao.js";
+import type { SugestaoDoAtleta } from "../repositories/autoavaliacao.js";
+import { avisarContasDoAtleta } from "../repositories/avisos.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { avaliarAtletas, carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 
@@ -24,7 +27,7 @@ const statusGate = z.enum(["apto", "condicional", "alerta"]);
 const statusFinal = z.enum(["apto", "condicional", "nao_prioritario"]);
 const faixa = z.object({ id: z.string(), nome: z.string(), nomeCurto: z.string() });
 
-const esquemaNota = z
+export const esquemaNota = z
   .object({
     indicadorId: z.string().min(1, "Informe o indicador.").max(64),
     valor: z
@@ -50,6 +53,18 @@ const esquemaNota = z
     anexoId: z.uuid().optional(),
   })
   .strict();
+
+/** Nota do treinador: a nota comum mais a justificativa (obrigatória só ao corrigir a sugestão do atleta). */
+const esquemaNotaAvaliador = esquemaNota.extend({
+  justificativa: z
+    .string("A justificativa deve ser um texto.")
+    .trim()
+    .max(500, "A justificativa pode ter no máximo 500 caracteres.")
+    .optional()
+    .describe(
+      "Obrigatória quando o atleta sugeriu (autoavaliação) outra nota para o indicador no ciclo aberto; opcional nos demais. Vazio vale como ausente",
+    ),
+});
 
 const esquemaMedida = z
   .object({
@@ -77,7 +92,7 @@ const esquemaMedida = z
 
 const esquemaCorpo = z
   .object({
-    notas: z.array(esquemaNota).max(60).default([]),
+    notas: z.array(esquemaNotaAvaliador).max(60).default([]),
     medida: esquemaMedida.optional(),
   })
   .strict()
@@ -90,13 +105,64 @@ type Corpo = z.infer<typeof esquemaCorpo>;
 function semVazios(corpo: Corpo): Corpo {
   return {
     ...corpo,
-    notas: corpo.notas.map(({ evidencia, link, ...resto }) => ({
+    notas: corpo.notas.map(({ evidencia, link, justificativa, ...resto }) => ({
       ...resto,
       ...(evidencia ? { evidencia } : {}),
       ...(link ? { link } : {}),
+      ...(justificativa ? { justificativa } : {}),
     })),
   };
 }
+
+type OrigemLancada = "avaliacao" | "resposta_confirmada" | "autoavaliacao_aprovada";
+
+interface DecisaoDaNota {
+  origem: OrigemLancada;
+  /** A nota difere da sugestão do atleta (o atleta é avisado). */
+  corrigiu: boolean;
+}
+
+/**
+ * Origem de cada nota e a regra da justificativa. Com sugestão do atleta (autoavaliação) no ciclo
+ * aberto: nota igual aprova (`autoavaliacao_aprovada`); nota diferente corrige e exige justificativa
+ * (400 em `notas.N.justificativa`). Sem sugestão, segue como sempre (`avaliacao` ou `resposta_confirmada`).
+ */
+function decidirNotas(
+  corpo: Corpo,
+  sugestoes: Map<string, SugestaoDoAtleta>,
+  respostas: Record<string, string>,
+): DecisaoDaNota[] {
+  const semJustificativa: { campo: string; mensagem: string }[] = [];
+  const decisoes = corpo.notas.map((n, i): DecisaoDaNota => {
+    const sug = sugestoes.get(n.indicadorId);
+    const comum = respostas[n.indicadorId] ? "resposta_confirmada" : "avaliacao";
+    if (!sug) return { origem: comum, corrigiu: false };
+    if (sug.valor === n.valor) return { origem: "autoavaliacao_aprovada", corrigiu: false };
+    if (!n.justificativa) {
+      semJustificativa.push({
+        campo: `notas.${i}.justificativa`,
+        mensagem: "Informe a justificativa: a nota difere da sugestão do atleta.",
+      });
+    }
+    return { origem: comum, corrigiu: true };
+  });
+  if (semJustificativa.length > 0) {
+    throw requisicaoInvalidaCampos(
+      semJustificativa,
+      "Há nota diferente da sugestão do atleta sem justificativa.",
+    );
+  }
+  return decisoes;
+}
+
+const esquemaSugestaoAtleta = z.object({
+  indicadorId: z.string(),
+  valor: z.number().int().describe("Nota sugerida pelo atleta, de 0 a 5"),
+  evidencia: z.string().nullable(),
+  link: z.string().nullable(),
+  anexo: z.object({ id: z.string(), nomeArquivo: z.string() }).nullable(),
+  em: z.string().describe("Instante ISO"),
+});
 
 const esquemaGates = z.object({
   statusFinal,
@@ -169,15 +235,21 @@ function arredondarMedida(corpo: Corpo): Corpo {
 }
 
 /** Dados do atleta como ficariam depois do lançamento (sem gravar). */
-function aplicarProposta(dados: DadosAtleta, corpo: Corpo, agora: Date): DadosAtleta {
+function aplicarProposta(
+  dados: DadosAtleta,
+  corpo: Corpo,
+  decisoes: DecisaoDaNota[],
+  agora: Date,
+): DadosAtleta {
   const notas = new Map(dados.notas.map((n) => [n.indicadorId, n]));
-  for (const n of corpo.notas) {
+  for (const [i, n] of corpo.notas.entries()) {
     notas.set(n.indicadorId, {
       indicadorId: n.indicadorId,
       valor: n.valor,
       evidencia: n.evidencia ?? null,
       link: n.link ?? null,
-      origem: dados.respostas[n.indicadorId] ? "resposta_confirmada" : "avaliacao",
+      origem: decisoes[i]!.origem,
+      justificativa: n.justificativa ?? null,
       avaliador: null,
       lancadoEm: agora.toISOString(),
       anexo: null,
@@ -242,6 +314,11 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
               pilares: z.array(z.object({ id: z.string(), nota: z.number().nullable() })),
               statusGates: statusFinal,
             }),
+            sugestoesAtleta: z
+              .array(esquemaSugestaoAtleta)
+              .describe(
+                "Sugestões do atleta (autoavaliação) no ciclo aberto, uma por indicador, para a tela mostrar ao lado da nota. Vazio sem sugestão ou sem ciclo aberto",
+              ),
             sugestaoPontos: z
               .object({
                 indicadorId: z.string(),
@@ -269,10 +346,13 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
       validarNotas(parametros, corpo);
 
       const antes = await avaliarUm(app.db, parametros, base, referencia);
+      const aberto = await sugestoesDoCicloAberto(app.db, base.id);
+      const sugestoes = aberto?.sugestoes ?? new Map<string, SugestaoDoAtleta>();
+      const decisoes = decidirNotas(corpo, sugestoes, antes.dados.respostas);
       const [depois] = avaliarAtletas(
         parametros,
         [base],
-        new Map([[base.id, aplicarProposta(antes.dados, corpo, referencia)]]),
+        new Map([[base.id, aplicarProposta(antes.dados, corpo, decisoes, referencia)]]),
         referencia,
       );
       if (!depois) throw naoEncontrado("Atleta não encontrado.");
@@ -285,6 +365,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           pilares: pilares(depois.calculo),
           statusGates: depois.calculo.statusFinal,
         },
+        sugestoesAtleta: [...sugestoes].map(([indicadorId, s]) => ({ indicadorId, ...s })),
         sugestaoPontos: sugestaoComIndicador(
           notaSugeridaPorPontos(antes.calculo.pontosCbvela, parametros.regras.perfPontos),
           parametros.regras.perfPontos.indicador,
@@ -301,7 +382,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
         tags: ["avaliacoes"],
         summary: "Lança notas e/ou medida do atleta (série histórica: só insere)",
         description:
-          "Origem da nota: resposta_confirmada se o atleta respondeu à pergunta do indicador, senão avaliacao. Indicador calculado (peso) ou tipo R é recusado.",
+          "Origem da nota: se o atleta sugeriu a nota (autoavaliação) no ciclo aberto, nota igual grava `autoavaliacao_aprovada` e nota diferente grava a correção, com `justificativa` obrigatória (400 em `notas.N.justificativa`) e aviso `autoavaliacao_corrigida` ao atleta. Sem sugestão: resposta_confirmada se o atleta respondeu à pergunta do indicador, senão avaliacao (justificativa opcional). Indicador calculado (peso) ou tipo R é recusado.",
         security: [{ bearerAuth: [] }],
         params: esquemaParams,
         body: esquemaCorpo,
@@ -346,11 +427,17 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           `select id from ciclos_avaliacao where status = 'aberto' limit 1 for share`,
         );
         const cicloId = ciclo.rows[0]?.id ?? null;
+        const aberto = await sugestoesDoCicloAberto(tx, base.id);
+        const decisoes = decidirNotas(
+          body,
+          aberto?.sugestoes ?? new Map<string, SugestaoDoAtleta>(),
+          antes.dados.respostas,
+        );
 
-        for (const n of body.notas) {
+        for (const [i, n] of body.notas.entries()) {
           await tx.query(
-            `insert into avaliacoes (atleta_id, indicador_id, ciclo_id, valor, evidencia, link, origem, avaliador_id, lancado_em, anexo_id)
-             values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+            `insert into avaliacoes (atleta_id, indicador_id, ciclo_id, valor, evidencia, link, origem, avaliador_id, lancado_em, anexo_id, justificativa)
+             values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
             [
               base.id,
               n.indicadorId,
@@ -358,12 +445,21 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
               n.valor,
               n.evidencia ?? null,
               n.link ?? null,
-              antes.dados.respostas[n.indicadorId] ? "resposta_confirmada" : "avaliacao",
+              decisoes[i]!.origem,
               usuario.id,
               referencia,
               n.anexoId ?? null,
+              n.justificativa ?? null,
             ],
           );
+          if (decisoes[i]!.corrigiu) {
+            await avisarContasDoAtleta(tx, base.id, {
+              tipo: "autoavaliacao_corrigida",
+              referencia: { indicadorId: n.indicadorId },
+              autorId: usuario.id,
+              em: referencia,
+            });
+          }
         }
 
         const m = body.medida;
@@ -391,6 +487,8 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
               indicadores: body.notas.map((n) => n.indicadorId),
               comAnexo: body.notas.some((n) => n.anexoId),
               comLink: body.notas.some((n) => n.link),
+              aprovouSugestao: decisoes.some((d) => d.origem === "autoavaliacao_aprovada"),
+              corrigiuSugestao: decisoes.some((d) => d.corrigiu),
               medida: m
                 ? [
                     m.pesoKg !== undefined ? "pesoKg" : null,

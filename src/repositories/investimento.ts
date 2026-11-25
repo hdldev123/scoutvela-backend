@@ -1,4 +1,5 @@
 import type { Db } from "../db/db.js";
+import { sqlNotaDoAvaliador } from "./origens.js";
 
 /** ids dos atletas com consentimento atual de compartilhamento com o IBVAR. */
 export async function idsComConsentimentoIbvar(db: Db, atletaIds: string[]): Promise<Set<string>> {
@@ -125,7 +126,7 @@ export async function carregarCongelado(
 /**
  * Instante do último lançamento que muda score ou gates (avaliações que pontuam, medidas corporais,
  * resultados de regata, decisões de gate e financeiro) dos atletas informados. Nulo se não houver.
- * Sugestão do atleta ainda sem nota (`resposta_sugerida`) não muda o score e fica de fora.
+ * Sugestão do atleta ainda sem nota (`resposta_sugerida` e `autoavaliacao`) não muda o score e fica de fora.
  * Os ids devem vir já filtrados pela matriz de acesso; para o painel, é sempre o agregado do piloto.
  */
 export async function ultimoLancamento(db: Db, atletaIds: string[]): Promise<string | null> {
@@ -133,7 +134,7 @@ export async function ultimoLancamento(db: Db, atletaIds: string[]): Promise<str
   const r = await db.query<{ em: Date | null }>(
     `select max(t) as em from (
        select max(lancado_em) as t from avaliacoes
-        where atleta_id = any($1::uuid[]) and origem <> 'resposta_sugerida'
+        where atleta_id = any($1::uuid[]) and ${sqlNotaDoAvaliador()}
        union all select max(registrado_em) from medidas_corporais where atleta_id = any($1::uuid[])
        union all select max(registrado_em) from resultados_regata where atleta_id = any($1::uuid[])
        union all select max(decidido_em) from gates_decisoes where atleta_id = any($1::uuid[])

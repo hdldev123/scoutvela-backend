@@ -161,6 +161,7 @@ export function pilaresDeTeste(): Pilar[] {
       calculado: iid === "cf_peso_kg",
       evidencia: /^(tec|tat|pot)_/.test(iid) ? ("opcional" as const) : ("obrigatoria" as const),
       exigeAnexo: iid === "cf_peso_kg",
+      autoavaliacao: tipo === "T" && iid !== "cf_peso_kg",
     })),
   }));
 }

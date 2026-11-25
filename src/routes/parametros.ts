@@ -32,6 +32,11 @@ const esquemaParametros = z.object({
           exigeAnexo: z
             .boolean()
             .describe("A nota depende de arquivo anexado (ex.: foto da balança no peso)"),
+          autoavaliacao: z
+            .boolean()
+            .describe(
+              "O atleta pode sugerir a nota deste indicador (POST /autoavaliacoes). O gestor muda em PUT /parametros (indicadores)",
+            ),
         }),
       ),
     }),
@@ -151,17 +156,31 @@ const esquemaAtualizacao = z
         z
           .object({
             id: z.string().min(1).max(64),
-            evidencia: z.enum(["obrigatoria", "opcional"], {
-              error: "A evidência deve ser obrigatoria ou opcional.",
-            }),
+            evidencia: z
+              .enum(["obrigatoria", "opcional"], {
+                error: "A evidência deve ser obrigatoria ou opcional.",
+              })
+              .optional(),
+            autoavaliacao: z
+              .boolean("Informe verdadeiro ou falso.")
+              .optional()
+              .describe(
+                "Liga ou desliga a autoavaliação do indicador (só tipo T não calculado pode ligar)",
+              ),
           })
-          .strict(),
+          .strict()
+          .refine(
+            (i) => i.evidencia !== undefined || i.autoavaliacao !== undefined,
+            "Informe a evidência ou a autoavaliação do indicador.",
+          ),
       )
       .min(1)
       .max(100)
       .refine((l) => new Set(l.map((i) => i.id)).size === l.length, "Indicador repetido.")
       .optional()
-      .describe("Regra de evidência por indicador (obrigatoria ou opcional)"),
+      .describe(
+        "Regra por indicador: `evidencia` (obrigatoria ou opcional) e/ou `autoavaliacao` (boolean). A auditoria guarda antes e depois",
+      ),
     classes: z
       .array(
         z.object({

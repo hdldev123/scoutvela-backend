@@ -118,8 +118,9 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
       calculado: boolean;
       evidencia: Indicador["evidencia"];
       exige_anexo: boolean;
+      autoavaliacao: boolean;
     }>(
-      "select id, pilar_id, nome, tipo, calculado, evidencia, exige_anexo from indicadores order by pilar_id, ordem",
+      "select id, pilar_id, nome, tipo, calculado, evidencia, exige_anexo, autoavaliacao from indicadores order by pilar_id, ordem",
     )
   ).rows;
   const faixasRows = (
@@ -161,6 +162,7 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
         calculado: i.calculado,
         evidencia: i.evidencia,
         exigeAnexo: i.exige_anexo,
+        autoavaliacao: i.autoavaliacao,
       })),
   }));
   const faixas: FaixaScore[] = faixasRows.map((f) => ({
@@ -255,7 +257,13 @@ export interface AtualizacaoParametros {
   rubricasRemover?: (string | null)[] | undefined;
   regras?: Record<string, unknown> | undefined;
   /** Regra de evidência por indicador. */
-  indicadores?: { id: string; evidencia: Indicador["evidencia"] }[] | undefined;
+  indicadores?:
+    | {
+        id: string;
+        evidencia?: Indicador["evidencia"] | undefined;
+        autoavaliacao?: boolean | undefined;
+      }[]
+    | undefined;
   classes?:
     | {
         id: string;
@@ -485,18 +493,46 @@ export async function atualizarParametros(
     if (dados.indicadores) {
       const antes: Record<string, string> = {};
       const depois: Record<string, string> = {};
+      const autoAntes: Record<string, boolean> = {};
+      const autoDepois: Record<string, boolean> = {};
       for (const i of dados.indicadores) {
         const atual = (
-          await tx.query<{ evidencia: string }>("select evidencia from indicadores where id = $1", [
+          await tx.query<{
+            evidencia: string;
+            autoavaliacao: boolean;
+            tipo: string;
+            calculado: boolean;
+          }>("select evidencia, autoavaliacao, tipo, calculado from indicadores where id = $1", [
             i.id,
           ])
         ).rows[0];
         if (!atual) throw new ErroParametros(`Indicador desconhecido: ${i.id}.`);
-        antes[i.id] = atual.evidencia;
-        depois[i.id] = i.evidencia;
-        await tx.query("update indicadores set evidencia = $2 where id = $1", [i.id, i.evidencia]);
+        if (i.evidencia !== undefined) {
+          antes[i.id] = atual.evidencia;
+          depois[i.id] = i.evidencia;
+          await tx.query("update indicadores set evidencia = $2 where id = $1", [
+            i.id,
+            i.evidencia,
+          ]);
+        }
+        if (i.autoavaliacao !== undefined) {
+          if (i.autoavaliacao && (atual.tipo !== "T" || atual.calculado)) {
+            throw new ErroParametros(
+              `Indicador ${i.id}: só indicador tipo T não calculado pode ter autoavaliação (os tipos A e R usam o questionário; o peso é medida).`,
+            );
+          }
+          autoAntes[i.id] = atual.autoavaliacao;
+          autoDepois[i.id] = i.autoavaliacao;
+          await tx.query("update indicadores set autoavaliacao = $2 where id = $1", [
+            i.id,
+            i.autoavaliacao,
+          ]);
+        }
       }
-      detalhes.indicadores = { antes, depois };
+      if (Object.keys(depois).length > 0) detalhes.indicadores = { antes, depois };
+      if (Object.keys(autoDepois).length > 0) {
+        detalhes.autoavaliacao = { antes: autoAntes, depois: autoDepois };
+      }
     }
 
     if (dados.classes) {
