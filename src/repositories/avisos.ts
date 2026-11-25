@@ -176,13 +176,18 @@ export async function listarAvisos(
 }
 
 /** Quantos avisos não lidos o usuário tem (mesmo filtro de acesso da lista). */
+/**
+ * Avisos não lidos, sem os de `mensagem_nova`: mensagem nova já é contada pelo balão `conversas`
+ * (D16), e contar nos dois somaria a mesma mensagem duas vezes no total do menu. O aviso continua
+ * na lista do sino, com o link para a conversa.
+ */
 export async function contarAvisosNaoLidos(db: Db, usuario: UsuarioDeAcesso): Promise<number> {
   if (!recebeAvisos(usuario.papel)) return 0;
   const vis = filtroVisibilidade(usuario, "a", 2);
   const r = await db.query<{ n: string }>(
     `select count(*)::text as n
        from avisos v left join atletas a on a.id = v.atleta_id
-      where v.destinatario_id = $1::uuid and v.lido_em is null
+      where v.destinatario_id = $1::uuid and v.lido_em is null and v.tipo <> 'mensagem_nova'
         and (v.atleta_id is null or ${vis.sql})`,
     [usuario.id, ...vis.params],
   );

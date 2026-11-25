@@ -488,8 +488,9 @@ paths:
         atenção). Gestor: `revisoes` (pedidos de revisão e do titular abertos),
         `cadastro` (atletas ativos sem aceite da versão vigente do termo),
         `investimento`, `sugestoes` (sugestões dos treinadores ainda abertas),
-        `avisos` (avisos não lidos, D8) e `conversas` (mensagens não lidas das
-        caixas compartilhadas da gestão, D16). Treinador: `revisoes` (pedidos de
+        `avisos` (avisos não lidos, D8, sem os de mensagem nova, que já contam
+        em `conversas`) e `conversas` (mensagens não lidas das caixas
+        compartilhadas da gestão, D16). Treinador: `revisoes` (pedidos de
         revisão abertos dos próprios atletas), `avaliar` (próprios atletas com
         indicadores pendentes no ciclo aberto; 0 sem ciclo aberto), `avisos` e
         `conversas` (mensagens não lidas, D16). Atleta: `avisos`, `conversas`

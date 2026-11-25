@@ -422,10 +422,33 @@ describe("D16: chat (conversas, mensagens, supervisão)", () => {
     expect(g.conversas).toBe((await c.lista(gestor2)).reduce((s, i) => s + i.naoLidas, 0));
     expect(g.conversas).toBeGreaterThan(0);
     expect((await c.contagens(ibvar)).conversas).toBeUndefined();
+    // A mesma mensagem não conta duas vezes no total: o aviso mensagem_nova fica fora de `avisos`.
+    const notif = (await c.chamar(EMAILS_DEMO.treinadora, "GET", "/me/notificacoes")).corpo as {
+      contagens: Record<string, number>;
+      total: number;
+    };
+    const naoLidosMensagem = await p.db.query<{ n: string }>(
+      `select count(*)::text as n from avisos v join usuarios u on u.id = v.destinatario_id
+        where u.email = $1 and v.tipo = 'mensagem_nova' and v.lido_em is null`,
+      [EMAILS_DEMO.treinadora],
+    );
+    expect(Number(naoLidosMensagem.rows[0]!.n)).toBeGreaterThan(0);
+    const outrosAvisos = await p.db.query<{ n: string }>(
+      `select count(*)::text as n from avisos v join usuarios u on u.id = v.destinatario_id
+        where u.email = $1 and v.tipo <> 'mensagem_nova' and v.lido_em is null`,
+      [EMAILS_DEMO.treinadora],
+    );
+    expect(notif.contagens.avisos).toBe(Number(outrosAvisos.rows[0]!.n));
+    expect(notif.total).toBe(Object.values(notif.contagens).reduce((t, n) => t + n, 0));
     // Ler zera o balão.
     for (const i of await c.lista(EMAILS_DEMO.treinadora))
       await c.lidas(EMAILS_DEMO.treinadora, i.id);
     expect((await c.contagens(EMAILS_DEMO.treinadora)).conversas).toBe(0);
+  });
+
+  it("enviar mensagem não grava auditoria (o gestor não vê quem escreveu sem supervisão)", async () => {
+    const r = await p.db.query("select 1 from auditoria where acao = 'enviar_mensagem'");
+    expect(r.rows).toHaveLength(0);
   });
 
   it("supervisão: sem acesso 404; lista só com metadados; com motivo lê por 24 h, não envia e audita sem conteúdo", async () => {

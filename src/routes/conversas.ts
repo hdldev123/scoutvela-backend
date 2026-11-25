@@ -400,11 +400,9 @@ export async function rotasConversas(app: FastifyInstance): Promise<void> {
           }
           throw conflito("Esta conversa está somente leitura.");
         }
+        // Sem auditoria por mensagem: na conversa entre treinador e atleta, ela mostraria ao gestor
+        // quem escreveu e quando sem passar pelo acesso de supervisão com motivo (decisão I).
         const id = await inserirMensagem(tx, conversa.id, usuario.id, body.texto, agora);
-        await auditar(tx, usuario.id, "enviar_mensagem", conversa.id, {
-          mensagemId: id,
-          tipo: conversa.tipo,
-        });
         await avisarMensagemNova(
           tx,
           {
