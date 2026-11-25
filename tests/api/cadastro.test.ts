@@ -237,6 +237,7 @@ describe("cadastro pelo WS ID, termo e importações", () => {
         wsId: "BRARB51",
         velaid: "MG-T15",
         sugestao: { nome: "Renata Bastos", genero: "F", dataNascimento: "2005-08-19" },
+        origemSugestao: "velaid",
       });
       expect(me.json().atleta).toEqual({ id: novoId, nome: null });
 
@@ -338,7 +339,12 @@ describe("cadastro pelo WS ID, termo e importações", () => {
       expect(corpo).toMatchObject({ wsId: "GBRHM15", velaid: null });
       const cab = await comoAtleta("sem.velaid@exemplo.com");
       const me = await p.app.inject({ method: "GET", url: "/me", headers: cab });
-      expect(me.json().cadastroPendente).toEqual({ wsId: "GBRHM15", velaid: null, sugestao: null });
+      expect(me.json().cadastroPendente).toEqual({
+        wsId: "GBRHM15",
+        velaid: null,
+        sugestao: null,
+        origemSugestao: null,
+      });
       const lista = await gestor("GET", "/atletas?cadastroCompleto=false");
       expect(lista.corpo).toHaveLength(1);
       expect(lista.corpo[0]).toMatchObject({

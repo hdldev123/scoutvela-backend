@@ -83,6 +83,7 @@ describe("perfil do usuário (/me/perfil e /me/foto)", () => {
         mfaAtivo: false,
         atleta: null,
         treinador: null,
+        sugestaoWorldSailing: null,
       });
       expect((await chamar(u, "GET", "/me/perfil", undefined, "aal2")).corpo.mfaAtivo).toBe(true);
     });

@@ -235,6 +235,7 @@ describe("PUT /me/cadastro", () => {
       wsId: "BRASUG01",
       velaid: "SP-S01",
       sugestao: { nome: "Sugestão Silva", genero: "M", dataNascimento: "1998-01-02" },
+      origemSugestao: "velaid",
     });
     expect(r.json().atleta).toEqual({ id: com.atletaId, nome: null });
 
@@ -244,6 +245,7 @@ describe("PUT /me/cadastro", () => {
       wsId: "BRASUG02",
       velaid: "SP-X99",
       sugestao: null,
+      origemSugestao: null,
     });
 
     // Treinador não tem cadastro pendente.
