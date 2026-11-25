@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
+import { EMAILS_DEMO, criarPiloto, urlInvestimentoAberto } from "../apoio/piloto.js";
 import type { Piloto } from "../apoio/piloto.js";
 
 const AGORA = () => new Date("2026-11-06T12:00:00-03:00");
@@ -87,7 +87,8 @@ describe("financeiro da campanha e resultados internacionais", () => {
 
     it("grava nova linha sem apagar a anterior; G4 e a lista de investimento refletem o perfil", async () => {
       const antes = await ficha(idAna);
-      const invAntes = (await chamar(EMAILS_DEMO.gestor, "GET", "/investimento")).corpo;
+      const invAntes = (await chamar(EMAILS_DEMO.gestor, "GET", await urlInvestimentoAberto(p.db)))
+        .corpo;
       const linhasAntes = await contar("financeiro_campanha", `atleta_id = '${idAna}'`);
       const r = await chamar(EMAILS_DEMO.gestor, "PUT", `/atletas/${idAna}/financeiro`, corpo());
       expect(r.status).toBe(200);
@@ -107,7 +108,8 @@ describe("financeiro da campanha e resultados internacionais", () => {
       expect(depois.score).toBe(antes.score); // financeiro não entra no score
 
       // O painel passa a contar o atleta como dependente de apoio (perfil C ou D) e o G4 agregado muda.
-      const inv = (await chamar(EMAILS_DEMO.gestor, "GET", "/investimento")).corpo;
+      const inv = (await chamar(EMAILS_DEMO.gestor, "GET", await urlInvestimentoAberto(p.db)))
+        .corpo;
       const jaDependia =
         antes.financeiro?.perfilSuporte === "C" || antes.financeiro?.perfilSuporte === "D";
       expect(inv.kpis.dependentesApoio).toBe(invAntes.kpis.dependentesApoio + (jaDependia ? 0 : 1));
@@ -128,7 +130,8 @@ describe("financeiro da campanha e resultados internacionais", () => {
       expect(r.status).toBe(200);
       expect(r.corpo.componentes).toHaveLength(2);
       expect(gate(await ficha(idAna), 4)).toBe("apto");
-      const inv = (await chamar(EMAILS_DEMO.gestor, "GET", "/investimento")).corpo;
+      const inv = (await chamar(EMAILS_DEMO.gestor, "GET", await urlInvestimentoAberto(p.db)))
+        .corpo;
       expect(
         (inv.ondeInvestir as { atleta: { id: string } }[]).some((a) => a.atleta.id === idAna),
       ).toBe(false);

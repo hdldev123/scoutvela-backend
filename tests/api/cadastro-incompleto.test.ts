@@ -1,6 +1,6 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { cabecalhoAuth, tokenPara } from "../apoio/app.js";
-import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
+import { EMAILS_DEMO, criarPiloto, urlInvestimentoAberto } from "../apoio/piloto.js";
 import type { Piloto } from "../apoio/piloto.js";
 
 // Ciclo aberto do seed: Novembro de 2026.
@@ -44,7 +44,8 @@ describe("atleta com cadastro incompleto", () => {
   const gestor = (m: "GET" | "POST" | "PUT", url: string, body?: unknown) =>
     chamar(EMAILS_DEMO.gestor, m, url, body);
 
-  const kpis = async () => (await gestor("GET", "/investimento")).corpo.kpis.atletas as number;
+  const kpis = async () =>
+    (await gestor("GET", await urlInvestimentoAberto(p.db))).corpo.kpis.atletas as number;
 
   it("cadastrado com termo aceito e IBVAR autorizado, segue fora de tudo", async () => {
     const antes = {
@@ -80,7 +81,9 @@ describe("atleta com cadastro incompleto", () => {
     expect(rankIbvar.corpo.ocultosSemConsentimento).toBeTypeOf("number");
     expect(await kpis()).toBe(antes.investimento);
     expect(
-      JSON.stringify((await chamar(EMAILS_DEMO.ibvar, "GET", "/investimento")).corpo),
+      JSON.stringify(
+        (await chamar(EMAILS_DEMO.ibvar, "GET", await urlInvestimentoAberto(p.db))).corpo,
+      ),
     ).not.toContain(incompletoId);
 
     // Ficha: 404 para todos (não há score a mostrar).

@@ -1,5 +1,5 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
-import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
+import { EMAILS_DEMO, criarPiloto, urlInvestimentoAberto } from "../apoio/piloto.js";
 import type { Piloto } from "../apoio/piloto.js";
 
 const AGORA = () => new Date("2026-11-06T12:00:00-03:00");
@@ -28,7 +28,7 @@ describe("GET /investimento", () => {
   const buscar = async (email: string) => {
     const r = await p.app.inject({
       method: "GET",
-      url: "/investimento",
+      url: await urlInvestimentoAberto(p.db),
       headers: await p.como(email),
     });
     return { status: r.statusCode, corpo: r.json(), texto: r.body };
@@ -43,7 +43,9 @@ describe("GET /investimento", () => {
   };
 
   it("sem token -> 401; treinador e atleta -> 403", async () => {
-    expect((await p.app.inject({ method: "GET", url: "/investimento" })).statusCode).toBe(401);
+    expect(
+      (await p.app.inject({ method: "GET", url: await urlInvestimentoAberto(p.db) })).statusCode,
+    ).toBe(401);
     expect((await buscar(EMAILS_DEMO.treinadora)).status).toBe(403);
     expect((await buscar(EMAILS_DEMO.atleta)).status).toBe(403);
   });

@@ -1897,15 +1897,16 @@ paths:
       summary: Ficha do atleta, conforme a matriz de acesso do papel
       tags:
         - atletas
-      description: "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo
-        404; atleta com cadastro incompleto também dá 404 (o próprio atleta lê a
-        sugestão em GET /me). IBVAR: só vê quem consentiu E está dentro do
-        piloto (mesma regra do ranking: aceite do termo, que segue
-        TERMO_EXIGE_REACEITE); fora do piloto dá 404, também no histórico do
-        indicador. Gestor, treinador e o próprio atleta mantêm o acesso. IBVAR:
-        sem indicadores sensíveis, Class Fit, contato, financeiro detalhado nem
-        texto de evidência; o motivo do gate G1 vem genérico, sem a diferença em
-        kg."
+      description: "`dadosAtualizadosEm` é o último lançamento do próprio atleta; o
+        IBVAR só chega à ficha de quem consentiu. Atleta fora do acesso do
+        usuário e atleta inexistente dão o mesmo 404; atleta com cadastro
+        incompleto também dá 404 (o próprio atleta lê a sugestão em GET /me).
+        IBVAR: só vê quem consentiu E está dentro do piloto (mesma regra do
+        ranking: aceite do termo, que segue TERMO_EXIGE_REACEITE); fora do
+        piloto dá 404, também no histórico do indicador. Gestor, treinador e o
+        próprio atleta mantêm o acesso. IBVAR: sem indicadores sensíveis, Class
+        Fit, contato, financeiro detalhado nem texto de evidência; o motivo do
+        gate G1 vem genérico, sem a diferença em kg."
       parameters:
         - schema:
             type: string
@@ -2040,6 +2041,12 @@ paths:
                       - nome
                       - prazo
                     additionalProperties: false
+                  dadosAtualizadosEm:
+                    nullable: true
+                    description: Instante ISO do último lançamento deste atleta que muda score ou
+                      gates (avaliações, medidas, resultados, decisões de gate e
+                      financeiro); nulo se não houver
+                    type: string
                   score:
                     type: number
                   faixa:
@@ -2511,6 +2518,7 @@ paths:
                   - atleta
                   - contato
                   - ciclo
+                  - dadosAtualizadosEm
                   - score
                   - faixa
                   - completo
@@ -7246,8 +7254,26 @@ paths:
       summary: "Painel de investimento: agregados do piloto e lista 'Onde investir'"
       tags:
         - investimento
-      description: Os números agregados incluem todos os atletas do piloto. A lista
-        'Onde investir' do IBVAR traz só quem consentiu, sem meses assegurados.
+      description: "Sem `ciclo`, abre no último ciclo fechado, com os números
+        congelados no fechamento (score, faixa, pilares, gates, status final e
+        perfil de suporte); sem ciclo fechado, no ciclo aberto, calculado na
+        hora (`parcial: true`); sem nenhum ciclo, calculado na hora com
+        `cicloExibido: null`. `?ciclo=<id>` escolhe outro ciclo (inexistente:
+        404). Ciclo fechado antes do congelamento completo só tem score e faixa:
+        o resto vem nulo, `congelamentoCompleto` é false e `ondeInvestir` vem
+        vazia. Os números agregados incluem todos os atletas do piloto. A lista
+        'Onde investir' do IBVAR traz só quem consentiu (vale o consentimento
+        atual), sem meses assegurados. `dadosAtualizadosEm` é sempre agregado,
+        nunca de um atleta. O campo `ciclo` fica por compatibilidade e repete
+        nome e prazo de `cicloExibido`."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: query
+          name: ciclo
+          required: false
       security:
         - bearerAuth: []
       responses:
@@ -7260,6 +7286,8 @@ paths:
                 properties:
                   ciclo:
                     nullable: true
+                    description: "Compatibilidade: nome e prazo do ciclo exibido (o mesmo de
+                      cicloExibido)"
                     type: object
                     properties:
                       nome:
@@ -7271,6 +7299,81 @@ paths:
                       - nome
                       - prazo
                     additionalProperties: false
+                  cicloExibido:
+                    nullable: true
+                    description: Ciclo de onde saem os números; nulo se ainda não existe nenhum
+                      ciclo
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        format: uuid
+                        pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                      nome:
+                        type: string
+                      inicio:
+                        type: string
+                        description: AAAA-MM-DD
+                      prazo:
+                        type: string
+                        description: AAAA-MM-DD
+                      status:
+                        type: string
+                        enum:
+                          - aberto
+                          - fechado
+                      fechadoEm:
+                        nullable: true
+                        description: Instante ISO do fechamento; nulo se aberto
+                        type: string
+                    required:
+                      - id
+                      - nome
+                      - inicio
+                      - prazo
+                      - status
+                      - fechadoEm
+                    additionalProperties: false
+                  parcial:
+                    type: boolean
+                    description: "true: números calculados na hora (ciclo aberto ou sem ciclo),
+                      ainda podem mudar"
+                  congelamentoCompleto:
+                    type: boolean
+                    description: "false: ciclo fechado antes do congelamento completo; só score e
+                      faixa existem e o resto vem nulo"
+                  ciclosDisponiveis:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        nome:
+                          type: string
+                        status:
+                          type: string
+                          enum:
+                            - aberto
+                            - fechado
+                        fechadoEm:
+                          nullable: true
+                          type: string
+                      required:
+                        - id
+                        - nome
+                        - status
+                        - fechadoEm
+                      additionalProperties: false
+                    description: Para o seletor, do mais recente ao mais antigo
+                  dadosAtualizadosEm:
+                    nullable: true
+                    description: "Instante ISO. Ciclo fechado: o fechamento. Ciclo aberto: o último
+                      lançamento que muda score ou gates no piloto. Sempre
+                      agregado, nunca de um atleta"
+                    type: string
                   kpis:
                     type: object
                     properties:
@@ -7281,15 +7384,17 @@ paths:
                       scoreMedio:
                         type: number
                       aptos:
+                        nullable: true
+                        description: Aptos nos 4 gates; nulo sem congelamento completo
                         type: integer
                         minimum: -9007199254740991
                         maximum: 9007199254740991
-                        description: Aptos nos 4 gates
                       dependentesApoio:
+                        nullable: true
+                        description: Perfil de suporte C ou D; nulo sem congelamento completo
                         type: integer
                         minimum: -9007199254740991
                         maximum: 9007199254740991
-                        description: Perfil de suporte C ou D
                     required:
                       - atletas
                       - scoreMedio
@@ -7332,14 +7437,17 @@ paths:
                         nome:
                           type: string
                         apto:
+                          nullable: true
                           type: integer
                           minimum: -9007199254740991
                           maximum: 9007199254740991
                         condicional:
+                          nullable: true
                           type: integer
                           minimum: -9007199254740991
                           maximum: 9007199254740991
                         alerta:
+                          nullable: true
                           type: integer
                           minimum: -9007199254740991
                           maximum: 9007199254740991
@@ -7421,18 +7529,62 @@ paths:
                   ocultosSemConsentimento:
                     nullable: true
                     description: "Só para o IBVAR: atletas do recorte 'Onde investir' que ficaram
-                      fora da lista; nulo para o gestor"
+                      fora da lista; nulo para o gestor (e sem congelamento
+                      completo)"
                     type: integer
                     minimum: -9007199254740991
                     maximum: 9007199254740991
                 required:
                   - ciclo
+                  - cicloExibido
+                  - parcial
+                  - congelamentoCompleto
+                  - ciclosDisponiveis
+                  - dadosAtualizadosEm
                   - kpis
                   - funil
                   - gates
                   - mediaPilares
                   - ondeInvestir
                   - ocultosSemConsentimento
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
                 additionalProperties: false
         "401":
           description: Default Response
@@ -7473,6 +7625,44 @@ paths:
                   - mensagem
                 additionalProperties: false
         "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
           description: Default Response
           content:
             application/json:
@@ -8871,14 +9061,17 @@ paths:
                 additionalProperties: false
   /ciclos/{id}/fechar:
     post:
-      summary: Fecha o ciclo e congela o score e a faixa dos atletas do piloto
+      summary: Fecha o ciclo e congela score, faixa, pilares, gates, status final e
+        perfil de suporte
       tags:
         - ciclos
       description: Calcula score e faixa de todos os atletas ativos com o termo do
-        piloto aceito, grava em scores_ciclo e marca o ciclo como fechado, numa
-        transação. Alimenta o histórico de score da ficha. Se nenhum atleta
-        tiver o termo aceito mas houver atletas ativos, recusa com 409 (nada a
-        congelar).
+        piloto aceito, grava em scores_ciclo e congela também a nota de cada
+        pilar, o status de cada gate, o status final e o perfil de suporte;
+        marca o ciclo como fechado (fechadoEm) numa só transação. Alimenta o
+        histórico de score da ficha e o painel de investimento (GET
+        /investimento?ciclo=). Se nenhum atleta tiver o termo aceito mas houver
+        atletas ativos, recusa com 409 (nada a congelar).
       parameters:
         - schema:
             type: string

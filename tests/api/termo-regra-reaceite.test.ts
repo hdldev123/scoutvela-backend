@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { criarProvedorEmailMemoria } from "../../src/email/index.js";
 import { executarLembretes } from "../../src/jobs/lembretes.js";
-import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
+import { EMAILS_DEMO, criarPiloto, urlInvestimentoAberto } from "../apoio/piloto.js";
 import type { Piloto } from "../apoio/piloto.js";
 
 /**
@@ -161,7 +161,7 @@ describe.each([
 
   it("GET /investimento: os agregados contam só o piloto", async () => {
     for (const email of [EMAILS_DEMO.gestor, EMAILS_DEMO.ibvar]) {
-      const r = await chamar(email, "GET", "/investimento");
+      const r = await chamar(email, "GET", await urlInvestimentoAberto(p.db));
       expect(r.status).toBe(200);
       expect(r.corpo.kpis.atletas, email).toBe(noPiloto);
       expect(

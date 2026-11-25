@@ -108,7 +108,9 @@ export async function semear(db: Db): Promise<void> {
     const ciclos: Record<string, string> = {};
     for (const c of CICLOS) {
       const { rows } = await tx.query<{ id: string }>(
-        "insert into ciclos_avaliacao (nome, inicio, prazo, status) values ($1, $2, $3, $4) returning id",
+        `insert into ciclos_avaliacao (nome, inicio, prazo, status, fechado_em)
+         values ($1, $2, $3, $4, case when $4 = 'fechado' then ($3::date + 1)::timestamptz - interval '1 second' end)
+         returning id`,
         [c.nome, c.inicio, c.prazo, c.status],
       );
       ciclos[c.nome] = rows[0]!.id;

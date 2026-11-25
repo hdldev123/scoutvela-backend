@@ -14,6 +14,7 @@ import {
 import { esquemaErro, naoEncontrado, semAcesso } from "../erros.js";
 import { historicoDeNotas, historicoDePesagens } from "../repositories/historico.js";
 import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
+import { ultimoLancamento } from "../repositories/investimento.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { buscarPlanoAtual } from "../repositories/plano.js";
 import { esquemaPlanoRegistrado, esquemaTextosPlano } from "./plano.js";
@@ -82,6 +83,12 @@ const esquemaFicha = z.object({
   }),
   contato: z.object({ email: z.string().nullable(), treinador: pessoa.nullable() }).nullable(),
   ciclo: z.object({ nome: z.string(), prazo: z.string() }).nullable(),
+  dadosAtualizadosEm: z
+    .string()
+    .nullable()
+    .describe(
+      "Instante ISO do último lançamento deste atleta que muda score ou gates (avaliações, medidas, resultados, decisões de gate e financeiro); nulo se não houver",
+    ),
   score: z.number(),
   faixa: z.object({ id: z.string(), nome: z.string(), nomeCurto: z.string() }),
   completo: z.boolean(),
@@ -192,7 +199,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         tags: ["atletas"],
         summary: "Ficha do atleta, conforme a matriz de acesso do papel",
         description:
-          "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo 404; atleta com cadastro incompleto também dá 404 (o próprio atleta lê a sugestão em GET /me). IBVAR: só vê quem consentiu E está dentro do piloto (mesma regra do ranking: aceite do termo, que segue TERMO_EXIGE_REACEITE); fora do piloto dá 404, também no histórico do indicador. Gestor, treinador e o próprio atleta mantêm o acesso. IBVAR: sem indicadores sensíveis, Class Fit, contato, financeiro detalhado nem texto de evidência; o motivo do gate G1 vem genérico, sem a diferença em kg.",
+          "`dadosAtualizadosEm` é o último lançamento do próprio atleta; o IBVAR só chega à ficha de quem consentiu. Atleta fora do acesso do usuário e atleta inexistente dão o mesmo 404; atleta com cadastro incompleto também dá 404 (o próprio atleta lê a sugestão em GET /me). IBVAR: só vê quem consentiu E está dentro do piloto (mesma regra do ranking: aceite do termo, que segue TERMO_EXIGE_REACEITE); fora do piloto dá 404, também no histórico do indicador. Gestor, treinador e o próprio atleta mantêm o acesso. IBVAR: sem indicadores sensíveis, Class Fit, contato, financeiro detalhado nem texto de evidência; o motivo do gate G1 vem genérico, sem a diferença em kg.",
         security: [{ bearerAuth: [] }],
         params: z.object({ id: z.uuid() }),
         response: {
@@ -375,6 +382,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         },
         contato: ibvar ? null : { email: atleta.emailContato, treinador: atleta.treinador },
         ciclo,
+        dadosAtualizadosEm: await ultimoLancamento(app.db, [atleta.id]),
         score: calculo.score,
         faixa: {
           id: calculo.faixa.id,

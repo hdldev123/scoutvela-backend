@@ -57,3 +57,11 @@ export async function criarPiloto(
     },
   };
 }
+
+/** URL do painel de investimento no ciclo aberto (cálculo na hora); sem `?ciclo`, o painel abre no último fechado. */
+export async function urlInvestimentoAberto(db: Db): Promise<string> {
+  const r = await db.query<{ id: string }>(
+    "select id from ciclos_avaliacao where status = 'aberto' limit 1",
+  );
+  return `/investimento?ciclo=${r.rows[0]!.id}`;
+}

@@ -8,6 +8,7 @@ import { listarAtletasVisiveis } from "../repositories/atletas.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { diasParaPrazo, pendenciasDoCiclo } from "../repositories/pendencias.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
+import { congelarCiclo } from "../servicos/congelamento-ciclo.js";
 
 const dataIso = z.iso.date().describe("AAAA-MM-DD");
 
@@ -34,7 +35,7 @@ interface LinhaCiclo {
 
 const SQL_CICLO = `select c.id, c.nome, c.inicio::text as inicio, c.prazo::text as prazo, c.status,
                           (select count(*)::text from scores_ciclo s where s.ciclo_id = c.id) as atletas_com_score,
-                          (select max(s.calculado_em) from scores_ciclo s where s.ciclo_id = c.id) as fechado_em
+                          coalesce(c.fechado_em, (select max(s.calculado_em) from scores_ciclo s where s.ciclo_id = c.id)) as fechado_em
                      from ciclos_avaliacao c`;
 
 const paraCiclo = (l: LinhaCiclo): Ciclo => ({
@@ -169,9 +170,10 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
       preHandler: acesso,
       schema: {
         tags: ["ciclos"],
-        summary: "Fecha o ciclo e congela o score e a faixa dos atletas do piloto",
+        summary:
+          "Fecha o ciclo e congela score, faixa, pilares, gates, status final e perfil de suporte",
         description:
-          "Calcula score e faixa de todos os atletas ativos com o termo do piloto aceito, grava em scores_ciclo e marca o ciclo como fechado, numa transação. Alimenta o histórico de score da ficha. Se nenhum atleta tiver o termo aceito mas houver atletas ativos, recusa com 409 (nada a congelar).",
+          "Calcula score e faixa de todos os atletas ativos com o termo do piloto aceito, grava em scores_ciclo e congela também a nota de cada pilar, o status de cada gate, o status final e o perfil de suporte; marca o ciclo como fechado (fechadoEm) numa só transação. Alimenta o histórico de score da ficha e o painel de investimento (GET /investimento?ciclo=). Se nenhum atleta tiver o termo aceito mas houver atletas ativos, recusa com 409 (nada a congelar).",
         security: seguranca,
         params,
         response: {
@@ -186,7 +188,7 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
       const agora = app.agora();
       const gestor = { id: req.usuario.id, papel: "gestor" as const, atletaId: null };
       const parametros = await carregarParametros(app.db);
-      return app.db.transacao(async (tx) => {
+      const resposta = await app.db.transacao(async (tx) => {
         const atual = await buscarCiclo(tx, req.params.id, true);
         if (!atual) throw naoEncontrado("Ciclo não encontrado.");
         if (atual.status !== "aberto") throw conflito("Este ciclo já está fechado.");
@@ -215,7 +217,11 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
             [x.atleta.id, atual.id, x.calculo.score, x.calculo.faixa.id, agora],
           );
         }
-        await tx.query(`update ciclos_avaliacao set status = 'fechado' where id = $1`, [atual.id]);
+        await congelarCiclo(tx, atual.id, avaliados);
+        await tx.query(
+          `update ciclos_avaliacao set status = 'fechado', fechado_em = $2, congelamento_completo = true where id = $1`,
+          [atual.id, agora],
+        );
         await tx.query(
           `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
            values ($1, 'fechar_ciclo', 'ciclo', $2, $3::jsonb, $4)`,
@@ -223,6 +229,7 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
         );
         return { ciclo: (await buscarCiclo(tx, atual.id))!, atletas: avaliados.length };
       });
+      return resposta;
     },
   );
 
