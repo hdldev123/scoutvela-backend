@@ -13,7 +13,7 @@ import {
   sugestoesDoCiclo,
 } from "../repositories/autoavaliacao.js";
 import { avisarTreinadorDoAtleta } from "../repositories/avisos.js";
-import { carregarParametros } from "../repositories/parametros.js";
+import { carregarParametros, carregarRubricas } from "../repositories/parametros.js";
 import { esquemaNota } from "./avaliacoes.js";
 
 const duasCasas = (v: number) => Math.round(v * 100) / 100;
@@ -45,6 +45,13 @@ const esquemaComparacao = z.object({
       indicadorId: z.string(),
       nome: z.string(),
       pilarId: z.string(),
+      evidencia: z
+        .enum(["obrigatoria", "opcional"])
+        .describe("Se a nota do indicador exige texto de evidência (regra do gestor)"),
+      orientacao: z
+        .string()
+        .nullable()
+        .describe("Texto de ajuda do indicador, editável pelo gestor; nulo se não há"),
       sugestao: esquemaSugestao.nullable().describe("Última sugestão do atleta no ciclo"),
       treinador: esquemaNotaTreinador.nullable().describe("Última nota do treinador no ciclo"),
       diferenca: z
@@ -54,6 +61,16 @@ const esquemaComparacao = z.object({
         .describe("Nota do treinador menos a do atleta; nulo se falta uma das duas"),
     }),
   ),
+  rubricas: z
+    .array(
+      z.object({
+        pilarId: z.string().nullable().describe("Nulo = escala geral de 0 a 5"),
+        notas: z.array(z.object({ nota: z.number().int(), descricao: z.string() })),
+      }),
+    )
+    .describe(
+      "Escala de 0 a 5: a geral (pilarId nulo) e a de cada pilar com rubrica própria. O atleta não lê GET /parametros, por isso a escala vem aqui",
+    ),
   resumoPorPilar: z
     .array(
       z.object({
@@ -234,7 +251,7 @@ export async function rotasAutoavaliacoes(app: FastifyInstance): Promise<void> {
         tags: ["autoavaliacao"],
         summary: "Atleta × treinador: a sugestão do atleta e a nota do treinador por indicador",
         description:
-          "Gestor, treinador dos próprios atletas e o próprio atleta (IBVAR: 403; outro atleta ou treinador: 404). `?ciclo=<id>`; sem ele, o ciclo aberto ou, não havendo, o último fechado. Traz os indicadores com autoavaliação ligada e os que já têm sugestão no ciclo. `diferenca` = nota do treinador − nota do atleta. `resumoPorPilar` (diferença média por pilar) só vem para o gestor.",
+          "Gestor, treinador dos próprios atletas e o próprio atleta (IBVAR: 403; outro atleta ou treinador: 404). `?ciclo=<id>`; sem ele, o ciclo aberto ou, não havendo, o último fechado. Traz os indicadores com autoavaliação ligada e os que já têm sugestão no ciclo. `diferenca` = nota do treinador − nota do atleta. `resumoPorPilar` (diferença média por pilar) só vem para o gestor. Cada indicador traz `evidencia` (obrigatoria|opcional) e `orientacao`, e a resposta traz `rubricas` (escala geral com `pilarId` nulo e a de cada pilar com rubrica própria), porque o atleta não lê GET /parametros.",
         security: seguranca,
         params: z.object({ id: z.uuid() }),
         querystring: z.object({ ciclo: z.uuid().optional() }),
@@ -272,6 +289,8 @@ export async function rotasAutoavaliacoes(app: FastifyInstance): Promise<void> {
               indicadorId: i.id,
               nome: i.nome,
               pilarId: p.id,
+              evidencia: i.evidencia,
+              orientacao: i.orientacao,
               sugestao,
               treinador,
               diferenca: sugestao && treinador ? treinador.valor - sugestao.valor : null,
@@ -297,7 +316,17 @@ export async function rotasAutoavaliacoes(app: FastifyInstance): Promise<void> {
               })
           : null;
 
-      return { ciclo, indicadores, resumoPorPilar };
+      const rubricas: z.infer<typeof esquemaComparacao>["rubricas"] = [];
+      for (const r of await carregarRubricas(app.db)) {
+        let grupo = rubricas.find((g) => g.pilarId === r.pilarId);
+        if (!grupo) {
+          grupo = { pilarId: r.pilarId, notas: [] };
+          rubricas.push(grupo);
+        }
+        grupo.notas.push({ nota: r.nota, descricao: r.descricao });
+      }
+
+      return { ciclo, indicadores, rubricas, resumoPorPilar };
     },
   );
 }

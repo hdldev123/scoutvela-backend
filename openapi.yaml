@@ -4982,7 +4982,10 @@ paths:
         aberto ou, não havendo, o último fechado. Traz os indicadores com
         autoavaliação ligada e os que já têm sugestão no ciclo. `diferenca` =
         nota do treinador − nota do atleta. `resumoPorPilar` (diferença média
-        por pilar) só vem para o gestor."
+        por pilar) só vem para o gestor. Cada indicador traz `evidencia`
+        (obrigatoria|opcional) e `orientacao`, e a resposta traz `rubricas`
+        (escala geral com `pilarId` nulo e a de cada pilar com rubrica própria),
+        porque o atleta não lê GET /parametros."
       parameters:
         - schema:
             type: string
@@ -5035,6 +5038,16 @@ paths:
                         nome:
                           type: string
                         pilarId:
+                          type: string
+                        evidencia:
+                          type: string
+                          enum:
+                            - obrigatoria
+                            - opcional
+                          description: Se a nota do indicador exige texto de evidência (regra do gestor)
+                        orientacao:
+                          nullable: true
+                          description: Texto de ajuda do indicador, editável pelo gestor; nulo se não há
                           type: string
                         sugestao:
                           nullable: true
@@ -5126,10 +5139,43 @@ paths:
                         - indicadorId
                         - nome
                         - pilarId
+                        - evidencia
+                        - orientacao
                         - sugestao
                         - treinador
                         - diferenca
                       additionalProperties: false
+                  rubricas:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        pilarId:
+                          nullable: true
+                          description: Nulo = escala geral de 0 a 5
+                          type: string
+                        notas:
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              nota:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                              descricao:
+                                type: string
+                            required:
+                              - nota
+                              - descricao
+                            additionalProperties: false
+                      required:
+                        - pilarId
+                        - notas
+                      additionalProperties: false
+                    description: "Escala de 0 a 5: a geral (pilarId nulo) e a de cada pilar com
+                      rubrica própria. O atleta não lê GET /parametros, por isso
+                      a escala vem aqui"
                   resumoPorPilar:
                     nullable: true
                     description: Só para o gestor (nulo para treinador e atleta)
@@ -5154,6 +5200,7 @@ paths:
                 required:
                   - ciclo
                   - indicadores
+                  - rubricas
                   - resumoPorPilar
                 additionalProperties: false
         "400":
@@ -10366,6 +10413,12 @@ paths:
                                 description: O atleta pode sugerir a nota deste indicador (POST
                                   /autoavaliacoes). O gestor muda em PUT
                                   /parametros (indicadores)
+                              orientacao:
+                                nullable: true
+                                description: Texto de ajuda do indicador, mostrado embaixo do campo; nulo = sem
+                                  orientação. O gestor muda em PUT /parametros
+                                  (indicadores)
+                                type: string
                             required:
                               - id
                               - nome
@@ -10374,6 +10427,7 @@ paths:
                               - evidencia
                               - exigeAnexo
                               - autoavaliacao
+                              - orientacao
                             additionalProperties: false
                       required:
                         - id
@@ -10675,9 +10729,10 @@ paths:
                   type: object
                   additionalProperties: {}
                 indicadores:
-                  description: "Regra por indicador: `evidencia` (obrigatoria ou opcional) e/ou
-                    `autoavaliacao` (boolean). A auditoria guarda antes e
-                    depois"
+                  description: "Regra por indicador: `evidencia` (obrigatoria ou opcional),
+                    `autoavaliacao` (boolean) e/ou `orientacao` (texto de ajuda,
+                    até 1.000 caracteres; null remove). A auditoria guarda antes
+                    e depois (da orientação, só se havia texto)"
                   minItems: 1
                   maxItems: 100
                   type: array
@@ -10697,6 +10752,12 @@ paths:
                         description: Liga ou desliga a autoavaliação do indicador (só tipo T não
                           calculado pode ligar)
                         type: boolean
+                      orientacao:
+                        description: Texto de ajuda do indicador (até 1.000 caracteres); null remove
+                        nullable: true
+                        type: string
+                        minLength: 1
+                        maxLength: 1000
                     required:
                       - id
                     additionalProperties: false
@@ -10806,6 +10867,12 @@ paths:
                                 description: O atleta pode sugerir a nota deste indicador (POST
                                   /autoavaliacoes). O gestor muda em PUT
                                   /parametros (indicadores)
+                              orientacao:
+                                nullable: true
+                                description: Texto de ajuda do indicador, mostrado embaixo do campo; nulo = sem
+                                  orientação. O gestor muda em PUT /parametros
+                                  (indicadores)
+                                type: string
                             required:
                               - id
                               - nome
@@ -10814,6 +10881,7 @@ paths:
                               - evidencia
                               - exigeAnexo
                               - autoavaliacao
+                              - orientacao
                             additionalProperties: false
                       required:
                         - id
