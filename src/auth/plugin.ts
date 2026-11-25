@@ -77,13 +77,15 @@ export function registrarAutenticacao(
     }
 
     let u = await buscarUsuarioPorAuthId(app.db, sub);
-    if (!u && email && emailVerificado === false) {
-      // O token diz que o e-mail não foi confirmado: não amarra o login ao cadastro por ele.
+    if (!u && email && emailVerificado !== true) {
+      // Só um e-mail confirmado no token amarra o login ao cadastro. Sem a confirmação (ou sem a
+      // claim), uma conta criada por terceiro com o e-mail de um cadastro ainda sem login (ex.:
+      // convite que falhou) assumiria esse cadastro se o projeto Supabase aceitasse cadastro
+      // público sem confirmação (auditoria de 25/11/2026, A1).
       logarAcessoNegado(req, "email_nao_verificado");
     } else if (!u && email) {
-      // Primeiro login de uma conta convidada: amarra o login ao cadastro pelo e-mail do token.
-      // (Se o token não traz `email_verified`, vale a configuração do projeto Supabase: cadastro
-      // público desligado e confirmação de e-mail ligada. Ver README, "Montar um ambiente".)
+      // Primeiro login com e-mail confirmado: amarra o login ao cadastro pelo e-mail do token.
+      // Contas convidadas já nascem com o login amarrado (o convite devolve o id do Supabase).
       u = await vincularContaPorEmail(app.db, sub, email, app.agora());
       if (u)
         req.log.info(

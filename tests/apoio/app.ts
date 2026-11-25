@@ -39,6 +39,8 @@ export interface OpcoesAppDeTeste {
   armazenamento?: ArmazenamentoEvidencias;
   adminAuth?: AdminAuth | null;
   email?: ProvedorEmail;
+  /** Captura as linhas do log (testes de segurança dos logs). */
+  destinoLog?: { write(linha: string): void };
 }
 
 /** App completo sobre o banco de teste, com verificador HS256 real. */
@@ -59,6 +61,7 @@ export async function criarAppDeTeste(
     armazenamento: opcoes.armazenamento ?? criarArmazenamentoFake(),
     ...(opcoes.adminAuth !== undefined ? { adminAuth: opcoes.adminAuth } : {}),
     ...(opcoes.email ? { email: opcoes.email } : {}),
+    ...(opcoes.destinoLog ? { destinoLog: opcoes.destinoLog } : {}),
     logger: false,
   });
   await app.ready();

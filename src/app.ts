@@ -3,7 +3,7 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import {
   jsonSchemaTransform,
   serializerCompiler,
@@ -63,6 +63,8 @@ export interface DepsApp {
   armazenamento?: ArmazenamentoEvidencias;
   /** Cliente admin do Supabase Auth (convites). Ausente = convite indisponível. */
   adminAuth?: AdminAuth | null;
+  /** Só para testes: recebe as linhas do log (liga o logger mesmo com `logger: false`). */
+  destinoLog?: { write(linha: string): void };
 }
 
 declare module "fastify" {
@@ -124,12 +126,22 @@ export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
       config.TRUST_PROXY_HOPS > 0 ? (_endereco, salto) => salto < config.TRUST_PROXY_HOPS : false,
     bodyLimit: 1024 * 1024,
     logger:
-      deps.logger === false
+      deps.logger === false && !deps.destinoLog
         ? false
         : {
             level: "info",
             // Nunca registrar credenciais. O corpo da requisição não é logado.
             redact: ["req.headers.authorization", "req.headers.cookie"],
+            // Sem a query string: ela pode trazer dado pessoal (ex.: ?busca=<nome do atleta>)
+            // (auditoria de 25/11/2026, A2).
+            serializers: {
+              req: (req: FastifyRequest) => ({
+                method: req.method,
+                url: req.url.split("?")[0],
+                remoteAddress: req.ip,
+              }),
+            },
+            ...(deps.destinoLog ? { stream: deps.destinoLog } : {}),
           },
   });
 
@@ -157,6 +169,13 @@ export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
     global: true,
     max: deps.limiteRequisicoes?.max ?? 300,
     timeWindow: deps.limiteRequisicoes?.janelaMs ?? 60_000,
+  });
+
+  // Toda resposta da API traz dado de sessão ou pessoal: nada fica no cache do navegador nem de
+  // proxy (auditoria de 25/11/2026, A3). Quem já definiu o próprio Cache-Control mantém.
+  app.addHook("onSend", async (_req, reply, payload) => {
+    if (!reply.hasHeader("cache-control")) reply.header("cache-control", "no-store");
+    return payload;
   });
 
   await app.register(cors, {
