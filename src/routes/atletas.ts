@@ -42,7 +42,16 @@ const esquemaIndicador = z.object({
   tipo: z.enum(["T", "A", "R"]),
   calculado: z.boolean(),
   nota: z.number().nullable(),
-  evidencia: z.string().nullable(),
+  evidencia: z
+    .string()
+    .nullable()
+    .describe(
+      "Texto da evidência; nulo se a nota não tem (indicador com evidência opcional) e sempre nulo para o IBVAR",
+    ),
+  link: z
+    .string()
+    .nullable()
+    .describe("Link https de vídeo ou outro conteúdo externo da nota; nulo para o IBVAR"),
   origem: z.enum(["avaliacao", "resposta_confirmada", "calculado"]).nullable(),
   avaliador: pessoa.nullable(),
   lancadoEm: z.string().nullable().describe("Instante ISO"),
@@ -262,6 +271,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                   nota,
                   // IBVAR não recebe texto de evidência (pode citar a pesagem).
                   evidencia: ibvar || nota == null ? null : m.pesoEvidencia,
+                  link: null,
                   origem: nota == null ? null : ("calculado" as const),
                   avaliador: nota == null ? null : m.pesoRegistradoPor,
                   lancadoEm: nota == null ? null : m.pesoMedidoEm,
@@ -275,6 +285,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                 ...base,
                 nota,
                 evidencia: ibvar ? null : (lancada?.evidencia ?? null),
+                link: ibvar ? null : (lancada?.link ?? null),
                 origem: lancada?.origem ?? null,
                 // IBVAR não recebe quem avaliou (seria o treinador) nem a resposta do atleta.
                 avaliador: ibvar ? null : (lancada?.avaliador ?? null),
@@ -433,6 +444,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
               valor: z.number().describe("Nota de 0 a 5"),
               pesoKg: z.number().nullable().describe("Só em cf_peso_kg: o peso da pesagem"),
               evidencia: z.string().nullable(),
+              link: z.string().nullable().describe("Link https da nota; nulo para o IBVAR"),
               origem: z.enum([
                 "avaliacao",
                 "resposta_confirmada",
@@ -477,6 +489,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
           ),
           pesoKg: m.pesoKg,
           evidencia: m.evidencia,
+          link: null,
           origem: "calculado" as const,
           pendente: false,
           avaliador: m.registradoPor,
@@ -494,6 +507,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
           pesoKg: null,
           // IBVAR: sem evidência, sem quem avaliou e sem anexo (como na ficha).
           evidencia: ibvar ? null : n.evidencia,
+          link: ibvar ? null : n.link,
           origem: n.origem,
           pendente: n.origem === "resposta_sugerida",
           avaliador: ibvar ? null : n.avaliador,

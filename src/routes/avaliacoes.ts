@@ -5,7 +5,8 @@ import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { notaSugeridaPorPontos } from "../domain/index.js";
 import type { Parametros, ResultadoCalculo, StatusGate, SugestaoPontos } from "../domain/index.js";
-import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
+import { ErroApi, esquemaErro, naoEncontrado, requisicaoInvalidaCampos } from "../erros.js";
+import { esquemaLinkHttps } from "../validacao.js";
 import { recusarAtletaAnonimizado, travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
 import type { AtletaBase, DadosAtleta } from "../repositories/atletas.js";
@@ -32,10 +33,19 @@ const esquemaNota = z
       .min(0, "A nota mínima é 0.")
       .max(5, "A nota máxima é 5."),
     evidencia: z
-      .string("Informe a evidência da nota.")
+      .string("A evidência deve ser um texto.")
       .trim()
-      .min(3, "A evidência precisa ter ao menos 3 caracteres.")
-      .max(500, "A evidência pode ter no máximo 500 caracteres."),
+      .max(500, "A evidência pode ter no máximo 500 caracteres.")
+      .refine((v) => v === "" || v.length >= 3, "A evidência precisa ter ao menos 3 caracteres.")
+      .optional()
+      .describe(
+        "Texto da evidência. Obrigatório nos indicadores com evidência `obrigatoria` (GET /parametros); opcional nos demais. Vazio vale como ausente",
+      ),
+    link: esquemaLinkHttps
+      .optional()
+      .describe(
+        "Link de vídeo ou outro conteúdo externo da nota: só https://, até 500 caracteres. A API não acessa o endereço. Vazio vale como ausente",
+      ),
     /** Evidência anexada antes (POST /atletas/:id/evidencias), do mesmo atleta. A prévia ignora. */
     anexoId: z.uuid().optional(),
   })
@@ -76,6 +86,18 @@ const esquemaCorpo = z
   });
 type Corpo = z.infer<typeof esquemaCorpo>;
 
+/** Texto e link vazios valem como ausentes (o formulário pode mandar "" num campo opcional). */
+function semVazios(corpo: Corpo): Corpo {
+  return {
+    ...corpo,
+    notas: corpo.notas.map(({ evidencia, link, ...resto }) => ({
+      ...resto,
+      ...(evidencia ? { evidencia } : {}),
+      ...(link ? { link } : {}),
+    })),
+  };
+}
+
 const esquemaGates = z.object({
   statusFinal,
   itens: z.array(
@@ -103,7 +125,8 @@ function validarNotas(parametros: Parametros, corpo: Corpo): void {
     parametros.pilares.flatMap((p) => p.indicadores).map((i) => [i.id, i]),
   );
   const vistos = new Set<string>();
-  for (const n of corpo.notas) {
+  const semEvidencia: { campo: string; mensagem: string }[] = [];
+  for (const [i, n] of corpo.notas.entries()) {
     const ind = indicadores.get(n.indicadorId);
     if (!ind) throw requisicaoInvalida(`Indicador inexistente: ${n.indicadorId}.`);
     if (ind.calculado) {
@@ -117,6 +140,15 @@ function validarNotas(parametros: Parametros, corpo: Corpo): void {
     if (vistos.has(n.indicadorId))
       throw requisicaoInvalida(`Indicador repetido no envio: ${n.indicadorId}.`);
     vistos.add(n.indicadorId);
+    if (ind.evidencia === "obrigatoria" && !n.evidencia) {
+      semEvidencia.push({
+        campo: `notas.${i}.evidencia`,
+        mensagem: "Informe a evidência da nota: este indicador a exige.",
+      });
+    }
+  }
+  if (semEvidencia.length > 0) {
+    throw requisicaoInvalidaCampos(semEvidencia, "Há nota sem a evidência exigida pelo indicador.");
   }
 }
 
@@ -143,7 +175,8 @@ function aplicarProposta(dados: DadosAtleta, corpo: Corpo, agora: Date): DadosAt
     notas.set(n.indicadorId, {
       indicadorId: n.indicadorId,
       valor: n.valor,
-      evidencia: n.evidencia,
+      evidencia: n.evidencia ?? null,
+      link: n.link ?? null,
       origem: dados.respostas[n.indicadorId] ? "resposta_confirmada" : "avaliacao",
       avaliador: null,
       lancadoEm: agora.toISOString(),
@@ -232,7 +265,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
       const base = await buscarAtletaVisivel(app.db, req.usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
-      const corpo = arredondarMedida(req.body);
+      const corpo = semVazios(arredondarMedida(req.body));
       validarNotas(parametros, corpo);
 
       const antes = await avaliarUm(app.db, parametros, base, referencia);
@@ -288,7 +321,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const referencia = app.agora();
       const { usuario } = req;
-      const body = arredondarMedida(req.body);
+      const body = semVazios(arredondarMedida(req.body));
       const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
@@ -316,14 +349,15 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
 
         for (const n of body.notas) {
           await tx.query(
-            `insert into avaliacoes (atleta_id, indicador_id, ciclo_id, valor, evidencia, origem, avaliador_id, lancado_em, anexo_id)
-             values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            `insert into avaliacoes (atleta_id, indicador_id, ciclo_id, valor, evidencia, link, origem, avaliador_id, lancado_em, anexo_id)
+             values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
             [
               base.id,
               n.indicadorId,
               cicloId,
               n.valor,
-              n.evidencia,
+              n.evidencia ?? null,
+              n.link ?? null,
               antes.dados.respostas[n.indicadorId] ? "resposta_confirmada" : "avaliacao",
               usuario.id,
               referencia,
@@ -356,6 +390,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
             JSON.stringify({
               indicadores: body.notas.map((n) => n.indicadorId),
               comAnexo: body.notas.some((n) => n.anexoId),
+              comLink: body.notas.some((n) => n.link),
               medida: m
                 ? [
                     m.pesoKg !== undefined ? "pesoKg" : null,

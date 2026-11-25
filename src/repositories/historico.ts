@@ -3,7 +3,8 @@ import type { Db } from "../db/db.js";
 /** Um lançamento da série histórica de um indicador, do jeito que o banco guarda. */
 export interface LancamentoNota {
   valor: number;
-  evidencia: string;
+  evidencia: string | null;
+  link: string | null;
   origem: "avaliacao" | "resposta_confirmada" | "resposta_sugerida";
   avaliador: { id: string; nome: string } | null;
   cicloNome: string | null;
@@ -33,7 +34,8 @@ export async function historicoDeNotas(
 ): Promise<LancamentoNota[]> {
   const r = await db.query<{
     valor: number;
-    evidencia: string;
+    evidencia: string | null;
+    link: string | null;
     origem: LancamentoNota["origem"];
     avaliador_id: string | null;
     avaliador_nome: string | null;
@@ -42,7 +44,7 @@ export async function historicoDeNotas(
     anexo_id: string | null;
     anexo_nome: string | null;
   }>(
-    `select n.valor, n.evidencia, n.origem, n.avaliador_id, u.nome as avaliador_nome,
+    `select n.valor, n.evidencia, n.link, n.origem, n.avaliador_id, u.nome as avaliador_nome,
             c.nome as ciclo_nome, n.lancado_em, n.anexo_id, ea.nome_arquivo as anexo_nome
        from avaliacoes n
        left join usuarios u on u.id = n.avaliador_id
@@ -57,6 +59,7 @@ export async function historicoDeNotas(
   return r.rows.map((l) => ({
     valor: Number(l.valor),
     evidencia: l.evidencia,
+    link: l.link,
     origem: l.origem,
     avaliador: l.avaliador_id ? { id: l.avaliador_id, nome: l.avaliador_nome ?? "" } : null,
     cicloNome: l.ciclo_nome,

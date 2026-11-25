@@ -77,6 +77,19 @@ export function mensagemPadrao(issue: z.core.$ZodRawIssue): string {
   }
 }
 
+/**
+ * Link de conteúdo externo (ex.: vídeo): só `https://`, até 500 caracteres, sem espaço. Vazio é aceito
+ * (quem usa trata como ausente). A API nunca acessa o endereço (evita SSRF).
+ */
+export const esquemaLinkHttps = z
+  .string()
+  .trim()
+  .max(500, "O link pode ter no máximo 500 caracteres.")
+  .refine(
+    (v) => v === "" || (/^https:\/\/[^\s]+$/.test(v) && URL.canParse(v)),
+    "O link deve ser um endereço que começa com https://.",
+  );
+
 let configurado = false;
 
 /** Troca as mensagens padrão do Zod (inglês) pelas de `mensagemPadrao`. Idempotente. */

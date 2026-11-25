@@ -2145,6 +2145,13 @@ paths:
                                 type: number
                               evidencia:
                                 nullable: true
+                                description: Texto da evidência; nulo se a nota não tem (indicador com evidência
+                                  opcional) e sempre nulo para o IBVAR
+                                type: string
+                              link:
+                                nullable: true
+                                description: Link https de vídeo ou outro conteúdo externo da nota; nulo para o
+                                  IBVAR
                                 type: string
                               origem:
                                 nullable: true
@@ -2223,6 +2230,7 @@ paths:
                               - calculado
                               - nota
                               - evidencia
+                              - link
                               - origem
                               - avaliador
                               - lancadoEm
@@ -3001,6 +3009,10 @@ paths:
                     evidencia:
                       nullable: true
                       type: string
+                    link:
+                      nullable: true
+                      description: Link https da nota; nulo para o IBVAR
+                      type: string
                     origem:
                       type: string
                       enum:
@@ -3045,6 +3057,7 @@ paths:
                     - valor
                     - pesoKg
                     - evidencia
+                    - link
                     - origem
                     - pendente
                     - avaliador
@@ -3232,8 +3245,16 @@ paths:
                         minimum: 0
                         maximum: 5
                       evidencia:
+                        description: Texto da evidência. Obrigatório nos indicadores com evidência
+                          `obrigatoria` (GET /parametros); opcional nos demais.
+                          Vazio vale como ausente
                         type: string
-                        minLength: 3
+                        maxLength: 500
+                      link:
+                        description: "Link de vídeo ou outro conteúdo externo da nota: só https://, até
+                          500 caracteres. A API não acessa o endereço. Vazio
+                          vale como ausente"
+                        type: string
                         maxLength: 500
                       anexoId:
                         type: string
@@ -3242,7 +3263,6 @@ paths:
                     required:
                       - indicadorId
                       - valor
-                      - evidencia
                     additionalProperties: false
                 medida:
                   type: object
@@ -3572,8 +3592,16 @@ paths:
                         minimum: 0
                         maximum: 5
                       evidencia:
+                        description: Texto da evidência. Obrigatório nos indicadores com evidência
+                          `obrigatoria` (GET /parametros); opcional nos demais.
+                          Vazio vale como ausente
                         type: string
-                        minLength: 3
+                        maxLength: 500
+                      link:
+                        description: "Link de vídeo ou outro conteúdo externo da nota: só https://, até
+                          500 caracteres. A API não acessa o endereço. Vazio
+                          vale como ausente"
+                        type: string
                         maxLength: 500
                       anexoId:
                         type: string
@@ -3582,7 +3610,6 @@ paths:
                     required:
                       - indicadorId
                       - valor
-                      - evidencia
                     additionalProperties: false
                 medida:
                   type: object
@@ -7756,11 +7783,24 @@ paths:
                                   - R
                               calculado:
                                 type: boolean
+                              evidencia:
+                                type: string
+                                enum:
+                                  - obrigatoria
+                                  - opcional
+                                description: Se a nota do indicador exige texto de evidência (treinador e
+                                  sugestão do atleta). O gestor muda em PUT
+                                  /parametros (indicadores)
+                              exigeAnexo:
+                                type: boolean
+                                description: "A nota depende de arquivo anexado (ex.: foto da balança no peso)"
                             required:
                               - id
                               - nome
                               - tipo
                               - calculado
+                              - evidencia
+                              - exigeAnexo
                             additionalProperties: false
                       required:
                         - id
@@ -7975,7 +8015,8 @@ paths:
                   - mensagem
                 additionalProperties: false
     put:
-      summary: Atualiza pesos, faixas de score, rubricas, regras e classes
+      summary: Atualiza pesos, faixas de score, rubricas, regras, evidência por
+        indicador e classes
       tags:
         - parametros
       description: O ranking recalcula sozinho (o cálculo é feito na leitura). Grava
@@ -8058,6 +8099,27 @@ paths:
                     }, ate crescente e nota de 0 a 5 que não diminui"
                   type: object
                   additionalProperties: {}
+                indicadores:
+                  description: Regra de evidência por indicador (obrigatoria ou opcional)
+                  minItems: 1
+                  maxItems: 100
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                        minLength: 1
+                        maxLength: 64
+                      evidencia:
+                        type: string
+                        enum:
+                          - obrigatoria
+                          - opcional
+                    required:
+                      - id
+                      - evidencia
+                    additionalProperties: false
                 classes:
                   maxItems: 50
                   type: array
@@ -8148,11 +8210,24 @@ paths:
                                   - R
                               calculado:
                                 type: boolean
+                              evidencia:
+                                type: string
+                                enum:
+                                  - obrigatoria
+                                  - opcional
+                                description: Se a nota do indicador exige texto de evidência (treinador e
+                                  sugestão do atleta). O gestor muda em PUT
+                                  /parametros (indicadores)
+                              exigeAnexo:
+                                type: boolean
+                                description: "A nota depende de arquivo anexado (ex.: foto da balança no peso)"
                             required:
                               - id
                               - nome
                               - tipo
                               - calculado
+                              - evidencia
+                              - exigeAnexo
                             additionalProperties: false
                       required:
                         - id

@@ -4,6 +4,7 @@ import { CODIGOS_REGRAS, ESQUEMAS_REGRAS, type CodigoRegra } from "./regras-esqu
 import type {
   Classe,
   FaixaScore,
+  Indicador,
   Parametros,
   Pilar,
   Regras,
@@ -115,7 +116,11 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
       nome: string;
       tipo: TipoIndicador;
       calculado: boolean;
-    }>("select id, pilar_id, nome, tipo, calculado from indicadores order by pilar_id, ordem")
+      evidencia: Indicador["evidencia"];
+      exige_anexo: boolean;
+    }>(
+      "select id, pilar_id, nome, tipo, calculado, evidencia, exige_anexo from indicadores order by pilar_id, ordem",
+    )
   ).rows;
   const faixasRows = (
     await db.query<{ id: string; nome: string; nome_curto: string; score_min: string }>(
@@ -154,6 +159,8 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
         nome: i.nome,
         tipo: i.tipo,
         calculado: i.calculado,
+        evidencia: i.evidencia,
+        exigeAnexo: i.exige_anexo,
       })),
   }));
   const faixas: FaixaScore[] = faixasRows.map((f) => ({
@@ -247,6 +254,8 @@ export interface AtualizacaoParametros {
   /** Ids de pilar cujas rubricas próprias são removidas. A escala geral (pilar nulo) não sai. */
   rubricasRemover?: (string | null)[] | undefined;
   regras?: Record<string, unknown> | undefined;
+  /** Regra de evidência por indicador. */
+  indicadores?: { id: string; evidencia: Indicador["evidencia"] }[] | undefined;
   classes?:
     | {
         id: string;
@@ -467,6 +476,23 @@ export async function atualizarParametros(
         );
       }
       detalhes.regras = { antes, depois };
+    }
+
+    if (dados.indicadores) {
+      const antes: Record<string, string> = {};
+      const depois: Record<string, string> = {};
+      for (const i of dados.indicadores) {
+        const atual = (
+          await tx.query<{ evidencia: string }>("select evidencia from indicadores where id = $1", [
+            i.id,
+          ])
+        ).rows[0];
+        if (!atual) throw new ErroParametros(`Indicador desconhecido: ${i.id}.`);
+        antes[i.id] = atual.evidencia;
+        depois[i.id] = i.evidencia;
+        await tx.query("update indicadores set evidencia = $2 where id = $1", [i.id, i.evidencia]);
+      }
+      detalhes.indicadores = { antes, depois };
     }
 
     if (dados.classes) {

@@ -24,6 +24,14 @@ const esquemaParametros = z.object({
           nome: z.string(),
           tipo: z.enum(["T", "A", "R"]),
           calculado: z.boolean(),
+          evidencia: z
+            .enum(["obrigatoria", "opcional"])
+            .describe(
+              "Se a nota do indicador exige texto de evidência (treinador e sugestão do atleta). O gestor muda em PUT /parametros (indicadores)",
+            ),
+          exigeAnexo: z
+            .boolean()
+            .describe("A nota depende de arquivo anexado (ex.: foto da balança no peso)"),
         }),
       ),
     }),
@@ -138,6 +146,22 @@ const esquemaAtualizacao = z
       .describe(
         "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4, RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_PONTOS. O valor segue o formato lido em GET /parametros. PERF_PONTOS: { ativa, indicador (opcional, padrão perf_nacional; precisa ser um indicador T não calculado), faixas: [{ ate, nota }] }, ate crescente e nota de 0 a 5 que não diminui",
       ),
+    indicadores: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1).max(64),
+            evidencia: z.enum(["obrigatoria", "opcional"], {
+              error: "A evidência deve ser obrigatoria ou opcional.",
+            }),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(100)
+      .refine((l) => new Set(l.map((i) => i.id)).size === l.length, "Indicador repetido.")
+      .optional()
+      .describe("Regra de evidência por indicador (obrigatoria ou opcional)"),
     classes: z
       .array(
         z.object({
@@ -165,10 +189,11 @@ const esquemaAtualizacao = z
       (d.rubricas?.length ?? 0) > 0 ||
       (d.rubricasRemover?.length ?? 0) > 0 ||
       (d.regras !== undefined && Object.keys(d.regras).length > 0) ||
+      (d.indicadores?.length ?? 0) > 0 ||
       (d.classes?.length ?? 0) > 0,
     {
       message:
-        "Informe ao menos um de: pesos, faixas, rubricas, rubricasRemover, regras ou classes.",
+        "Informe ao menos um de: pesos, faixas, rubricas, rubricasRemover, regras, indicadores ou classes.",
     },
   );
 
@@ -197,7 +222,8 @@ export async function rotasParametros(app: FastifyInstance): Promise<void> {
       preHandler: [app.autenticar, exigirPapel("gestor")],
       schema: {
         tags: ["parametros"],
-        summary: "Atualiza pesos, faixas de score, rubricas, regras e classes",
+        summary:
+          "Atualiza pesos, faixas de score, rubricas, regras, evidência por indicador e classes",
         description:
           "O ranking recalcula sozinho (o cálculo é feito na leitura). Grava auditoria com antes e depois.",
         security: [{ bearerAuth: [] }],

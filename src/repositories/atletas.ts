@@ -44,7 +44,8 @@ export interface AtletaBase {
 export interface NotaAtual {
   indicadorId: string;
   valor: number;
-  evidencia: string;
+  evidencia: string | null;
+  link: string | null;
   origem: "avaliacao" | "resposta_confirmada";
   avaliador: { id: string; nome: string } | null;
   lancadoEm: string;
@@ -425,7 +426,8 @@ export async function carregarDadosAtletas(
         atleta_id: string;
         indicador_id: string;
         valor: number;
-        evidencia: string;
+        evidencia: string | null;
+        link: string | null;
         origem: "avaliacao" | "resposta_confirmada";
         avaliador_id: string | null;
         avaliador_nome: string | null;
@@ -433,7 +435,7 @@ export async function carregarDadosAtletas(
         anexo_id: string | null;
         anexo_nome: string | null;
       }>(
-        `select n.atleta_id, n.indicador_id, n.valor, n.evidencia, n.origem, n.avaliador_id,
+        `select n.atleta_id, n.indicador_id, n.valor, n.evidencia, n.link, n.origem, n.avaliador_id,
               u.nome as avaliador_nome, n.lancado_em, n.anexo_id, ea.nome_arquivo as anexo_nome
          from avaliacao_atual n
          left join usuarios u on u.id = n.avaliador_id
@@ -506,6 +508,7 @@ export async function carregarDadosAtletas(
       indicadorId: l.indicador_id,
       valor: l.valor,
       evidencia: l.evidencia,
+      link: l.link,
       origem: l.origem,
       avaliador: l.avaliador_id ? { id: l.avaliador_id, nome: l.avaliador_nome ?? "" } : null,
       lancadoEm: iso(l.lancado_em),

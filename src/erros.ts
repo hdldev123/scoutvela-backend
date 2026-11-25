@@ -1,7 +1,7 @@
 import type { FastifyInstance } from "fastify";
 import { hasZodFastifySchemaValidationErrors } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { camposDoErro, configurarMensagensZod } from "./validacao.js";
+import { camposDoErro, configurarMensagensZod, type CampoInvalido } from "./validacao.js";
 
 export const codigosDeErro = [
   "nao_autenticado",
@@ -33,6 +33,8 @@ export class ErroApi extends Error {
     readonly status: number,
     readonly codigo: CodigoDeErro,
     mensagem: string,
+    /** Só no 400 de validação de negócio: um item por campo (mesmo formato do erro de esquema). */
+    readonly campos?: CampoInvalido[],
   ) {
     super(mensagem);
   }
@@ -46,6 +48,9 @@ export const naoEncontrado = (m = "Recurso não encontrado.") =>
   new ErroApi(404, "nao_encontrado", m);
 export const requisicaoInvalida = (m = "Requisição inválida.") =>
   new ErroApi(400, "requisicao_invalida", m);
+/** 400 com a lista de campos inválidos, como no erro de esquema (`campos[].campo` = caminho do campo). */
+export const requisicaoInvalidaCampos = (campos: CampoInvalido[], m = "Requisição inválida.") =>
+  new ErroApi(400, "requisicao_invalida", m, campos);
 /** Conflito de estado (já existe, já respondido). Status 409 com o código `requisicao_invalida`. */
 export const conflito = (m: string) => new ErroApi(409, "requisicao_invalida", m);
 export const mfaObrigatorio = (m = "Ative a verificação em duas etapas para continuar.") =>
@@ -64,7 +69,11 @@ export function registrarTratamentoDeErros(app: FastifyInstance): void {
 
   app.setErrorHandler((err, req, reply) => {
     if (err instanceof ErroApi) {
-      return reply.code(err.status).send({ erro: err.codigo, mensagem: err.message });
+      return reply.code(err.status).send({
+        erro: err.codigo,
+        mensagem: err.message,
+        ...(err.campos ? { campos: err.campos } : {}),
+      });
     }
     if (hasZodFastifySchemaValidationErrors(err)) {
       return reply.code(400).send({

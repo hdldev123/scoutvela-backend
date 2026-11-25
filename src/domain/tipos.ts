@@ -32,6 +32,10 @@ export interface Indicador {
   tipo: TipoIndicador;
   /** Nota derivada pelo sistema (ex.: cf_peso_kg pela P3), nunca digitada. */
   calculado: boolean;
+  /** `obrigatoria`: a nota exige texto de evidência. Editável pelo gestor em Parâmetros. */
+  evidencia: "obrigatoria" | "opcional";
+  /** A nota depende de um arquivo anexado (ex.: a foto da balança no peso). */
+  exigeAnexo: boolean;
 }
 
 export interface Pilar {
