@@ -28,11 +28,22 @@ const esquemaMe = z.object({
       sugestao: z
         .object({
           nome: z.string(),
-          genero: z.enum(["F", "M"]),
-          dataNascimento: z.string().describe("AAAA-MM-DD"),
+          genero: z.enum(["F", "M"]).nullable().describe("Nulo se a World Sailing não informa"),
+          dataNascimento: z
+            .string()
+            .nullable()
+            .describe("AAAA-MM-DD; nula se a World Sailing não informa"),
         })
         .nullable()
-        .describe("Dados do VelaID para o atleta confirmar; nula sem VelaID"),
+        .describe(
+          "Dados do VelaID ou, sem eles, do perfil da World Sailing, para o atleta confirmar ou corrigir; nula sem nenhum dos dois",
+        ),
+      origemSugestao: z
+        .enum(["velaid", "world_sailing"])
+        .nullable()
+        .describe(
+          "De onde veio a sugestão (o VelaID vale antes da World Sailing); nula sem sugestão",
+        ),
     })
     .nullable()
     .describe(

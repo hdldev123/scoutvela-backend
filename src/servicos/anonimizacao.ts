@@ -13,7 +13,7 @@ import type { ArmazenamentoEvidencias } from "../storage/index.js";
  * do VelaID, os dados pessoais da conta de login, a conta no Supabase Auth, a foto de perfil, os
  * arquivos de evidência, os textos livres da série histórica (evidência das notas e das medidas,
  * justificativa de gate, plano individual, pedidos de revisão, de ajuste e do titular, avisos, nome do evento e link
- * dos resultados de regata) e as chaves com dado pessoal da trilha de auditoria. A data de
+ * dos resultados de regata, a referência e o perfil importados da World Sailing) e as chaves com dado pessoal da trilha de auditoria. A data de
  * nascimento vira 1º de julho do mesmo ano.
  * Fica: a série histórica (valores, datas, status), ligada ao atleta_id e sem identificação direta.
  *
@@ -227,7 +227,7 @@ async function anonimizarNoBanco(
 export function textoDaResposta(em: Date): string {
   return [
     `Dados pessoais anonimizados em ${dataBr(em)}.`,
-    "Removidos: nome, e-mail de contato, telefone, validade do passaporte, clube, cidade, UF, número de vela, ID World Sailing e código VelaID (trocado por um código anônimo); o registro no VelaID; os dados da conta de login (nome, e-mail e acesso) e a conta no serviço de login; a foto de perfil e os arquivos de evidência; as aptidões conferidas (dado de saúde); os pedidos de ajuste e os avisos sobre o atleta; os textos livres da série histórica (evidências das notas e das medidas, justificativas de gates, plano individual, pedidos de revisão e do titular, nome e link dos resultados de regata e o motivo da recusa de resultados); e os dados pessoais da trilha de auditoria. O compartilhamento com o IBVAR e o aceite do termo foram revogados.",
+    "Removidos: nome, e-mail de contato, telefone, validade do passaporte, clube, cidade, UF, número de vela, ID World Sailing e código VelaID (trocado por um código anônimo); o registro no VelaID; os dados da conta de login (nome, e-mail e acesso) e a conta no serviço de login; a foto de perfil e os arquivos de evidência; as aptidões conferidas (dado de saúde); os pedidos de ajuste e os avisos sobre o atleta; os textos livres da série histórica (evidências das notas e das medidas, justificativas de gates, plano individual, pedidos de revisão e do titular, nome e link dos resultados de regata e o motivo da recusa de resultados); os dados importados da World Sailing (histórico de ranking, sugestão de nome, gênero, nascimento, foto e bio, e a referência dos resultados); e os dados pessoais da trilha de auditoria. O compartilhamento com o IBVAR e o aceite do termo foram revogados.",
     "Alterado: a data de nascimento foi generalizada para 1º de julho do mesmo ano.",
     "Mantidos, sem identificação direta e ligados apenas a um identificador interno: notas, respostas do questionário, medidas corporais, resultados de regata (nível, data, edição, posição, tamanho da frota, pontos e a situação da validação), status e datas das decisões de gate, financeiro da campanha, pontuações dos ciclos e a trilha de auditoria (quem fez o quê e quando, sem dados pessoais).",
   ].join(" ");
@@ -316,10 +316,14 @@ async function removerTextosLivres(
         and v.motivo is not null and v.motivo <> $2`,
   );
   await tx.query(
-    `update resultados_regata set evento = $2, link_oficial = null, anonimizado = true
+    `update resultados_regata set evento = $2, link_oficial = null, ws_ref = null, anonimizado = true
       where atleta_id = $1::uuid`,
     [atletaId, EVENTO_ANONIMIZADO],
   );
+  // D19: o que veio da World Sailing sai (histórico de ranking e sugestão de nome, gênero, nascimento,
+  // foto e bio). O histórico das buscas fica só com contagens, status e código curto de erro.
+  await tx.query(`delete from world_sailing_ranking where atleta_id = $1::uuid`, [atletaId]);
+  await tx.query(`delete from world_sailing_perfis where atleta_id = $1::uuid`, [atletaId]);
   await tx.query(
     `update auditoria set detalhes = anonimiza_detalhes_auditoria(detalhes)
       where entidade_id = $1 and detalhes is distinct from anonimiza_detalhes_auditoria(detalhes)`,

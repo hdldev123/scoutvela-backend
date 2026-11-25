@@ -80,9 +80,12 @@ export interface ResultadoDoAtleta {
   tamanhoFrota: number | null;
   internacional: boolean;
   pontosCbvela: number | null;
-  fonte: "ranking_cbvela" | "manual" | "atleta";
+  fonte: "ranking_cbvela" | "manual" | "atleta" | "world_sailing";
   linkOficial: string | null;
-  /** Só o resultado do atleta passa por validação; os demais valem direto (`validado`). */
+  /**
+   * Situação vigente. `atleta`: pendente até o treinador validar. `world_sailing`: vale (`validado`) até
+   * o treinador ou o gestor invalidar (`recusado`, com motivo); dá para revalidar. Os demais valem direto.
+   */
   status: StatusResultado;
   /** Motivo da recusa. */
   motivo: string | null;
@@ -419,8 +422,13 @@ export async function cicloAberto(db: Db): Promise<{ nome: string; prazo: string
 const iso = (v: unknown): string =>
   v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString();
 
-/** Situação do resultado: o do atleta vale a validação mais recente (sem validação, pendente); os demais já valem. */
-export const SQL_STATUS_RESULTADO = `case when r.fonte = 'atleta' then coalesce(v.status, 'pendente') else 'validado' end`;
+/**
+ * Situação do resultado (regra de vigência por fonte; é a ÚNICA definição, usada pela nota P12, pelos gates,
+ * pelo congelamento do ciclo, pelas listas e pelas conquistas): `atleta` vale só se a última validação for
+ * `validado` (sem validação, `pendente`); `world_sailing` vale sem validação ou se a última for `validado`, e
+ * sai (`recusado`) se a última for `recusado`; `manual` e `ranking_cbvela` sempre valem.
+ */
+export const SQL_STATUS_RESULTADO = `case r.fonte when 'atleta' then coalesce(v.status, 'pendente') when 'world_sailing' then coalesce(v.status, 'validado') else 'validado' end`;
 /** Ano da edição: o informado ou, nos resultados antigos, o ano da data. */
 export const SQL_EDICAO_RESULTADO = `coalesce(r.edicao, extract(year from r.data))::int`;
 

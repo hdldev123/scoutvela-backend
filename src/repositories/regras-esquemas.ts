@@ -37,6 +37,17 @@ function faixasColocacao(nivel: string) {
     );
 }
 
+/** Níveis de competição aceitos como destino da regra WS_NIVEIS (os mesmos de resultados_regata). */
+const NIVEIS_COMPETICAO = [
+  "mundial",
+  "sul_americano",
+  "continental",
+  "internacional_aberto",
+  "brasileiro",
+  "estadual",
+  "regional",
+] as const;
+
 export const ESQUEMAS_REGRAS = {
   P3: z.strictObject({
     limites: z
@@ -87,6 +98,12 @@ export const ESQUEMAS_REGRAS = {
   META_EVOLUCAO: z.strictObject({ percentual: z.number().min(0).max(1000) }),
   MIN_GRUPO_AGREGADO: z.strictObject({ minimo: z.number().int().min(1).max(1000) }),
   TENDENCIA: z.strictObject({ limiar: z.number().positive().max(100) }),
+  /** P13 (D19): nível do evento na World Sailing -> nível de competição do Scout Vela. */
+  WS_NIVEIS: z.strictObject({
+    niveis: z
+      .record(z.string().trim().min(1).max(120), z.enum(NIVEIS_COMPETICAO))
+      .refine((n) => Object.keys(n).length <= 100, "WS_NIVEIS aceita até 100 níveis."),
+  }),
 } as const;
 
 export type CodigoRegra = keyof typeof ESQUEMAS_REGRAS;

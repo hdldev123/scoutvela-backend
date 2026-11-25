@@ -240,9 +240,10 @@ export async function rotasResultados(app: FastifyInstance): Promise<void> {
       preHandler: [app.autenticar, exigirPapel("gestor", "treinador")],
       schema: {
         tags: ["resultados"],
-        summary: "Valida ou recusa um resultado informado pelo atleta",
+        summary:
+          "Valida ou recusa um resultado do atleta, ou invalida e revalida um resultado da World Sailing",
         description:
-          "Gestor ou treinador do atleta (outro treinador e resultado inexistente: 404; atleta e IBVAR: 403). Só vale para resultado da fonte `atleta`; os lançados por gestor ou treinador e os do Ranking CBVela já valem (400). `recusar` exige `motivo` (até 300 caracteres; 400 em `motivo`). A decisão vira uma linha nova na série (nada é sobrescrito): a situação vigente é a da validação mais recente, então dá para mudar de `validado` para `recusado` e vice-versa; repetir a situação atual dá 409. Só o `validado` entra na nota (PERF_RESULTADOS) e nos gates G2 e G3. A súmula fica guardada. Avisa o atleta (`resultado_validado` ou `resultado_recusado`, `referencia: { resultadoId }`). Auditoria `decidir_resultado` sem o motivo.",
+          "Gestor ou treinador do atleta (outro treinador e resultado inexistente: 404; atleta e IBVAR: 403). Vale para resultado da fonte `atleta` (valida ou recusa) e da fonte `world_sailing` (D19: `recusar` invalida o resultado importado, `validar` o revalida); os lançados por gestor ou treinador e os do Ranking CBVela já valem (400). `recusar` exige `motivo` (até 300 caracteres; 400 em `motivo`). A decisão vira uma linha nova na série (nada é sobrescrito): a situação vigente é a da validação mais recente, então dá para mudar de `validado` para `recusado` e vice-versa; repetir a situação atual dá 409 (o resultado da World Sailing já nasce vigente, então só `recusar` vale antes da primeira invalidação). Só o `validado` entra na nota (PERF_RESULTADOS) e nos gates G2 e G3: o resultado da World Sailing invalidado sai da nota e dos gates até ser revalidado. A súmula fica guardada. Avisa o atleta (`resultado_validado` ou `resultado_recusado`, `referencia: { resultadoId }`). Auditoria `decidir_resultado` sem o motivo.",
         security: seguranca,
         params: idResultado,
         body: z
@@ -285,9 +286,15 @@ export async function rotasResultados(app: FastifyInstance): Promise<void> {
       );
       const dono = alvo.rows[0];
       if (!dono) throw naoEncontrado("Resultado não encontrado.");
-      if (dono.fonte !== "atleta") {
+      if (dono.fonte !== "atleta" && dono.fonte !== "world_sailing") {
         throw requisicaoInvalidaCampos(
-          [{ campo: "id", mensagem: "Só o resultado informado pelo atleta passa por validação." }],
+          [
+            {
+              campo: "id",
+              mensagem:
+                "Só o resultado informado pelo atleta ou importado da World Sailing passa por validação.",
+            },
+          ],
           "Este resultado não precisa de validação.",
         );
       }
@@ -299,7 +306,7 @@ export async function rotasResultados(app: FastifyInstance): Promise<void> {
           req.params.id,
         ]);
         const atual = await tx.query<{ status: string }>(
-          `select coalesce(v.status, 'pendente') as status
+          `select coalesce(v.status, case r.fonte when 'world_sailing' then 'validado' else 'pendente' end) as status
              from resultados_regata r left join validacao_resultado_atual v on v.resultado_id = r.id
             where r.id = $1::bigint`,
           [req.params.id],
@@ -348,7 +355,7 @@ export async function rotasResultados(app: FastifyInstance): Promise<void> {
         tags: ["resultados"],
         summary: "Resultados do atleta, com a situação de cada um",
         description:
-          "Gestor, treinador dos próprios atletas e o próprio atleta (IBVAR: 403; outro atleta ou treinador: 404). Do mais recente para o mais antigo. `?status=validado|pendente|recusado` filtra pela situação (os resultados lançados por gestor, treinador ou importados do Ranking CBVela são sempre `validado`). Cada item traz fonte, edição, súmula (`anexo`), motivo da recusa e quem validou.",
+          "Gestor, treinador dos próprios atletas e o próprio atleta (IBVAR: 403; outro atleta ou treinador: 404). Do mais recente para o mais antigo. `?status=validado|pendente|recusado` filtra pela situação (os lançados por gestor, treinador ou importados do Ranking CBVela são sempre `validado`; os da World Sailing (`fonte: world_sailing`) são `validado` até serem invalidados, e então `recusado`, com o motivo). Cada item traz fonte, edição, súmula (`anexo`), motivo da recusa ou da invalidação e quem validou.",
         security: seguranca,
         params: z.object({ id: z.uuid() }),
         querystring: z.object({ status: z.enum(["validado", "pendente", "recusado"]).optional() }),

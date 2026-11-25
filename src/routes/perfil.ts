@@ -7,7 +7,9 @@ import { exigirPapel, limitePorIp } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { mesPassaporteValido, normalizarTelefone, ultimoDiaDoMes } from "../domain/index.js";
 import {
+  conflito,
   esquemaErro,
+  naoEncontrado,
   requisicaoInvalida,
   requisicaoInvalidaCampos,
   servicoIndisponivel,
@@ -15,6 +17,13 @@ import {
 import { avisarTreinadorDoAtleta } from "../repositories/avisos.js";
 import { lerContatoSensivel } from "../repositories/contato-sensivel.js";
 import { esquemaAptidao } from "./aptidao.js";
+import { cortarNoFimDaPalavra } from "../domain/world-sailing.js";
+import {
+  baixarFotoWorldSailing,
+  FotoWorldSailingInvalida,
+} from "../integracoes/world-sailing/foto.js";
+import { ErroWorldSailing } from "../integracoes/world-sailing/tipos.js";
+import { erroAtletaAnonimizado, travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { TIPOS_ARQUIVO, decodificarArquivo, limparMetadados } from "../servicos/arquivo-base64.js";
 import { removerOuPendenciar } from "../servicos/arquivos-pendentes.js";
 import { linkDaFoto } from "../servicos/foto-perfil.js";
@@ -74,6 +83,18 @@ const esquemaPerfil = z.object({
     })
     .nullable(),
   treinador: z.object({ quantidadeAtletas: z.number().int() }).nullable(),
+  sugestaoWorldSailing: z
+    .object({
+      fotoUrl: z
+        .string()
+        .nullable()
+        .describe("Foto de https://assets.sailing.org/, para a prévia (o servidor é quem a baixa)"),
+      bio: z.string().nullable().describe("Texto da World Sailing; vai cortado em 500 caracteres"),
+    })
+    .nullable()
+    .describe(
+      "Sugestão de foto e bio do perfil da World Sailing (D19). Só para o atleta, enquanto ele não decidiu (POST /me/perfil/world-sailing) e houver foto ou bio; nulo nos demais casos",
+    ),
 });
 
 const esquemaFoto = z.object({ fotoUrl: z.string().nullable() });
@@ -167,7 +188,75 @@ async function montarPerfil(
         ? await dadosDoAtleta(app.db, u, u.atletaId, app.agora())
         : null,
     treinador,
+    sugestaoWorldSailing:
+      u.papel === "atleta" && u.atletaId ? await sugestaoDeFotoEBio(app.db, u.atletaId) : null,
   };
+}
+
+/** Foto e bio sugeridas pela World Sailing, enquanto o atleta não decidiu e houver o que sugerir. */
+async function sugestaoDeFotoEBio(
+  db: Db,
+  atletaId: string,
+): Promise<{ fotoUrl: string | null; bio: string | null } | null> {
+  const r = await db.query<{ foto_url: string | null; bio: string | null }>(
+    `select p.foto_url, p.bio
+       from world_sailing_perfis p join atletas a on a.id = p.atleta_id
+      where p.atleta_id = $1::uuid and a.anonimizado_em is null and p.foto_bio_decidida_em is null
+        and (p.foto_url is not null or p.bio is not null)`,
+    [atletaId],
+  );
+  const l = r.rows[0];
+  return l ? { fotoUrl: l.foto_url, bio: l.bio ? cortarNoFimDaPalavra(l.bio, 500) : null } : null;
+}
+
+/**
+ * Guarda a foto de perfil do usuário (já sem metadados) e troca a anterior. `noMesmaTransacao` roda na
+ * transação que grava o caminho (se ela falhar, o arquivo novo sai do Storage). A foto antiga sai depois.
+ */
+async function trocarFotoDoUsuario(
+  app: FastifyInstance,
+  log: FastifyBaseLogger,
+  usuarioId: string,
+  bytes: Buffer,
+  tipoMime: keyof typeof TIPOS_ARQUIVO,
+  detalhesAuditoria: Record<string, unknown>,
+  noMesmaTransacao?: (tx: Db) => Promise<void>,
+): Promise<string> {
+  const limpeza = { db: app.db, armazenamento: app.armazenamento, log, agora: app.agora };
+  const caminho = `fotos/${usuarioId}/${randomUUID()}.${TIPOS_ARQUIVO[tipoMime].ext}`;
+  try {
+    await app.armazenamento.salvar(caminho, bytes, tipoMime);
+  } catch (e) {
+    log.error({ err: e }, "falha ao salvar foto");
+    throw servicoIndisponivel("Não foi possível guardar a foto agora.");
+  }
+  let anterior: string | null;
+  try {
+    anterior = await app.db.transacao(async (tx) => {
+      const r = await tx.query<{ foto_caminho: string | null }>(
+        `select foto_caminho from usuarios where id = $1::uuid for update`,
+        [usuarioId],
+      );
+      await tx.query(`update usuarios set foto_caminho = $2 where id = $1::uuid`, [
+        usuarioId,
+        caminho,
+      ]);
+      await auditar(
+        tx,
+        usuarioId,
+        "enviar_foto",
+        { tipoMime, tamanhoBytes: bytes.length, ...detalhesAuditoria },
+        app.agora(),
+      );
+      if (noMesmaTransacao) await noMesmaTransacao(tx);
+      return r.rows[0]?.foto_caminho ?? null;
+    });
+  } catch (e) {
+    await removerOuPendenciar(limpeza, caminho, "rollback_foto");
+    throw e;
+  }
+  if (anterior) await removerOuPendenciar(limpeza, anterior, "troca_foto");
+  return caminho;
 }
 
 async function auditar(
@@ -189,12 +278,6 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
   // Um array novo por rota: o plugin de rate-limit empurra hooks no array da rota e não pode vazar para as outras.
   const acesso = () => [app.autenticar, exigirPapel("gestor", "treinador", "atleta")];
   const respostasComuns = { 401: esquemaErro, 403: esquemaErro };
-  const limpeza = (log: FastifyBaseLogger) => ({
-    db: app.db,
-    armazenamento: app.armazenamento,
-    log,
-    agora: app.agora,
-  });
   const limiteIp = limitePorIp(app);
 
   rota.get(
@@ -384,40 +467,137 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
         }),
         tipoMime,
       );
-      const caminho = `fotos/${u.id}/${randomUUID()}.${TIPOS_ARQUIVO[tipoMime].ext}`;
-      try {
-        await app.armazenamento.salvar(caminho, bytes, tipoMime);
-      } catch (e) {
-        req.log.error({ err: e }, "falha ao salvar foto");
-        throw servicoIndisponivel("Não foi possível guardar a foto agora.");
+      const caminho = await trocarFotoDoUsuario(app, req.log, u.id, bytes, tipoMime, {});
+      return { fotoUrl: await linkDaFoto(app.armazenamento, caminho, req.log) };
+    },
+  );
+
+  rota.post(
+    "/me/perfil/world-sailing",
+    {
+      preHandler: [app.autenticar, exigirPapel("atleta")],
+      schema: {
+        tags: ["sessao"],
+        summary: "O atleta aceita ou dispensa a foto e a bio sugeridas pela World Sailing",
+        description:
+          "Só o atleta, uma vez (a decisão fica marcada, também quando ele dispensa com `usarFoto` e `usarBio` falsos; depois disso, 409). Sem sugestão, 404. `usarFoto`: o SERVIDOR baixa a foto, só de https://assets.sailing.org/ (sem seguir redirecionamento, até 5 MB, só JPEG ou PNG conferidos pela assinatura do arquivo; outro formato dá 400, falha de rede ou tempo esgotado dá 503), tira EXIF e GPS e a guarda como a foto do perfil (a regra de foto e bio para o IBVAR é a mesma de sempre: só com consentimento na versão do termo que inclui foto e bio). `usarBio`: a bio da World Sailing, cortada em 500 caracteres no fim de uma palavra, substitui a bio do perfil. Pedir uma delas sem a sugestão correspondente dá 400. A auditoria guarda só se usou foto e bio (nunca o texto).",
+        security: [{ bearerAuth: [] }],
+        body: z
+          .object({
+            usarFoto: z.boolean("Informe se quer usar a foto."),
+            usarBio: z.boolean("Informe se quer usar a bio."),
+          })
+          .strict(),
+        response: {
+          200: z.object({
+            usouFoto: z.boolean(),
+            usouBio: z.boolean(),
+            fotoUrl: z.string().nullable().describe("Link assinado curto da foto do perfil"),
+            bio: z.string().nullable().describe("Bio atual do perfil"),
+          }),
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+          409: esquemaErro,
+          503: esquemaErro,
+        },
+      },
+    },
+    async (req) => {
+      const u = req.usuario;
+      if (!u.atletaId) throw naoEncontrado("Atleta não encontrado.");
+      const atletaId = u.atletaId;
+      const { usarFoto, usarBio } = req.body;
+      const sug = await app.db.query<{
+        foto_url: string | null;
+        bio: string | null;
+        decidida: boolean;
+        anonimizado: boolean;
+      }>(
+        `select p.foto_url, p.bio, (p.foto_bio_decidida_em is not null) as decidida,
+                (a.anonimizado_em is not null) as anonimizado
+           from world_sailing_perfis p join atletas a on a.id = p.atleta_id
+          where p.atleta_id = $1::uuid`,
+        [atletaId],
+      );
+      const s = sug.rows[0];
+      if (!s) throw naoEncontrado("Não há sugestão da World Sailing para este perfil.");
+      if (s.anonimizado) throw erroAtletaAnonimizado();
+      if (s.decidida) throw conflito("Você já decidiu sobre a foto e a bio da World Sailing.");
+      if (usarFoto && !s.foto_url) throw requisicaoInvalida("A World Sailing não trouxe foto.");
+      if (usarBio && !s.bio) throw requisicaoInvalida("A World Sailing não trouxe bio.");
+
+      let foto: { bytes: Buffer; tipoMime: "image/jpeg" | "image/png" } | null = null;
+      if (usarFoto) {
+        try {
+          const baixada = await baixarFotoWorldSailing(s.foto_url!, app.worldSailing.fetch);
+          foto = {
+            bytes: limparMetadados(baixada.bytes, baixada.tipoMime),
+            tipoMime: baixada.tipoMime,
+          };
+        } catch (e) {
+          if (e instanceof FotoWorldSailingInvalida) {
+            throw requisicaoInvalida(
+              "A foto da World Sailing não pôde ser usada (endereço, formato ou tamanho). Envie uma foto pelo perfil.",
+            );
+          }
+          if (e instanceof ErroWorldSailing) {
+            req.log.warn(
+              { evento: "world_sailing_foto_falhou", erro: e.codigo },
+              "foto não baixou",
+            );
+            throw servicoIndisponivel("Não foi possível baixar a foto da World Sailing agora.");
+          }
+          throw e;
+        }
+      }
+      const bio = usarBio && s.bio ? cortarNoFimDaPalavra(s.bio, 500) : null;
+
+      const decidir = async (tx: Db): Promise<void> => {
+        await travarAtletaEditavel(tx, atletaId);
+        const marcou = await tx.query(
+          `update world_sailing_perfis set foto_bio_decidida_em = $2
+            where atleta_id = $1::uuid and foto_bio_decidida_em is null returning atleta_id`,
+          [atletaId, app.agora()],
+        );
+        if (marcou.rows.length === 0) {
+          throw conflito("Você já decidiu sobre a foto e a bio da World Sailing.");
+        }
+        if (bio) await tx.query(`update atletas set bio = $2 where id = $1::uuid`, [atletaId, bio]);
+        await auditar(
+          tx,
+          u.id,
+          "aceitar_sugestao_world_sailing",
+          { usouFoto: foto !== null, usouBio: bio !== null },
+          app.agora(),
+        );
+      };
+
+      if (foto) {
+        await trocarFotoDoUsuario(
+          app,
+          req.log,
+          u.id,
+          foto.bytes,
+          foto.tipoMime,
+          { origem: "world_sailing" },
+          decidir,
+        );
+      } else {
+        await app.db.transacao(decidir);
       }
 
-      let anterior: string | null;
-      try {
-        anterior = await app.db.transacao(async (tx) => {
-          const r = await tx.query<{ foto_caminho: string | null }>(
-            `select foto_caminho from usuarios where id = $1::uuid for update`,
-            [u.id],
-          );
-          await tx.query(`update usuarios set foto_caminho = $2 where id = $1::uuid`, [
-            u.id,
-            caminho,
-          ]);
-          await auditar(
-            tx,
-            u.id,
-            "enviar_foto",
-            { tipoMime, tamanhoBytes: bytes.length },
-            app.agora(),
-          );
-          return r.rows[0]?.foto_caminho ?? null;
-        });
-      } catch (e) {
-        await removerOuPendenciar(limpeza(req.log), caminho, "rollback_foto");
-        throw e;
-      }
-      if (anterior) await removerOuPendenciar(limpeza(req.log), anterior, "troca_foto");
-      return { fotoUrl: await linkDaFoto(app.armazenamento, caminho, req.log) };
+      const atual = await app.db.query<{ foto_caminho: string | null; bio: string | null }>(
+        `select u.foto_caminho, a.bio from usuarios u join atletas a on a.id = $2::uuid where u.id = $1::uuid`,
+        [u.id, atletaId],
+      );
+      return {
+        usouFoto: foto !== null,
+        usouBio: bio !== null,
+        fotoUrl: await linkDaFoto(app.armazenamento, atual.rows[0]?.foto_caminho ?? null, req.log),
+        bio: atual.rows[0]?.bio ?? null,
+      };
     },
   );
 

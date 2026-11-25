@@ -17,6 +17,10 @@ import type { Db } from "./db/db.js";
 import { criarProvedorEmailLog, type ProvedorEmail } from "./email/index.js";
 import { registrarTratamentoDeErros } from "./erros.js";
 import type { AdminAuth } from "./integracoes/supabase-admin.js";
+import {
+  resolverIntegracao,
+  type IntegracaoWorldSailing,
+} from "./integracoes/world-sailing/index.js";
 import { rotasHealth } from "./routes/health.js";
 import { rotasAnonimizacao } from "./routes/anonimizacao.js";
 import { rotasAptidao } from "./routes/aptidao.js";
@@ -47,6 +51,7 @@ import { criarArmazenamentoLocal, type ArmazenamentoEvidencias } from "./storage
 import { rotasSugestoes } from "./routes/sugestoes.js";
 import { rotasTermo } from "./routes/termo.js";
 import { rotasUsuarios } from "./routes/usuarios.js";
+import { rotasWorldSailing } from "./routes/world-sailing.js";
 
 export interface DepsApp {
   db: Db;
@@ -63,6 +68,8 @@ export interface DepsApp {
   armazenamento?: ArmazenamentoEvidencias;
   /** Cliente admin do Supabase Auth (convites). Ausente = convite indisponível. */
   adminAuth?: AdminAuth | null;
+  /** World Sailing (D19). Padrão: pelo modo da config. Os testes injetam a fonte (simulada) e o fetch falso. */
+  worldSailing?: Partial<IntegracaoWorldSailing>;
   /** Só para testes: recebe as linhas do log (liga o logger mesmo com `logger: false`). */
   destinoLog?: { write(linha: string): void };
 }
@@ -73,6 +80,7 @@ declare module "fastify" {
     email: ProvedorEmail;
     armazenamento: ArmazenamentoEvidencias;
     adminAuth: AdminAuth | null;
+    worldSailing: IntegracaoWorldSailing;
   }
 }
 
@@ -115,6 +123,7 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasTermo,
   rotasAvisos,
   rotasSugestoes,
+  rotasWorldSailing,
 ];
 
 export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
@@ -157,6 +166,13 @@ export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
     deps.armazenamento ?? criarArmazenamentoLocal(config.STORAGE_DIR_LOCAL),
   );
   app.decorate("adminAuth", deps.adminAuth ?? null);
+  app.decorate("worldSailing", resolverIntegracao(config, deps.worldSailing));
+  if (app.worldSailing.modo === "real" && config.APP_ENV !== "producao") {
+    app.log.warn(
+      { evento: "world_sailing_real" },
+      "WORLD_SAILING_MODO=real fora da produção: as buscas chamam a API pública da World Sailing",
+    );
+  }
   app.decorate("agora", deps.agora ?? (() => new Date()));
   registrarAutenticacao(app, deps.verificarToken);
 

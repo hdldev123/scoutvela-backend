@@ -19,15 +19,15 @@ export const esquemaResultadoDetalhe = z.object({
   internacional: z.boolean(),
   pontosCbvela: z.number().nullable().describe("Só informação: não entra na nota"),
   fonte: z
-    .enum(["ranking_cbvela", "manual", "atleta"])
+    .enum(["ranking_cbvela", "manual", "atleta", "world_sailing"])
     .describe(
-      "ranking_cbvela: importado; manual: lançado por gestor ou treinador; atleta: informado pelo atleta",
+      "ranking_cbvela: importado; manual: lançado por gestor ou treinador; atleta: informado pelo atleta; world_sailing: importado do perfil da World Sailing (fonte oficial: vale direto, e o treinador do atleta ou o gestor pode invalidar com motivo)",
     ),
   linkOficial: z.string().nullable(),
   status: z
     .enum(["validado", "pendente", "recusado"])
     .describe(
-      "Só o resultado do atleta (fonte `atleta`) passa por validação; os demais vêm `validado`. Só o validado conta na nota e nos gates",
+      "`atleta`: pendente até a validação do treinador. `world_sailing`: `validado` (vigente) até o treinador ou o gestor invalidar (`recusado`, com `motivo`); revalidar volta a `validado`. Manual e Ranking CBVela vêm sempre `validado`. Só o validado conta na nota e nos gates",
     ),
   motivo: z.string().nullable().describe("Motivo da recusa; nulo para o IBVAR"),
   anexo: z

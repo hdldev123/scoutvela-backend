@@ -69,6 +69,7 @@ describe("POST /atletas com conta e e-mail do termo", () => {
       cadastroCompleto: false,
       termo: { status: "aguardando_aceite", versao: "Piloto 18+ · v1" },
       conta: "convite_enviado",
+      worldSailing: { status: "desligado", resultadosNovos: 0, rankingNovos: 0 },
     });
     const u = (await usuarioDe(p, "renata@exemplo.com"))!;
     expect(u).toMatchObject({ papel: "atleta", atleta_id: corpo.id });
