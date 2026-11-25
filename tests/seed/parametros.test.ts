@@ -32,10 +32,16 @@ describe("Parâmetros iniciais (migration 0004)", () => {
     expect(p.pilares.filter((x) => x.sensivel).map((x) => x.id)).toEqual(["cf", "men", "amb"]);
   });
 
-  it("indicadores por ordem; só cf_peso_kg é calculado", () => {
+  it("indicadores por ordem; calculados: cf_peso_kg e os três de resultado (D10)", () => {
     const todos = p.pilares.flatMap((x) => x.indicadores);
     expect(todos).toHaveLength(42);
-    expect(todos.filter((i) => i.calculado).map((i) => i.id)).toEqual(["cf_peso_kg"]);
+    expect(todos.filter((i) => i.calculado).map((i) => i.id)).toEqual([
+      "perf_mundial",
+      "perf_continental",
+      "perf_nacional",
+      "cf_peso_kg",
+    ]);
+    expect(todos.filter((i) => i.calculado).every((i) => !i.autoavaliacao)).toBe(true);
     expect(todos.filter((i) => i.tipo === "R").map((i) => i.id)).toEqual([
       "amb_historico_familiar",
     ]);
@@ -89,7 +95,29 @@ describe("Parâmetros iniciais (migration 0004)", () => {
         D: { status: "alerta", motivo: "Sem estrutura para campanha internacional" },
       },
       rankingCbvela: { janelaSemanas: 52 },
-      perfPontos: { ativa: false, indicador: "perf_nacional", faixas: [] },
+      perfResultados: {
+        edicoesMax: 4,
+        niveis: {
+          mundial: [
+            { ate: 3, nota: 5 },
+            { ate: 10, nota: 4 },
+            { ate: 25, nota: 3 },
+            { ate: null, nota: 2 },
+          ],
+          continental: [
+            { ate: 3, nota: 5 },
+            { ate: 10, nota: 4 },
+            { ate: 25, nota: 3 },
+            { ate: null, nota: 2 },
+          ],
+          nacional: [
+            { ate: 1, nota: 5 },
+            { ate: 2, nota: 4 },
+            { ate: 3, nota: 3 },
+            { ate: null, nota: 0 },
+          ],
+        },
+      },
     });
   });
 

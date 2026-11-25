@@ -74,7 +74,7 @@ describe("notificações do menu (GET /me/notificacoes, PUT /me/notificacoes/vis
   });
 
   it("treinador: avaliar conta os atletas próprios com indicador T sem nota no ciclo; sem ciclo aberto, 0", async () => {
-    // Seed: a Ana tem 7 atletas ativos e nenhum tem nota de ciclo nos 33 indicadores T lançáveis.
+    // Seed: a Ana tem 7 atletas ativos e nenhum tem nota de ciclo nos 30 indicadores T lançáveis (os de resultado são calculados desde a D10).
     // O Marcos (outro treinador) tem 7 atletas e não entra na conta dela.
     const ciclo = (
       await p.db.query<{ id: string }>("select id from ciclos_avaliacao where status = 'aberto'")
@@ -85,7 +85,7 @@ describe("notificações do menu (GET /me/notificacoes, PUT /me/notificacoes/vis
     const indicadores = await p.db.query<{ id: string }>(
       "select id from indicadores where tipo = 'T' and not calculado",
     );
-    expect(indicadores.rows).toHaveLength(33);
+    expect(indicadores.rows).toHaveLength(30);
     const r = await chamar(
       EMAILS_DEMO.treinadora,
       "POST",

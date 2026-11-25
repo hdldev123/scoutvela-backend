@@ -3,8 +3,8 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
-import { notaSugeridaPorPontos } from "../domain/index.js";
-import type { Parametros, ResultadoCalculo, StatusGate, SugestaoPontos } from "../domain/index.js";
+import { NIVEIS_DE_NOTA, INDICADOR_DO_NIVEL } from "../domain/index.js";
+import type { Parametros, ResultadoCalculo, StatusGate } from "../domain/index.js";
 import { ErroApi, esquemaErro, naoEncontrado, requisicaoInvalidaCampos } from "../erros.js";
 import { esquemaLinkHttps } from "../validacao.js";
 import { recusarAtletaAnonimizado, travarAtletaEditavel } from "../repositories/anonimizado.js";
@@ -196,8 +196,11 @@ function validarNotas(parametros: Parametros, corpo: Corpo): void {
     const ind = indicadores.get(n.indicadorId);
     if (!ind) throw requisicaoInvalida(`Indicador inexistente: ${n.indicadorId}.`);
     if (ind.calculado) {
+      const deResultado = NIVEIS_DE_NOTA.some((nivel) => INDICADOR_DO_NIVEL[nivel] === ind.id);
       throw requisicaoInvalida(
-        `O indicador ${n.indicadorId} é calculado pelo sistema: informe o peso na medida.`,
+        deResultado
+          ? `O indicador ${n.indicadorId} é calculado pelo sistema a partir dos resultados validados do atleta.`
+          : `O indicador ${n.indicadorId} é calculado pelo sistema: informe o peso na medida.`,
       );
     }
     if (ind.tipo === "R") {
@@ -284,9 +287,6 @@ async function avaliarUm(db: Db, parametros: Parametros, atleta: AtletaBase, ref
   return avaliado;
 }
 
-const sugestaoComIndicador = (s: SugestaoPontos | null, indicadorId: string) =>
-  s ? { indicadorId, ...s } : null;
-
 export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
   const rota = app.withTypeProvider<ZodTypeProvider>();
   const acessoAvaliador = [app.autenticar, exigirPapel("gestor", "treinador")];
@@ -318,16 +318,6 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
               .array(esquemaSugestaoAtleta)
               .describe(
                 "Sugestões do atleta (autoavaliação) no ciclo aberto, uma por indicador, para a tela mostrar ao lado da nota. Vazio sem sugestão ou sem ciclo aberto",
-              ),
-            sugestaoPontos: z
-              .object({
-                indicadorId: z.string(),
-                nota: z.number().int(),
-                pontos: z.number().describe("Pontos do Ranking CBVela na janela"),
-              })
-              .nullable()
-              .describe(
-                "Nota sugerida para perf_nacional pelos pontos do Ranking CBVela (regra PERF_PONTOS). Nula com a regra desligada. Não entra na prévia nem no score: o avaliador confirma lançando a nota.",
               ),
           }),
           400: esquemaErro,
@@ -366,10 +356,6 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           statusGates: depois.calculo.statusFinal,
         },
         sugestoesAtleta: [...sugestoes].map(([indicadorId, s]) => ({ indicadorId, ...s })),
-        sugestaoPontos: sugestaoComIndicador(
-          notaSugeridaPorPontos(antes.calculo.pontosCbvela, parametros.regras.perfPontos),
-          parametros.regras.perfPontos.indicador,
-        ),
       };
     },
   );
@@ -382,7 +368,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
         tags: ["avaliacoes"],
         summary: "Lança notas e/ou medida do atleta (série histórica: só insere)",
         description:
-          "Origem da nota: se o atleta sugeriu a nota (autoavaliação) no ciclo aberto, nota igual grava `autoavaliacao_aprovada` e nota diferente grava a correção, com `justificativa` obrigatória (400 em `notas.N.justificativa`) e aviso `autoavaliacao_corrigida` ao atleta. Sem sugestão: resposta_confirmada se o atleta respondeu à pergunta do indicador, senão avaliacao (justificativa opcional). Indicador calculado (peso) ou tipo R é recusado.",
+          "Origem da nota: se o atleta sugeriu a nota (autoavaliação) no ciclo aberto, nota igual grava `autoavaliacao_aprovada` e nota diferente grava a correção, com `justificativa` obrigatória (400 em `notas.N.justificativa`) e aviso `autoavaliacao_corrigida` ao atleta. Sem sugestão: resposta_confirmada se o atleta respondeu à pergunta do indicador, senão avaliacao (justificativa opcional). Indicador calculado (o peso e os de resultado: perf_mundial, perf_continental, perf_nacional) ou tipo R é recusado (400).",
         security: [{ bearerAuth: [] }],
         params: esquemaParams,
         body: esquemaCorpo,

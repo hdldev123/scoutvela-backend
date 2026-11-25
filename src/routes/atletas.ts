@@ -7,19 +7,25 @@ import {
   funcaoNaClasse,
   idadeEm,
   motivoSemPeso,
+  INDICADOR_DO_NIVEL,
+  NIVEIS_DE_NOTA,
+  explicacaoDaNota,
+  notaDaColocacao,
   notaPeso,
-  notaSugeridaPorPontos,
+  nivelDeNota,
   sugerirPlano,
 } from "../domain/index.js";
+import type { NivelDeNota } from "../domain/index.js";
 import { esquemaErro, naoEncontrado, semAcesso } from "../erros.js";
 import { historicoDeNotas, historicoDePesagens } from "../repositories/historico.js";
 import { ehSugestao } from "../repositories/origens.js";
-import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
+import { buscarAtletaVisivel, carregarDadosAtletas, cicloAberto } from "../repositories/atletas.js";
 import { lerContatoSensivel } from "../repositories/contato-sensivel.js";
 import { ultimoLancamento } from "../repositories/investimento.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { buscarPlanoAtual } from "../repositories/plano.js";
 import { esquemaAptidao } from "./aptidao.js";
+import { esquemaResultadoDetalhe } from "./esquemas-resultado.js";
 import { esquemaPlanoRegistrado, esquemaTextosPlano } from "./plano.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 import { caminhoDaFotoDoAtleta, linkDaFoto } from "../servicos/foto-perfil.js";
@@ -33,11 +39,6 @@ const NOMES_GATES: Record<number, string> = {
 
 const statusGate = z.enum(["apto", "condicional", "alerta"]);
 const pessoa = z.object({ id: z.string(), nome: z.string() });
-
-export const esquemaSugestaoPontos = z.object({
-  nota: z.number().int(),
-  pontos: z.number().describe("Pontos do Ranking CBVela na janela"),
-});
 
 const esquemaIndicador = z.object({
   id: z.string(),
@@ -76,10 +77,22 @@ const esquemaIndicador = z.object({
     .describe(
       "Sugestão do atleta (resposta do questionário ou autoavaliação) ainda sem nota do treinador; nula para o IBVAR. O detalhe da autoavaliação vem em GET /atletas/:id/autoavaliacao",
     ),
-  sugestaoPontos: esquemaSugestaoPontos
+  explicacao: z
+    .string()
     .nullable()
     .describe(
-      "Nota sugerida pelos pontos do Ranking CBVela (regra PERF_PONTOS). Só em perf_nacional e com a regra ativa; não entra no score até o avaliador lançar a nota.",
+      "Só nos indicadores de resultado (perf_mundial, perf_continental, perf_nacional): de onde veio a nota calculada, em texto. Nulo sem resultado validado no nível",
+    ),
+  resultado: z
+    .object({
+      nivel: z.enum(["mundial", "continental", "nacional"]),
+      posicao: z.number().int().describe("Melhor colocação validada que definiu a nota"),
+      edicao: z.number().int().describe("Ano da edição dessa colocação"),
+      evento: z.string(),
+    })
+    .nullable()
+    .describe(
+      "Os dados de `explicacao`, para a tela montar o texto; nulo fora dos indicadores de resultado",
     ),
   anexo: z.object({ id: z.string(), nomeArquivo: z.string() }).nullable(),
 });
@@ -195,19 +208,11 @@ const esquemaFicha = z.object({
         .describe("Altura de referência da classe. O IBVAR não recebe (classFit inteiro nulo)"),
     })
     .nullable(),
-  resultados: z.array(
-    z.object({
-      data: z.string(),
-      nivel: z.string(),
-      evento: z.string(),
-      posicao: z.number().int(),
-      tamanhoFrota: z.number().int(),
-      internacional: z.boolean(),
-      pontosCbvela: z.number().nullable(),
-      fonte: z.enum(["ranking_cbvela", "manual"]),
-      linkOficial: z.string().nullable(),
-    }),
-  ),
+  resultados: z
+    .array(esquemaResultadoDetalhe)
+    .describe(
+      "Todos os resultados do atleta, com a situação de cada um. O IBVAR recebe só os validados, sem anexo, motivo nem quem validou. Só os validados entram na nota e nos gates",
+    ),
   financeiro: z
     .union([
       z.object({
@@ -268,6 +273,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
       const [avaliado] = await carregarEAvaliarAtletas(app.db, parametros, [base], referencia, {
         componentesFinanceiro: usuario.papel === "gestor" || usuario.papel === "atleta",
         historico: true,
+        resultadosParaIbvar: usuario.papel === "ibvar",
       });
       if (!avaliado) throw naoEncontrado("Atleta não encontrado.");
       const { atleta, dados, calculo } = avaliado;
@@ -283,10 +289,8 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
           );
       const notaPorIndicador = new Map(dados.notas.map((n) => [n.indicadorId, n]));
       const pilaresCalc = new Map(calculo.pilares.map((p) => [p.pilarId, p]));
-      // Só sugestão: não entra no score até o avaliador lançar a nota.
-      const sugestaoPontos = notaSugeridaPorPontos(
-        calculo.pontosCbvela,
-        parametros.regras.perfPontos,
+      const nivelDoIndicador = new Map<string, NivelDeNota>(
+        NIVEIS_DE_NOTA.map((n) => [INDICADOR_DO_NIVEL[n], n]),
       );
 
       const pilares = parametros.pilares.map((p) => {
@@ -299,6 +303,33 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
               const lancada = notaPorIndicador.get(i.id);
               const sug = dados.sugestoesPendentes[i.id] ?? null;
               const base = { id: i.id, nome: i.nome, tipo: i.tipo, calculado: i.calculado };
+              const nivelResultado = nivelDoIndicador.get(i.id);
+              if (i.calculado && nivelResultado) {
+                // Nota derivada dos resultados validados: a explicação diz qual resultado a definiu.
+                const origem = calculo.notasResultados[nivelResultado];
+                return {
+                  ...base,
+                  nota,
+                  evidencia: null,
+                  link: null,
+                  origem: nota == null ? null : ("calculado" as const),
+                  justificativa: null,
+                  avaliador: null,
+                  lancadoEm: null,
+                  resposta: null,
+                  sugestaoPendente: null,
+                  explicacao: origem ? explicacaoDaNota(origem) : null,
+                  resultado: origem
+                    ? {
+                        nivel: origem.nivel,
+                        posicao: origem.posicao,
+                        edicao: origem.edicao,
+                        evento: origem.evento,
+                      }
+                    : null,
+                  anexo: null,
+                };
+              }
               if (i.calculado) {
                 // Nota derivada do peso: a evidência vem da pesagem.
                 const m = dados.medida;
@@ -314,7 +345,8 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                   lancadoEm: nota == null ? null : m.pesoMedidoEm,
                   resposta: dados.respostas[i.id] ?? null,
                   sugestaoPendente: null,
-                  sugestaoPontos: null,
+                  explicacao: null,
+                  resultado: null,
                   anexo: null,
                 };
               }
@@ -334,8 +366,8 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                 lancadoEm: lancada?.lancadoEm ?? null,
                 resposta: ibvar ? null : (dados.respostas[i.id] ?? null),
                 sugestaoPendente: ibvar ? null : sug,
-                sugestaoPontos:
-                  i.id === parametros.regras.perfPontos.indicador ? sugestaoPontos : null,
+                explicacao: null,
+                resultado: null,
                 // O IBVAR não vê evidências anexadas.
                 anexo: ibvar ? null : (lancada?.anexo ?? null),
               };
@@ -402,7 +434,9 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
               nome: p.nome,
               nota: pilaresCalc.get(p.id)?.nota ?? null,
             })),
-            temResultadoMundial: dados.resultados.some((r) => r.nivel === "mundial"),
+            temResultadoMundial: dados.resultados.some(
+              (r) => r.status === "validado" && r.nivel === "mundial",
+            ),
             statusFinal: calculo.statusFinal,
             gatesNaoAptos: calculo.gates
               .filter((g) => g.status !== "apto")
@@ -479,7 +513,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         tags: ["atletas"],
         summary: "Histórico de lançamentos de um indicador, do mais novo para o mais antigo",
         description:
-          "Mesma matriz de acesso da ficha: gestor vê todos, treinador só os próprios atletas, atleta só a si. Inclui a sugestão do atleta ainda pendente (pendente: true, origem resposta_sugerida ou autoavaliacao) e a justificativa da nota do treinador. cf_peso_kg (calculado) traz as pesagens, com a nota pela regra P3 atual. IBVAR: pilar sensível dá 403; nos demais, sem evidência, avaliador, anexo, justificativa nem sugestão pendente (a aprovação aparece como `avaliacao`). Atleta fora do acesso ou indicador inexistente: 404.",
+          "Mesma matriz de acesso da ficha: gestor vê todos, treinador só os próprios atletas, atleta só a si. Inclui a sugestão do atleta ainda pendente (pendente: true, origem resposta_sugerida ou autoavaliacao) e a justificativa da nota do treinador. cf_peso_kg (calculado) traz as pesagens, com a nota pela regra P3 atual; perf_mundial, perf_continental e perf_nacional (calculados) trazem um item por resultado validado do nível, com a nota que a colocação daria pela regra PERF_RESULTADOS atual (só as últimas `edicoes_max` edições entram na nota do indicador). IBVAR: pilar sensível dá 403; nos demais, sem evidência, avaliador, anexo, justificativa nem sugestão pendente (a aprovação aparece como `avaliacao`). Atleta fora do acesso ou indicador inexistente: 404.",
         security: [{ bearerAuth: [] }],
         params: z.object({ id: z.uuid(), indicadorId: z.string().min(1).max(64) }),
         response: {
@@ -530,6 +564,29 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
       if (ibvar && pilar.sensivel) throw semAcesso("O IBVAR não vê o detalhe deste pilar.");
 
       if (indicador.calculado) {
+        const nivel = NIVEIS_DE_NOTA.find((n) => INDICADOR_DO_NIVEL[n] === indicador.id);
+        if (nivel) {
+          // Indicador de resultado: um item por resultado validado do nível, com a nota que ele daria.
+          const dados = (
+            await carregarDadosAtletas(app.db, [base.id], { resultadosParaIbvar: ibvar })
+          ).get(base.id);
+          return (dados?.resultados ?? [])
+            .filter((r) => r.status === "validado" && nivelDeNota(r.nivel) === nivel)
+            .map((r) => ({
+              valor: notaDaColocacao(r.posicao, parametros.regras.perfResultados.niveis[nivel]),
+              pesoKg: null,
+              evidencia: ibvar ? null : `${r.posicao}º em ${r.evento} (${r.edicao})`,
+              link: ibvar ? null : r.linkOficial,
+              origem: "calculado" as const,
+              justificativa: null,
+              pendente: false,
+              avaliador: ibvar ? null : r.validadoPor,
+              cicloNome: null,
+              lancadoEm: r.validadoEm ?? r.registradoEm,
+              anexo: ibvar ? null : r.anexo,
+            }))
+            .sort((a, b) => b.lancadoEm.localeCompare(a.lancadoEm));
+        }
         if (indicador.id !== "cf_peso_kg") return [];
         const pesagens = await historicoDePesagens(app.db, base.id);
         return pesagens.map((m) => ({

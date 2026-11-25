@@ -22,15 +22,19 @@ export function montarEntradaCalculo(
     classe: atleta.classe,
     pesoKg: dados.medida.pesoKg,
     notas,
-    resultados: dados.resultados.map((r) => ({
-      nivel: r.nivel,
-      evento: r.evento,
-      data: r.data,
-      posicao: r.posicao,
-      tamanhoFrota: r.tamanhoFrota,
-      internacional: r.internacional,
-      pontosCbvela: r.pontosCbvela,
-    })),
+    // Só vale o resultado validado: o do atleta pendente ou recusado não entra na nota nem nos gates.
+    resultados: dados.resultados
+      .filter((r) => r.status === "validado")
+      .map((r) => ({
+        nivel: r.nivel,
+        evento: r.evento,
+        data: r.data,
+        edicao: r.edicao,
+        posicao: r.posicao,
+        tamanhoFrota: r.tamanhoFrota,
+        internacional: r.internacional,
+        pontosCbvela: r.pontosCbvela,
+      })),
     perfilSuporte: dados.financeiro?.perfilSuporte ?? null,
     decisoesGates: dados.decisoesGates,
     referencia,

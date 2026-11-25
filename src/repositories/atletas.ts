@@ -63,16 +63,31 @@ export interface MedidaAtual {
   pesoRegistradoPor: { id: string; nome: string } | null;
 }
 
+export type StatusResultado = "validado" | "pendente" | "recusado";
+
 export interface ResultadoDoAtleta {
+  id: string;
   data: string;
   nivel: NivelCompeticao;
   evento: string;
+  /** Ano da edição (o ano da data nos resultados anteriores à D10). */
+  edicao: number;
   posicao: number;
-  tamanhoFrota: number;
+  /** Nulo quando o atleta informou o resultado sem a frota. */
+  tamanhoFrota: number | null;
   internacional: boolean;
   pontosCbvela: number | null;
-  fonte: "ranking_cbvela" | "manual";
+  fonte: "ranking_cbvela" | "manual" | "atleta";
   linkOficial: string | null;
+  /** Só o resultado do atleta passa por validação; os demais valem direto (`validado`). */
+  status: StatusResultado;
+  /** Motivo da recusa. */
+  motivo: string | null;
+  validadoPor: { id: string; nome: string } | null;
+  validadoEm: string | null;
+  /** Súmula anexada pelo atleta; nula se removida ou sem anexo. */
+  anexo: { id: string; nomeArquivo: string } | null;
+  registradoEm: string;
 }
 
 export interface FinanceiroAtual {
@@ -103,6 +118,11 @@ export interface OpcoesCarga {
   componentesFinanceiro?: boolean;
   /** Inclui o histórico de score dos ciclos fechados. */
   historico?: boolean;
+  /**
+   * Só os resultados validados, sem motivo, anexo nem quem validou (visão do IBVAR). O cálculo usa
+   * sempre só os validados; isto restringe também o que a ficha lista.
+   */
+  resultadosParaIbvar?: boolean;
 }
 
 /**
@@ -391,6 +411,79 @@ export async function cicloAberto(db: Db): Promise<{ nome: string; prazo: string
 const iso = (v: unknown): string =>
   v instanceof Date ? v.toISOString() : new Date(String(v)).toISOString();
 
+/** Situação do resultado: o do atleta vale a validação mais recente (sem validação, pendente); os demais já valem. */
+export const SQL_STATUS_RESULTADO = `case when r.fonte = 'atleta' then coalesce(v.status, 'pendente') else 'validado' end`;
+/** Ano da edição: o informado ou, nos resultados antigos, o ano da data. */
+export const SQL_EDICAO_RESULTADO = `coalesce(r.edicao, extract(year from r.data))::int`;
+
+export interface LinhaResultado {
+  id: string;
+  atleta_id: string;
+  data: string;
+  nivel: NivelCompeticao;
+  evento: string;
+  edicao: number;
+  posicao: number;
+  tamanho_frota: number | null;
+  internacional: boolean;
+  pontos_cbvela: string | null;
+  fonte: ResultadoDoAtleta["fonte"];
+  link_oficial: string | null;
+  status: StatusResultado;
+  motivo: string | null;
+  validado_por: string | null;
+  validador_nome: string | null;
+  validado_em: Date | null;
+  anexo_id: string | null;
+  anexo_nome: string | null;
+  registrado_em: Date;
+}
+
+export const COLUNAS_RESULTADO = `r.id::text as id, r.atleta_id, r.data::text as data, r.nivel, r.evento,
+       ${SQL_EDICAO_RESULTADO} as edicao, r.posicao, r.tamanho_frota, r.internacional, r.pontos_cbvela,
+       r.fonte, r.link_oficial, ${SQL_STATUS_RESULTADO} as status, v.motivo,
+       v.validado_por::text as validado_por, u.nome as validador_nome, v.validado_em,
+       case when ea.removido_em is null then r.anexo_id::text end as anexo_id,
+       case when ea.removido_em is null then ea.nome_arquivo end as anexo_nome, r.registrado_em`;
+
+export const ORIGEM_RESULTADO = `resultados_regata r
+       left join validacao_resultado_atual v on v.resultado_id = r.id
+       left join usuarios u on u.id = v.validado_por
+       left join evidencias_anexos ea on ea.id = r.anexo_id`;
+
+/** `semDetalhe`: visão do IBVAR (sem motivo, anexo nem quem validou). */
+export function paraResultado(l: LinhaResultado, semDetalhe = false): ResultadoDoAtleta {
+  return {
+    id: l.id,
+    data: l.data,
+    nivel: l.nivel,
+    evento: l.evento,
+    edicao: l.edicao,
+    posicao: l.posicao,
+    tamanhoFrota: l.tamanho_frota,
+    internacional: l.internacional,
+    pontosCbvela: l.pontos_cbvela === null ? null : Number(l.pontos_cbvela),
+    fonte: l.fonte,
+    linkOficial: l.link_oficial,
+    status: l.status,
+    motivo: semDetalhe ? null : l.motivo,
+    validadoPor:
+      semDetalhe || !l.validado_por ? null : { id: l.validado_por, nome: l.validador_nome ?? "" },
+    validadoEm: semDetalhe || !l.validado_em ? null : iso(l.validado_em),
+    anexo: semDetalhe || !l.anexo_id ? null : { id: l.anexo_id, nomeArquivo: l.anexo_nome ?? "" },
+    registradoEm: iso(l.registrado_em),
+  };
+}
+
+/** Um resultado pelo id, como o gestor o vê (a rota já conferiu o acesso). */
+export async function lerResultado(db: Db, id: string): Promise<ResultadoDoAtleta> {
+  const r = await db.query<LinhaResultado>(
+    `select ${COLUNAS_RESULTADO} from ${ORIGEM_RESULTADO} where r.id = $1::bigint`,
+    [id],
+  );
+  return paraResultado(r.rows[0]!);
+}
+
 /**
  * Carrega, numa ida por tabela, tudo o que o cálculo (e a ficha) precisa para o conjunto de atletas.
  * Os ids devem vir de `listarAtletasVisiveis`/`buscarAtletaVisivel` (filtro de acesso já aplicado).
@@ -470,21 +563,12 @@ export async function carregarDadosAtletas(
         order by m.medido_em desc, m.id desc`,
         p,
       ),
-      db.query<{
-        atleta_id: string;
-        data: string;
-        nivel: NivelCompeticao;
-        evento: string;
-        posicao: number;
-        tamanho_frota: number;
-        internacional: boolean;
-        pontos_cbvela: string | null;
-        fonte: "ranking_cbvela" | "manual";
-        link_oficial: string | null;
-      }>(
-        `select atleta_id, data::text as data, nivel, evento, posicao, tamanho_frota, internacional,
-              pontos_cbvela, fonte, link_oficial
-         from resultados_regata where atleta_id = any($1::uuid[]) order by data desc, id desc`,
+      db.query<LinhaResultado>(
+        `select ${COLUNAS_RESULTADO}
+           from ${ORIGEM_RESULTADO}
+          where r.atleta_id = any($1::uuid[])
+            ${opcoes.resultadosParaIbvar ? `and ${SQL_STATUS_RESULTADO} = 'validado'` : ""}
+          order by r.data desc, r.id desc`,
         p,
       ),
       db.query<{ atleta_id: string; gate: number; status: StatusGate | null }>(
@@ -540,17 +624,7 @@ export async function carregarDadosAtletas(
   }
 
   for (const l of resultados.rows) {
-    dado(l.atleta_id).resultados.push({
-      data: l.data,
-      nivel: l.nivel,
-      evento: l.evento,
-      posicao: l.posicao,
-      tamanhoFrota: l.tamanho_frota,
-      internacional: l.internacional,
-      pontosCbvela: l.pontos_cbvela === null ? null : Number(l.pontos_cbvela),
-      fonte: l.fonte,
-      linkOficial: l.link_oficial,
-    });
+    dado(l.atleta_id).resultados.push(paraResultado(l, opcoes.resultadosParaIbvar === true));
   }
   for (const l of decisoes.rows) dado(l.atleta_id).decisoesGates[l.gate - 1] = l.status;
 

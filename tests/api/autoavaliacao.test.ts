@@ -31,7 +31,7 @@ describe("D9: autoavaliação", () => {
   let marcosAtleta: string; // RS-T02, de outro treinador
   let authMarcos: { authorization: string };
   let cicloId: string;
-  const obrigatorio = "perf_nacional"; // tipo T, evidência obrigatória
+  const obrigatorio = "perf_consistencia"; // tipo T, evidência obrigatória
   const opcional = "tec_largada"; // tipo T, evidência opcional
   const opcional2 = "tat_leitura_vento";
   const questionario = "car_disponibilidade"; // tipo A

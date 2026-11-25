@@ -1,5 +1,6 @@
 import type { EntradaCalculo, NotaPilar, Parametros, ResultadoCalculo } from "./tipos.js";
 import { distanciaClassFit } from "./classfit.js";
+import { notaDeResultados } from "./resultados.js";
 import { aplicarDecisoes, gatesAutomaticos, statusFinal } from "./gates.js";
 import {
   calcularScore,
@@ -42,5 +43,6 @@ export function calcularAtleta(parametros: Parametros, entrada: EntradaCalculo):
       entrada.referencia,
       parametros.regras.rankingCbvela.janelaSemanas,
     ),
+    notasResultados: notaDeResultados(entrada.resultados, parametros.regras.perfResultados),
   };
 }

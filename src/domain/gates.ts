@@ -49,11 +49,12 @@ export function gatesAutomaticos(
   // Mais recente primeiro: find pega o resultado mais recente de cada nível.
   const ordenados = [...entrada.resultados].sort((a, b) => b.data.localeCompare(a.data));
   const internacionais = ordenados.filter((r) => r.internacional);
-  const mund = internacionais.find((r) => r.nivel === "mundial");
+  // O Mundial entra no G2 pela fração posição/frota: só vale o informado com a frota (o atleta pode omiti-la).
+  const mund = internacionais.find((r) => r.nivel === "mundial" && r.tamanhoFrota != null);
   const sul = internacionais.find((r) => r.nivel === "sul_americano");
   const bras = ordenados.find((r) => r.nivel === "brasileiro");
   let g2: SugestaoGate;
-  if (mund && mund.posicao / mund.tamanhoFrota <= r2.mundialAptoAteFracao)
+  if (mund?.tamanhoFrota != null && mund.posicao / mund.tamanhoFrota <= r2.mundialAptoAteFracao)
     g2 = {
       gate: 2,
       status: "apto",
@@ -61,7 +62,10 @@ export function gatesAutomaticos(
     };
   else if (sul && sul.posicao <= r2.sulAmericanoCondicionalAtePosicao)
     g2 = { gate: 2, status: "condicional", motivo: `${sul.posicao}º no Sul-Americano` };
-  else if (mund && mund.posicao / mund.tamanhoFrota <= r2.mundialCondicionalAteFracao)
+  else if (
+    mund?.tamanhoFrota != null &&
+    mund.posicao / mund.tamanhoFrota <= r2.mundialCondicionalAteFracao
+  )
     g2 = {
       gate: 2,
       status: "condicional",

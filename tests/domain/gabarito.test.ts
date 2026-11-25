@@ -2,7 +2,11 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { calcularAtleta } from "../../src/domain/index.js";
 import type { NivelCompeticao, PerfilSuporte, ResultadoRegata } from "../../src/domain/index.js";
-import { classeDeTeste, parametrosDeTeste, REFERENCIA_TESTE } from "../apoio/parametros-teste.js";
+import {
+  classeDeTeste,
+  parametrosDoPrototipo,
+  REFERENCIA_TESTE,
+} from "../apoio/parametros-teste.js";
 
 interface AtletaGabarito {
   velaid: string;
@@ -49,7 +53,7 @@ const STATUS_FINAL: Record<string, string> = {
 const corrigir = (motivo: string) => motivo.replace("internacionalis", "internacionais");
 
 describe("gabarito do protótipo", () => {
-  const parametros = parametrosDeTeste();
+  const parametros = parametrosDoPrototipo();
 
   it("tem os 14 atletas", () => {
     expect(gabarito.atletas).toHaveLength(14);
@@ -63,6 +67,7 @@ describe("gabarito do protótipo", () => {
         nivel: NIVEIS[r.nivel] as NivelCompeticao,
         evento: r.evento,
         data: r.data,
+        edicao: Number(r.data.slice(0, 4)),
         posicao: r.posicao,
         tamanhoFrota: r.tamanhoFrota,
         internacional: r.internacional,

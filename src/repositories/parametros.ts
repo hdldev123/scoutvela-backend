@@ -1,5 +1,5 @@
 import type { Db } from "../db/db.js";
-import { INDICADOR_PONTOS_PADRAO } from "../domain/pontos.js";
+import { NIVEIS_DE_NOTA, type FaixaColocacao } from "../domain/resultados.js";
 import { CODIGOS_REGRAS, ESQUEMAS_REGRAS, type CodigoRegra } from "./regras-esquemas.js";
 import type {
   Classe,
@@ -74,26 +74,31 @@ export function regrasDoBanco(linhas: { codigo: string; valor: ValorRegra }[]): 
     },
     g4: { A: perfil("A"), B: perfil("B"), C: perfil("C"), D: perfil("D") },
     rankingCbvela: { janelaSemanas: numero(rk.janela_semanas, "RANKING_CBVELA", "janela_semanas") },
-    perfPontos: perfPontosDoBanco(porCodigo.get("PERF_PONTOS")),
+    perfResultados: perfResultadosDoBanco(pegar("PERF_RESULTADOS")),
   };
 }
 
-/** PERF_PONTOS (migration 0012). Ausente ou desligada: sem nota sugerida. */
-function perfPontosDoBanco(valor: ValorRegra | undefined): Regras["perfPontos"] {
-  if (!valor) return { ativa: false, indicador: INDICADOR_PONTOS_PADRAO, faixas: [] };
-  const faixas = Array.isArray(valor.faixas) ? (valor.faixas as Record<string, unknown>[]) : [];
+/** PERF_RESULTADOS (migration 0030): faixas de colocação por nível. Obrigatória: a nota depende dela. */
+function perfResultadosDoBanco(valor: ValorRegra): Regras["perfResultados"] {
+  const niveis = (valor.niveis ?? {}) as Record<string, unknown>;
+  const faixasDe = (nivel: string): FaixaColocacao[] => {
+    const lista = niveis[nivel];
+    if (!Array.isArray(lista) || lista.length === 0) {
+      throw new Error(`Regra PERF_RESULTADOS sem faixas para o nível "${nivel}"`);
+    }
+    return (lista as Record<string, unknown>[]).map((f) => ({
+      ate: f.ate === null || f.ate === undefined ? null : numero(f.ate, "PERF_RESULTADOS", "ate"),
+      nota: numero(f.nota, "PERF_RESULTADOS", "nota"),
+    }));
+  };
+  const [mundial, continental, nacional] = NIVEIS_DE_NOTA.map(faixasDe) as [
+    FaixaColocacao[],
+    FaixaColocacao[],
+    FaixaColocacao[],
+  ];
   return {
-    ativa: valor.ativa === true,
-    indicador:
-      typeof valor.indicador === "string" && valor.indicador
-        ? valor.indicador
-        : INDICADOR_PONTOS_PADRAO,
-    faixas: faixas
-      .map((f) => ({
-        ate: numero(f.ate, "PERF_PONTOS", "faixas.ate"),
-        nota: numero(f.nota, "PERF_PONTOS", "faixas.nota"),
-      }))
-      .sort((a, b) => a.ate - b.ate),
+    edicoesMax: numero(valor.edicoes_max, "PERF_RESULTADOS", "edicoes_max"),
+    niveis: { mundial, continental, nacional },
   };
 }
 
@@ -470,19 +475,6 @@ export async function atualizarParametros(
           throw new ErroParametros(
             `Regra ${codigo} inválida${onde}: ${problema?.message ?? "valor incorreto"}.`,
           );
-        }
-        if (codigo === "PERF_PONTOS") {
-          const ind = (parsed.data as { indicador?: string }).indicador;
-          if (ind !== undefined) {
-            const ok = await tx.query(
-              "select 1 from indicadores where id = $1 and tipo = 'T' and not calculado",
-              [ind],
-            );
-            if (ok.rows.length === 0)
-              throw new ErroParametros(
-                `Regra PERF_PONTOS inválida (indicador): "${ind}" não é um indicador T não calculado.`,
-              );
-          }
         }
         const atual = (
           await tx.query<{ valor: unknown }>("select valor from regras where codigo = $1", [codigo])

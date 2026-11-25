@@ -127,6 +127,12 @@ export async function semear(db: Db): Promise<void> {
     const componentes = (
       await tx.query<{ id: string }>("select id from componentes_custo order by ordem")
     ).rows;
+    // Indicadores calculados pelo sistema (peso pela P3; os de resultado por PERF_RESULTADOS) não têm lançamento.
+    const calculados = new Set(
+      (await tx.query<{ id: string }>("select id from indicadores where calculado")).rows.map(
+        (r) => r.id,
+      ),
+    );
 
     for (const a of ATLETAS_PROTOTIPO) {
       const treinadorId = treinadores[a.treinador];
@@ -196,8 +202,7 @@ export async function semear(db: Db): Promise<void> {
 
       for (const [indicadorId, n] of Object.entries(a.notas)) {
         const cicloId = ciclos[CICLO_DO_MES[mesDe(n.data)]!]!;
-        // cf_peso_kg é calculado pelo sistema (P3): não tem lançamento.
-        if (n.valor !== null && indicadorId !== "cf_peso_kg") {
+        if (n.valor !== null && !calculados.has(indicadorId)) {
           await tx.query(
             `insert into avaliacoes (atleta_id, indicador_id, ciclo_id, valor, evidencia, origem, avaliador_id, lancado_em)
              values ($1, $2, $3, $4, $5, $6, $7, $8)`,
@@ -227,9 +232,9 @@ export async function semear(db: Db): Promise<void> {
         const nivel = NIVEIS[r.nivel];
         if (!nivel) throw new Error(`Nível ${r.nivel} desconhecido`);
         await tx.query(
-          `insert into resultados_regata (atleta_id, nivel, evento, data, posicao, tamanho_frota, internacional,
-                                          pontos_cbvela, fonte, link_oficial, registrado_por)
-           values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+          `insert into resultados_regata (atleta_id, nivel, evento, data, edicao, posicao, tamanho_frota,
+                                          internacional, pontos_cbvela, fonte, link_oficial, registrado_por)
+           values ($1, $2, $3, $4, extract(year from $4::date), $5, $6, $7, $8, $9, $10, $11)`,
           [
             atletaId,
             nivel,

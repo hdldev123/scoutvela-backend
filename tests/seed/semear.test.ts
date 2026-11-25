@@ -24,6 +24,7 @@ interface Gabarito {
     }[];
   }[];
 }
+const INDICADORES_CALCULADOS = ["cf_peso_kg", "perf_mundial", "perf_continental", "perf_nacional"];
 const gabarito = JSON.parse(readFileSync("tests/fixtures/prototipo.json", "utf8")) as Gabarito;
 
 const NIVEIS: Record<string, string> = {
@@ -96,7 +97,10 @@ describe("semear", () => {
       ).rows;
       const obtido = Object.fromEntries(notas.map((n) => [n.indicador_id, n.valor]));
       const esperado = Object.fromEntries(
-        Object.entries(g.notas).filter(([id, v]) => v !== null && id !== "cf_peso_kg"),
+        // Indicadores calculados (peso e os de resultado) não têm lançamento no seed.
+        Object.entries(g.notas).filter(
+          ([id, v]) => v !== null && !INDICADORES_CALCULADOS.includes(id),
+        ),
       );
       expect(obtido, g.velaid).toEqual(esperado);
 

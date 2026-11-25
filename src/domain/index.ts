@@ -5,7 +5,7 @@ export * from "./score.js";
 export * from "./gates.js";
 export * from "./calculo.js";
 export * from "./plano.js";
-export * from "./pontos.js";
+export * from "./resultados.js";
 export * from "./altura.js";
 export * from "./ws-id.js";
 export * from "./contato.js";

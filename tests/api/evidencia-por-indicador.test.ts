@@ -14,7 +14,7 @@ describe("D5: evidência por indicador e link de vídeo", () => {
   let p: Piloto;
   let livia: string; // SC-T01, da Ana, consentiu com o IBVAR
   let helena: string; // SP-T07, da Ana, é a conta de atleta
-  const obrigatorio = "perf_nacional";
+  const obrigatorio = "perf_consistencia";
   const opcional = "tec_largada";
 
   beforeAll(async () => {

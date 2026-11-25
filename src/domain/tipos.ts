@@ -1,3 +1,5 @@
+import type { NivelDeNota, NotaDeResultado, RegraResultados } from "./resultados.js";
+
 /**
  * Tipos do domínio do Scout Vela. As funções de domain/ são puras: recebem
  * parâmetros (vindos do banco) e dados do atleta, e devolvem o cálculo.
@@ -30,7 +32,7 @@ export interface Indicador {
   pilarId: string;
   nome: string;
   tipo: TipoIndicador;
-  /** Nota derivada pelo sistema (ex.: cf_peso_kg pela P3), nunca digitada. */
+  /** Nota derivada pelo sistema (cf_peso_kg pela P3; os de resultado por PERF_RESULTADOS), nunca digitada. */
   calculado: boolean;
   /** `obrigatoria`: a nota exige texto de evidência. Editável pelo gestor em Parâmetros. */
   evidencia: "obrigatoria" | "opcional";
@@ -97,14 +99,8 @@ export interface Regras {
   g4: Record<PerfilSuporte, { status: StatusGate; motivo: string }>;
   /** Janela do Ranking CBVela para somar pontos. */
   rankingCbvela: { janelaSemanas: number };
-  /** Pontos do Ranking CBVela → nota sugerida de perf_nacional. Faixas em ordem crescente de `ate`;
-   *  cada uma vale até `ate` pontos (inclusive) e, acima da última, vale a nota dela. Não entra no score. */
-  perfPontos: {
-    ativa: boolean;
-    /** Indicador que recebe a sugestão (padrão: perf_nacional). */
-    indicador: string;
-    faixas: { ate: number; nota: number }[];
-  };
+  /** Nota de perf_mundial, perf_continental e perf_nacional pelos resultados validados (P12). */
+  perfResultados: RegraResultados;
 }
 
 export interface Parametros {
@@ -121,8 +117,11 @@ export interface ResultadoRegata {
   evento: string;
   /** ISO, AAAA-MM-DD. */
   data: string;
+  /** Ano da edição. */
+  edicao: number;
   posicao: number;
-  tamanhoFrota: number;
+  /** Nulo quando o resultado foi informado sem a frota (a colocação vale sem ela). */
+  tamanhoFrota: number | null;
   internacional: boolean;
   /** Pontos do Ranking CBVela (nacionais). Nulo nos internacionais. */
   pontosCbvela: number | null;
@@ -138,6 +137,7 @@ export interface EntradaCalculo {
   pesoKg: number | null;
   /** Notas lançadas (não inclui indicadores calculados; eles são derivados). */
   notas: NotasAtuais;
+  /** Só os resultados que valem: lançados por gestor ou treinador, do Ranking CBVela ou do atleta já validados. */
   resultados: ResultadoRegata[];
   /** Nulo = financeiro ainda não informado (G4 em alerta). */
   perfilSuporte: PerfilSuporte | null;
@@ -182,4 +182,6 @@ export interface ResultadoCalculo {
   gates: Gate[];
   statusFinal: StatusFinal;
   pontosCbvela: number;
+  /** De onde veio a nota de cada nível de resultado (nulo = sem resultado validado no nível). */
+  notasResultados: Record<NivelDeNota, NotaDeResultado | null>;
 }

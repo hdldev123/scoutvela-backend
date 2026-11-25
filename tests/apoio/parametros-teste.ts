@@ -145,6 +145,9 @@ const PILARES_BASE: [string, string, string, number, boolean, string, Ind[]][] =
   ],
 ];
 
+/** Nota calculada pelos resultados validados (D10), como no banco. */
+const INDICADORES_DE_RESULTADO = ["perf_mundial", "perf_continental", "perf_nacional"];
+
 export function pilaresDeTeste(): Pilar[] {
   return PILARES_BASE.map(([id, nome, nomeCurto, peso, sensivel, evidenciaPadrao, inds]) => ({
     id,
@@ -158,10 +161,11 @@ export function pilaresDeTeste(): Pilar[] {
       pilarId: id,
       nome: inome,
       tipo,
-      calculado: iid === "cf_peso_kg",
+      calculado: iid === "cf_peso_kg" || INDICADORES_DE_RESULTADO.includes(iid),
       evidencia: /^(tec|tat|pot)_/.test(iid) ? ("opcional" as const) : ("obrigatoria" as const),
       exigeAnexo: iid === "cf_peso_kg",
-      autoavaliacao: tipo === "T" && iid !== "cf_peso_kg",
+      autoavaliacao:
+        tipo === "T" && iid !== "cf_peso_kg" && !INDICADORES_DE_RESULTADO.includes(iid),
       orientacao: null,
     })),
   }));
@@ -219,7 +223,29 @@ export const REGRAS_TESTE: Regras = {
     D: { status: "alerta", motivo: "Sem estrutura para campanha internacional" },
   },
   rankingCbvela: { janelaSemanas: 52 },
-  perfPontos: { ativa: false, indicador: "perf_nacional", faixas: [] },
+  perfResultados: {
+    edicoesMax: 4,
+    niveis: {
+      mundial: [
+        { ate: 3, nota: 5 },
+        { ate: 10, nota: 4 },
+        { ate: 25, nota: 3 },
+        { ate: null, nota: 2 },
+      ],
+      continental: [
+        { ate: 3, nota: 5 },
+        { ate: 10, nota: 4 },
+        { ate: 25, nota: 3 },
+        { ate: null, nota: 2 },
+      ],
+      nacional: [
+        { ate: 1, nota: 5 },
+        { ate: 2, nota: 4 },
+        { ate: 3, nota: 3 },
+        { ate: null, nota: 0 },
+      ],
+    },
+  },
 };
 
 export function parametrosDeTeste(): Parametros {
@@ -234,6 +260,24 @@ export function parametrosDeTeste(): Parametros {
     classes: CLASSES_TESTE.map((c) => ({ ...c })),
     regras: structuredClone(REGRAS_TESTE),
   };
+}
+
+/**
+ * Parâmetros do protótipo (engine.js), em que as notas de perf_mundial, perf_continental e perf_nacional
+ * ainda eram lançadas à mão. Só o teste de gabarito do domínio usa: a API calcula essas notas pelos
+ * resultados validados (PERF_RESULTADOS).
+ */
+export function parametrosDoPrototipo(): Parametros {
+  const p = parametrosDeTeste();
+  for (const pilar of p.pilares) {
+    for (const i of pilar.indicadores) {
+      if (INDICADORES_DE_RESULTADO.includes(i.id)) {
+        i.calculado = false;
+        i.autoavaliacao = true;
+      }
+    }
+  }
+  return p;
 }
 
 export const REFERENCIA_TESTE = new Date("2026-11-06T12:00:00-03:00");
@@ -251,6 +295,7 @@ export function resultadoDeTeste(parcial: Partial<ResultadoRegata> = {}): Result
     nivel: "estadual",
     evento: "Evento de teste",
     data: "2026-05-30",
+    edicao: 2026,
     posicao: 1,
     tamanhoFrota: 10,
     internacional: false,
