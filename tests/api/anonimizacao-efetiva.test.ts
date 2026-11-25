@@ -191,6 +191,14 @@ describe("anonimização efetiva (de fato)", () => {
         })
       ).status,
     ).toBe(201);
+    // Pedido em 2ª instância (D6): resposta do treinador e recurso trazem o nome do atleta.
+    await p.db.query(
+      `insert into pedidos_revisao (atleta_id, pilar_id, motivo, criado_por, instancia, resposta_1,
+                                    respondido_por_1, respondido_em_1, recurso_texto, recurso_em)
+       select $1, 'tec', 'Motivo do recurso, longo o bastante.', u.id, 2, $2, u.id, now(), $3, now()
+         from usuarios u where u.papel = 'gestor' limit 1`,
+      [atletaId, `Resposta para ${NOME}.`, `Recurso de ${NOME}.`],
+    );
     const pedido = await chamar(atleta, "POST", "/pedidos-titular", {
       tipo: "exclusao",
       descricao: `Eu, ${NOME}, quero que apaguem meus dados.`,
@@ -306,8 +314,19 @@ describe("anonimização efetiva (de fato)", () => {
       },
     ]);
     expect(
-      await q("select motivo, status, resposta from pedidos_revisao where atleta_id = $1"),
-    ).toEqual([{ motivo: MARCADOR, status: "aberto", resposta: null }]);
+      await q(
+        "select motivo, status, resposta, resposta_1, recurso_texto from pedidos_revisao where atleta_id = $1 order by id",
+      ),
+    ).toEqual([
+      { motivo: MARCADOR, status: "aberto", resposta: null, resposta_1: null, recurso_texto: null },
+      {
+        motivo: MARCADOR,
+        status: "aberto",
+        resposta: null,
+        resposta_1: MARCADOR,
+        recurso_texto: MARCADOR,
+      },
+    ]);
     const titular = await q(
       "select tipo, descricao, status, resposta from pedidos_titular where atleta_id = $1 order by id",
     );
@@ -487,7 +506,7 @@ describe("anonimização efetiva (de fato)", () => {
     it("gestor: responder revisão e pedido do titular do atleta anonimizado", async () => {
       const rev = (
         await p.db.query<{ id: string }>(
-          "select id::text as id from pedidos_revisao where atleta_id = $1",
+          "select id::text as id from pedidos_revisao where atleta_id = $1 order by id",
           [atletaId],
         )
       ).rows[0]!.id;

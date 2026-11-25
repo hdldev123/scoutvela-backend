@@ -268,7 +268,10 @@ async function removerTextosLivres(
         and not (forcas = $2 and lacunas = $2 and meta_12m = $2 and meta_24m = $2 and recomendacao = $2)`,
   );
   await q(
-    `update pedidos_revisao set motivo = $2, resposta = case when resposta is null then null else $2 end
+    `update pedidos_revisao
+        set motivo = $2, resposta = case when resposta is null then null else $2 end,
+            resposta_1 = case when resposta_1 is null then null else $2 end,
+            recurso_texto = case when recurso_texto is null then null else $2 end
       where atleta_id = $1::uuid`,
   );
   // A resposta do pedido de exclusão é o registro da anonimização: fica. Só a descrição sai.

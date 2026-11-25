@@ -88,3 +88,31 @@ export async function listarLancamentosElegiveis(
     avaliador: l.avaliador_id ? { id: l.avaliador_id, nome: l.avaliador_nome ?? "" } : null,
   }));
 }
+
+export interface PedidoDoAvaliador extends PedidoParaVinculo {
+  status: "aberto" | "respondido";
+  instancia: 1 | 2;
+}
+
+/**
+ * Pedido de revisão que o usuário pode responder ou consultar (gestor: qualquer um; treinador: só de
+ * atleta dele, filtro no SQL). Fora do acesso e inexistente dão o mesmo resultado (nulo, 404 na rota).
+ * Com `travar`, bloqueia a linha do pedido até o fim da transação.
+ */
+export async function buscarPedidoDoAvaliador(
+  db: Db,
+  usuario: { id: string; papel: string },
+  id: string,
+  travar = false,
+): Promise<PedidoDoAvaliador | null> {
+  const r = await db.query<PedidoDoAvaliador>(
+    `select p.atleta_id, p.pilar_id, p.indicador_id, p.criado_em, p.status, p.instancia
+       from pedidos_revisao p
+       join atletas a on a.id = p.atleta_id
+      where p.id = $1::bigint
+        and ($2::text = 'gestor' or a.treinador_id = $3::uuid)
+      ${travar ? "for update of p" : ""}`,
+    [id, usuario.papel, usuario.id],
+  );
+  return r.rows[0] ?? null;
+}

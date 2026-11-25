@@ -58,7 +58,7 @@ export async function contarNotificacoes(
         db.query<{ n: string }>(
           `select count(*)::text as n from pedidos_revisao r
              join atletas a on a.id = r.atleta_id
-            where r.status = 'aberto' and a.treinador_id = $1::uuid`,
+            where r.status = 'aberto' and r.instancia = 1 and a.treinador_id = $1::uuid`,
           [usuario.id],
         ),
         cicloAbertoId(db),

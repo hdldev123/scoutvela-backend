@@ -276,7 +276,9 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         ),
         q<Record<string, unknown>>(
           `select r.pilar_id as "pilarId", r.indicador_id as "indicadorId", r.motivo, r.status, r.resposta,
-                    r.criado_em as "criadoEm", r.respondido_em as "respondidoEm"
+                    r.criado_em as "criadoEm", r.respondido_em as "respondidoEm", r.instancia,
+                    r.resposta_1 as "respostaPrimeiraInstancia", r.respondido_em_1 as "respondidoEmPrimeiraInstancia",
+                    r.recurso_texto as "recurso", r.recurso_em as "recursoEm"
                from pedidos_revisao r where r.atleta_id = $1::uuid order by r.criado_em, r.id`,
         ),
         q<Record<string, unknown>>(

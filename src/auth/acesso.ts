@@ -21,7 +21,7 @@ const ACESSO: Partial<Record<Papel, AcessoDoPapel>> = {
     ],
     telaInicial: "ranking",
   },
-  // No front, "ranking" do treinador aparece como "Meus atletas". Revisões: só leitura dos próprios atletas.
+  // No front, "ranking" do treinador aparece como "Meus atletas". Revisões: responde os pedidos dos próprios atletas (1ª instância).
   treinador: { telas: ["ranking", "avaliar", "revisoes"], telaInicial: "ranking" },
   atleta: { telas: ["painel", "ficha"], telaInicial: "painel" },
   ibvar: { telas: ["investimento", "ranking"], telaInicial: "investimento" },

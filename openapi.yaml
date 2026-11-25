@@ -6657,6 +6657,9 @@ paths:
         dos próprios atletas; atleta: os seus)"
       tags:
         - revisoes
+      description: Cada pedido traz a instância (1 ou 2), a resposta da 1ª instância
+        (texto, papel e data de quem respondeu), o recurso do atleta e a
+        resposta final do gestor na 2ª instância.
       parameters:
         - schema:
             type: string
@@ -6725,10 +6728,83 @@ paths:
                       type: string
                     resposta:
                       nullable: true
+                      description: "Resposta vigente: a da 1ª instância enquanto não há recurso;
+                        depois do recurso, a da 2ª (nula até o gestor
+                        responder)"
                       type: string
                     respondidoEm:
                       nullable: true
                       type: string
+                    instancia:
+                      anyOf:
+                        - type: number
+                          enum:
+                            - 1
+                        - type: number
+                          enum:
+                            - 2
+                      description: "1: treinador ou gestor responde; 2: recurso do atleta, só o gestor
+                        responde"
+                    primeiraResposta:
+                      nullable: true
+                      description: Resposta da 1ª instância (também depois do recurso); nula enquanto
+                        não respondida
+                      type: object
+                      properties:
+                        texto:
+                          type: string
+                        papel:
+                          type: string
+                          enum:
+                            - gestor
+                            - treinador
+                          description: Papel de quem respondeu
+                        respondidoEm:
+                          type: string
+                      required:
+                        - texto
+                        - papel
+                        - respondidoEm
+                      additionalProperties: false
+                    recurso:
+                      nullable: true
+                      description: Recurso do atleta contra a resposta da 1ª instância; nulo se não
+                        houve
+                      type: object
+                      properties:
+                        texto:
+                          type: string
+                        em:
+                          type: string
+                      required:
+                        - texto
+                        - em
+                      additionalProperties: false
+                    respostaFinal:
+                      nullable: true
+                      description: Resposta do gestor na 2ª instância; nula se não houve recurso ou se
+                        ainda aberto
+                      type: object
+                      properties:
+                        texto:
+                          type: string
+                        papel:
+                          type: string
+                          enum:
+                            - gestor
+                            - treinador
+                          description: Papel de quem respondeu
+                        respondidoEm:
+                          type: string
+                      required:
+                        - texto
+                        - papel
+                        - respondidoEm
+                      additionalProperties: false
+                    podeRecurso:
+                      type: boolean
+                      description: true quando o atleta ainda pode pedir a 2ª instância (respondido
+                        pelo treinador, sem recurso)
                     avaliacaoId:
                       nullable: true
                       description: Lançamento ligado à resposta, se houver
@@ -6755,6 +6831,11 @@ paths:
                     - criadoEm
                     - resposta
                     - respondidoEm
+                    - instancia
+                    - primeiraResposta
+                    - recurso
+                    - respostaFinal
+                    - podeRecurso
                     - avaliacaoId
                     - notaAnterior
                     - notaNova
@@ -6842,10 +6923,11 @@ paths:
       summary: Lista os lançamentos que podem ser ligados ao pedido de revisão
       tags:
         - revisoes
-      description: Só os lançamentos que o PUT /revisoes/:id aceitaria em avaliacaoId
-        (mesmo atleta, indicador do pedido ou de um indicador do pilar, e
-        lançados depois do pedido), do mais novo para o mais antigo. Vale para
-        pedido aberto ou respondido. Sem evidência.
+      description: Gestor (qualquer pedido) e treinador (só de atleta dele; outro
+        pedido dá 404). Só os lançamentos que o PUT /revisoes/:id aceitaria em
+        avaliacaoId (mesmo atleta, indicador do pedido ou de um indicador do
+        pilar, e lançados depois do pedido), do mais novo para o mais antigo.
+        Vale para pedido aberto ou respondido. Sem evidência.
       parameters:
         - schema:
             type: string
@@ -7065,12 +7147,14 @@ paths:
       summary: Responde um pedido de revisão
       tags:
         - revisoes
-      description: "Pedido já respondido devolve 409 (código requisicao_invalida).
-        avaliacaoId (opcional) liga a resposta ao lançamento que a atendeu: do
-        mesmo atleta, do indicador do pedido (ou de um indicador do pilar, se o
-        pedido foi por pilar) e lançado depois do pedido. Depois de gravar, o
-        atleta recebe um e-mail só com o aviso e o link; falha no envio não
-        desfaz a resposta."
+      description: "Gestor responde qualquer pedido; treinador, só o de atleta dele
+        (outro dá 404) e só na 1ª instância (pedido em 2ª instância dá 403). A
+        resposta do gestor na 2ª instância encerra o pedido. Pedido já
+        respondido devolve 409 (código requisicao_invalida). avaliacaoId
+        (opcional) liga a resposta ao lançamento que a atendeu: do mesmo atleta,
+        do indicador do pedido (ou de um indicador do pilar, se o pedido foi por
+        pilar) e lançado depois do pedido. Depois de gravar, o atleta recebe um
+        e-mail só com o aviso e o link; falha no envio não desfaz a resposta."
       requestBody:
         required: true
         content:
@@ -7157,10 +7241,82 @@ paths:
                     type: string
                   resposta:
                     nullable: true
+                    description: "Resposta vigente: a da 1ª instância enquanto não há recurso;
+                      depois do recurso, a da 2ª (nula até o gestor responder)"
                     type: string
                   respondidoEm:
                     nullable: true
                     type: string
+                  instancia:
+                    anyOf:
+                      - type: number
+                        enum:
+                          - 1
+                      - type: number
+                        enum:
+                          - 2
+                    description: "1: treinador ou gestor responde; 2: recurso do atleta, só o gestor
+                      responde"
+                  primeiraResposta:
+                    nullable: true
+                    description: Resposta da 1ª instância (também depois do recurso); nula enquanto
+                      não respondida
+                    type: object
+                    properties:
+                      texto:
+                        type: string
+                      papel:
+                        type: string
+                        enum:
+                          - gestor
+                          - treinador
+                        description: Papel de quem respondeu
+                      respondidoEm:
+                        type: string
+                    required:
+                      - texto
+                      - papel
+                      - respondidoEm
+                    additionalProperties: false
+                  recurso:
+                    nullable: true
+                    description: Recurso do atleta contra a resposta da 1ª instância; nulo se não
+                      houve
+                    type: object
+                    properties:
+                      texto:
+                        type: string
+                      em:
+                        type: string
+                    required:
+                      - texto
+                      - em
+                    additionalProperties: false
+                  respostaFinal:
+                    nullable: true
+                    description: Resposta do gestor na 2ª instância; nula se não houve recurso ou se
+                      ainda aberto
+                    type: object
+                    properties:
+                      texto:
+                        type: string
+                      papel:
+                        type: string
+                        enum:
+                          - gestor
+                          - treinador
+                        description: Papel de quem respondeu
+                      respondidoEm:
+                        type: string
+                    required:
+                      - texto
+                      - papel
+                      - respondidoEm
+                    additionalProperties: false
+                  podeRecurso:
+                    type: boolean
+                    description: true quando o atleta ainda pode pedir a 2ª instância (respondido
+                      pelo treinador, sem recurso)
                   avaliacaoId:
                     nullable: true
                     description: Lançamento ligado à resposta, se houver
@@ -7187,6 +7343,404 @@ paths:
                   - criadoEm
                   - resposta
                   - respondidoEm
+                  - instancia
+                  - primeiraResposta
+                  - recurso
+                  - respostaFinal
+                  - podeRecurso
+                  - avaliacaoId
+                  - notaAnterior
+                  - notaNova
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /revisoes/{id}/recurso:
+    post:
+      summary: Atleta discorda da resposta do treinador e pede a 2ª instância (gestor)
+      tags:
+        - revisoes
+      description: Só o atleta dono do pedido (outro pedido dá 404). Só uma vez por
+        pedido e só depois da resposta do treinador na 1ª instância; fora disso,
+        409 (inclusive pedido respondido pelo gestor, que já é a instância
+        final). O pedido volta a `aberto` com `instancia` 2 e só o gestor
+        responde. A auditoria guarda a instância, sem o texto.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                texto:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+              required:
+                - texto
+      parameters:
+        - schema:
+            type: string
+            pattern: ^\d{1,18}$
+          in: path
+          name: id
+          required: true
+      security: *a3
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  atleta:
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  pilar:
+                    nullable: true
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nomeCurto:
+                        type: string
+                    required:
+                      - id
+                      - nomeCurto
+                    additionalProperties: false
+                  indicador:
+                    nullable: true
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  motivo:
+                    type: string
+                  status:
+                    type: string
+                    enum:
+                      - aberto
+                      - respondido
+                  criadoEm:
+                    type: string
+                  resposta:
+                    nullable: true
+                    description: "Resposta vigente: a da 1ª instância enquanto não há recurso;
+                      depois do recurso, a da 2ª (nula até o gestor responder)"
+                    type: string
+                  respondidoEm:
+                    nullable: true
+                    type: string
+                  instancia:
+                    anyOf:
+                      - type: number
+                        enum:
+                          - 1
+                      - type: number
+                        enum:
+                          - 2
+                    description: "1: treinador ou gestor responde; 2: recurso do atleta, só o gestor
+                      responde"
+                  primeiraResposta:
+                    nullable: true
+                    description: Resposta da 1ª instância (também depois do recurso); nula enquanto
+                      não respondida
+                    type: object
+                    properties:
+                      texto:
+                        type: string
+                      papel:
+                        type: string
+                        enum:
+                          - gestor
+                          - treinador
+                        description: Papel de quem respondeu
+                      respondidoEm:
+                        type: string
+                    required:
+                      - texto
+                      - papel
+                      - respondidoEm
+                    additionalProperties: false
+                  recurso:
+                    nullable: true
+                    description: Recurso do atleta contra a resposta da 1ª instância; nulo se não
+                      houve
+                    type: object
+                    properties:
+                      texto:
+                        type: string
+                      em:
+                        type: string
+                    required:
+                      - texto
+                      - em
+                    additionalProperties: false
+                  respostaFinal:
+                    nullable: true
+                    description: Resposta do gestor na 2ª instância; nula se não houve recurso ou se
+                      ainda aberto
+                    type: object
+                    properties:
+                      texto:
+                        type: string
+                      papel:
+                        type: string
+                        enum:
+                          - gestor
+                          - treinador
+                        description: Papel de quem respondeu
+                      respondidoEm:
+                        type: string
+                    required:
+                      - texto
+                      - papel
+                      - respondidoEm
+                    additionalProperties: false
+                  podeRecurso:
+                    type: boolean
+                    description: true quando o atleta ainda pode pedir a 2ª instância (respondido
+                      pelo treinador, sem recurso)
+                  avaliacaoId:
+                    nullable: true
+                    description: Lançamento ligado à resposta, se houver
+                    type: string
+                  notaAnterior:
+                    nullable: true
+                    description: Nota do lançamento anterior ao ligado (mesmo atleta e indicador)
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                  notaNova:
+                    nullable: true
+                    description: Nota do lançamento ligado
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - id
+                  - atleta
+                  - pilar
+                  - indicador
+                  - motivo
+                  - status
+                  - criadoEm
+                  - resposta
+                  - respondidoEm
+                  - instancia
+                  - primeiraResposta
+                  - recurso
+                  - respostaFinal
+                  - podeRecurso
                   - avaliacaoId
                   - notaAnterior
                   - notaNova
