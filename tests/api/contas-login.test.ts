@@ -29,7 +29,9 @@ describe("vínculo da conta no primeiro login", () => {
   it("grava o sub no usuário ativo com o mesmo e-mail (sem diferenciar maiúsculas) e audita sem e-mail", async () => {
     const id = await cadastrar("convidada@exemplo.com");
     const sub = crypto.randomUUID();
-    const r = await me(await tokenPara(sub, { email: "Convidada@Exemplo.com" }));
+    const r = await me(
+      await tokenPara(sub, { email: "Convidada@Exemplo.com", emailVerificado: true }),
+    );
     expect(r.statusCode).toBe(200);
     expect(r.json().usuario.papel).toBe("treinador");
     expect(
@@ -51,13 +53,16 @@ describe("vínculo da conta no primeiro login", () => {
     );
   });
 
-  it("e-mail marcado como não confirmado no token não vincula; confirmado (ou sem a informação) vincula", async () => {
+  it("e-mail não confirmado ou sem a informação no token não vincula; só confirmado vincula", async () => {
     const id = await cadastrar("naoconfirmado@exemplo.com");
     const sub = crypto.randomUUID();
     const nao = await me(
       await tokenPara(sub, { email: "naoconfirmado@exemplo.com", emailVerificado: false }),
     );
     expect(nao.statusCode).toBe(403);
+    // Sem a claim email_verified: também não vincula (auditoria A1).
+    const semClaim = await me(await tokenPara(sub, { email: "naoconfirmado@exemplo.com" }));
+    expect(semClaim.statusCode).toBe(403);
     const vinculo = async () =>
       (
         await db.query<{ auth_user_id: string | null }>(
@@ -77,10 +82,24 @@ describe("vínculo da conta no primeiro login", () => {
     const inativo = await cadastrar("inativo@exemplo.com", "treinador", false);
     expect((await me(await tokenPara(crypto.randomUUID()))).statusCode).toBe(403);
     expect(
-      (await me(await tokenPara(crypto.randomUUID(), { email: "ninguem@exemplo.com" }))).statusCode,
+      (
+        await me(
+          await tokenPara(crypto.randomUUID(), {
+            email: "ninguem@exemplo.com",
+            emailVerificado: true,
+          }),
+        )
+      ).statusCode,
     ).toBe(403);
     expect(
-      (await me(await tokenPara(crypto.randomUUID(), { email: "inativo@exemplo.com" }))).statusCode,
+      (
+        await me(
+          await tokenPara(crypto.randomUUID(), {
+            email: "inativo@exemplo.com",
+            emailVerificado: true,
+          }),
+        )
+      ).statusCode,
     ).toBe(403);
     expect(
       (

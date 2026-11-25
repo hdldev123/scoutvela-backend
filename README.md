@@ -59,7 +59,7 @@ O esquema só muda por migration: nada é criado à mão no painel. As senhas do
 1. **Projeto.** Crie no painel com senha forte gerada e guarde-a no cofre.
 2. **Auth** (Authentication):
    - **desligue o cadastro público** (Sign In / Providers > "Allow new users to sign up"); contas são criadas pela CBVela em `POST /usuarios`. Isto é obrigatório: no primeiro login a API amarra o login ao cadastro pelo e-mail do token (`vincularContaPorEmail`), então quem conseguisse criar conta com o e-mail de um cadastro herdaria o papel dele;
-   - **mantenha a confirmação de e-mail ligada** ("Confirm email"), pelo mesmo motivo. O token do Supabase traz `user_metadata.email_verified`; a API recusa o vínculo (403) quando o claim vem `false`, mas quando ele não vem a decisão é só da configuração do projeto, por isso as duas opções acima não são opcionais;
+   - **mantenha a confirmação de e-mail ligada** ("Confirm email"), pelo mesmo motivo. O token do Supabase traz `user_metadata.email_verified`; a API só faz o vínculo quando o claim vem `true` e recusa (403) quando ele vem `false` ou não vem (auditoria de 25/11/2026, A1). As duas opções acima continuam obrigatórias, como segunda barreira;
    - ative o MFA por TOTP (Multi-Factor) e use `EXIGIR_MFA=true`;
    - ligue **"Secure password change"** (Authentication > Providers > Email): a troca de senha pelo `updateUser` passa a exigir login recente. O modal "Meu perfil" do front troca a senha sem pedir a atual;
    - em URL Configuration, Site URL = domínio do front e redirect permitido `FRONT_URL/redefinir-senha` (convite e redefinição de senha). Em homologação, inclua também o preview da Vercel e `http://localhost:8080/redefinir-senha`;
