@@ -271,7 +271,7 @@ export interface AtualizacaoParametros {
     | undefined;
 }
 
-const umaCasa = <T extends number | null | undefined>(v: T): T =>
+export const umaCasa = <T extends number | null | undefined>(v: T): T =>
   (typeof v === "number" ? Math.round(v * 10) / 10 : v) as T;
 
 /**
@@ -298,6 +298,10 @@ function arredondarClasse<
     alturaMaxCm: umaCasa(c.alturaMaxCm),
   };
 }
+
+/** Mesma regra de PUT /parametros para as faixas de peso da classe (também usada pelas sugestões, D7). */
+export const MSG_ORDEM_PESO_CLASSE =
+  "Em cada classe, o peso mínimo não pode passar da média, nem a média do máximo.";
 
 /** Erro de validação de negócio ao atualizar parâmetros (a rota converte em 400). */
 export class ErroParametros extends Error {}
@@ -537,9 +541,7 @@ export async function atualizarParametros(
         if (!comFaixa && alturaNova === undefined && c.ativa === undefined)
           throw new ErroParametros(`Classe ${c.id}: nada para alterar.`);
         if (comFaixa && !(min <= medio && medio <= max)) {
-          throw new ErroParametros(
-            "Em cada classe, o peso mínimo não pode passar da média, nem a média do máximo.",
-          );
+          throw new ErroParametros(MSG_ORDEM_PESO_CLASSE);
         }
         const atual = (
           await tx.query<{

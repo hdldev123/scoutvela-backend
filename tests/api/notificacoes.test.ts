@@ -63,6 +63,7 @@ describe("notificações do menu (GET /me/notificacoes, PUT /me/notificacoes/vis
       "cadastro",
       "investimento",
       "revisoes",
+      "sugestoes",
     ]);
     expect(g.total).toBe(Object.values(g.contagens).reduce((s, n) => s + n, 0));
     const t = await contagens(EMAILS_DEMO.treinadora);

@@ -36,7 +36,7 @@ export async function contarNotificacoes(
 ): Promise<Record<string, number>> {
   switch (usuario.papel) {
     case "gestor": {
-      const [r, investimento, avisos] = await Promise.all([
+      const [r, investimento, avisos, sugestoes] = await Promise.all([
         db.query<{ revisoes: string; cadastro: string }>(
           `select ((select count(*) from pedidos_revisao where status = 'aberto')
                + (select count(*) from pedidos_titular where status = 'aberto'))::text as revisoes,
@@ -48,12 +48,16 @@ export async function contarNotificacoes(
         ),
         avisoCicloFechado(db, usuario.id),
         contarAvisosNaoLidos(db, usuario),
+        db.query<{ n: string }>(
+          `select count(*)::text as n from sugestoes where status = 'aberta'`,
+        ),
       ]);
       return {
         revisoes: contagem(r.rows[0]?.revisoes),
         cadastro: contagem(r.rows[0]?.cadastro),
         investimento,
         avisos,
+        sugestoes: contagem(sugestoes.rows[0]?.n),
       };
     }
     case "treinador": {

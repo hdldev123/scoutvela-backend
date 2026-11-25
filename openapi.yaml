@@ -487,17 +487,17 @@ paths:
       description: "Só as chaves do papel, sempre presentes (0 quando nada pede
         atenção). Gestor: `revisoes` (pedidos de revisão e do titular abertos),
         `cadastro` (atletas ativos sem aceite da versão vigente do termo),
-        `investimento` e `avisos` (avisos não lidos, D8). Treinador: `revisoes`
-        (pedidos de revisão abertos dos próprios atletas), `avaliar` (próprios
-        atletas com indicadores pendentes no ciclo aberto; 0 sem ciclo aberto) e
-        `avisos`. Atleta: `avisos` e `painel` (perguntas ainda sem resposta,
-        hoje contadas só com ciclo aberto, + 1 se o termo vigente está pendente
-        + respostas a pedidos de revisão e do titular dadas depois da última
-        marcação de visto). IBVAR: só `investimento`. `investimento` (gestor e
-        IBVAR) vale 1 quando há ciclo fechado depois da última vez que a pessoa
-        marcou a tela como vista (PUT /me/notificacoes/vistas com chave
-        `investimento`), senão 0. `total` é a soma. Feito para consulta a cada
-        60 s."
+        `investimento`, `sugestoes` (sugestões dos treinadores ainda abertas) e
+        `avisos` (avisos não lidos, D8). Treinador: `revisoes` (pedidos de
+        revisão abertos dos próprios atletas), `avaliar` (próprios atletas com
+        indicadores pendentes no ciclo aberto; 0 sem ciclo aberto) e `avisos`.
+        Atleta: `avisos` e `painel` (perguntas ainda sem resposta, hoje contadas
+        só com ciclo aberto, + 1 se o termo vigente está pendente + respostas a
+        pedidos de revisão e do titular dadas depois da última marcação de
+        visto). IBVAR: só `investimento`. `investimento` (gestor e IBVAR) vale 1
+        quando há ciclo fechado depois da última vez que a pessoa marcou a tela
+        como vista (PUT /me/notificacoes/vistas com chave `investimento`), senão
+        0. `total` é a soma. Feito para consulta a cada 60 s."
       security: &a1
         - bearerAuth: []
       responses:
@@ -16677,6 +16677,928 @@ paths:
                 required:
                   - id
                   - avisoEnviado
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /sugestoes:
+    post:
+      summary: O treinador sugere uma mudança ao gestor
+      tags:
+        - sugestoes
+      description: "Só o treinador (gestor, atleta e IBVAR: 403). `tipo`: `class_fit`
+        (exige `classeId` existente e `proposta` com `pesoMinKg` <=
+        `pesoMedioKg` <= `pesoMaxKg`, de 0 a 400 kg, arredondados a 1 casa, as
+        mesmas regras de PUT /parametros), `parametro` ou `sistema` (sem
+        `classeId` nem `proposta`). `texto` de 1 a 1.000 caracteres, texto puro.
+        Até 10 sugestões abertas por autor: acima disso, 409. Nada muda nos
+        parâmetros: o gestor responde em PUT /sugestoes/{id}."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tipo:
+                  type: string
+                  enum:
+                    - class_fit
+                    - parametro
+                    - sistema
+                classeId:
+                  type: string
+                  minLength: 1
+                  maxLength: 40
+                proposta:
+                  type: object
+                  properties:
+                    pesoMinKg:
+                      type: number
+                      minimum: 0
+                      maximum: 400
+                    pesoMedioKg:
+                      type: number
+                      minimum: 0
+                      maximum: 400
+                    pesoMaxKg:
+                      type: number
+                      minimum: 0
+                      maximum: 400
+                  required:
+                    - pesoMinKg
+                    - pesoMedioKg
+                    - pesoMaxKg
+                  additionalProperties: false
+                texto:
+                  type: string
+                  minLength: 1
+                  maxLength: 1000
+              required:
+                - tipo
+                - texto
+              additionalProperties: false
+      security: &a10
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  tipo:
+                    type: string
+                    enum:
+                      - class_fit
+                      - parametro
+                      - sistema
+                  status:
+                    type: string
+                    enum:
+                      - aberta
+                      - aprovada
+                      - recusada
+                  texto:
+                    type: string
+                  autor:
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                    required:
+                      - nome
+                    additionalProperties: false
+                  classe:
+                    nullable: true
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  proposta:
+                    nullable: true
+                    description: "Só em `class_fit`: a faixa de peso proposta (kg)"
+                    type: object
+                    properties:
+                      pesoMinKg:
+                        type: number
+                      pesoMedioKg:
+                        type: number
+                      pesoMaxKg:
+                        type: number
+                    required:
+                      - pesoMinKg
+                      - pesoMedioKg
+                      - pesoMaxKg
+                    additionalProperties: false
+                  faixaAtual:
+                    nullable: true
+                    description: "Só em `class_fit`: a faixa de peso vigente da classe, para o
+                      gestor comparar"
+                    type: object
+                    properties:
+                      pesoMinKg:
+                        type: number
+                      pesoMedioKg:
+                        type: number
+                      pesoMaxKg:
+                        type: number
+                    required:
+                      - pesoMinKg
+                      - pesoMedioKg
+                      - pesoMaxKg
+                    additionalProperties: false
+                  resposta:
+                    nullable: true
+                    type: string
+                  respondidoPor:
+                    nullable: true
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                    required:
+                      - nome
+                    additionalProperties: false
+                  respondidoEm:
+                    nullable: true
+                    description: Instante ISO
+                    type: string
+                  criadoEm:
+                    type: string
+                    description: Instante ISO
+                required:
+                  - id
+                  - tipo
+                  - status
+                  - texto
+                  - autor
+                  - classe
+                  - proposta
+                  - faixaAtual
+                  - resposta
+                  - respondidoPor
+                  - respondidoEm
+                  - criadoEm
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    get:
+      summary: "Sugestões ao gestor: todas (gestor) ou só as minhas (treinador)"
+      tags:
+        - sugestoes
+      description: "Gestor vê todas; treinador, só as próprias. Atleta e IBVAR: 403.
+        Do mais recente para o mais antigo, no máximo 200. `faixaAtual` traz a
+        faixa de peso vigente da classe, para o gestor comparar com a
+        `proposta`."
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - aberta
+              - aprovada
+              - recusada
+          in: query
+          name: status
+          required: false
+      security: *a10
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        tipo:
+                          type: string
+                          enum:
+                            - class_fit
+                            - parametro
+                            - sistema
+                        status:
+                          type: string
+                          enum:
+                            - aberta
+                            - aprovada
+                            - recusada
+                        texto:
+                          type: string
+                        autor:
+                          type: object
+                          properties:
+                            nome:
+                              type: string
+                          required:
+                            - nome
+                          additionalProperties: false
+                        classe:
+                          nullable: true
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                          required:
+                            - id
+                            - nome
+                          additionalProperties: false
+                        proposta:
+                          nullable: true
+                          description: "Só em `class_fit`: a faixa de peso proposta (kg)"
+                          type: object
+                          properties:
+                            pesoMinKg:
+                              type: number
+                            pesoMedioKg:
+                              type: number
+                            pesoMaxKg:
+                              type: number
+                          required:
+                            - pesoMinKg
+                            - pesoMedioKg
+                            - pesoMaxKg
+                          additionalProperties: false
+                        faixaAtual:
+                          nullable: true
+                          description: "Só em `class_fit`: a faixa de peso vigente da classe, para o
+                            gestor comparar"
+                          type: object
+                          properties:
+                            pesoMinKg:
+                              type: number
+                            pesoMedioKg:
+                              type: number
+                            pesoMaxKg:
+                              type: number
+                          required:
+                            - pesoMinKg
+                            - pesoMedioKg
+                            - pesoMaxKg
+                          additionalProperties: false
+                        resposta:
+                          nullable: true
+                          type: string
+                        respondidoPor:
+                          nullable: true
+                          type: object
+                          properties:
+                            nome:
+                              type: string
+                          required:
+                            - nome
+                          additionalProperties: false
+                        respondidoEm:
+                          nullable: true
+                          description: Instante ISO
+                          type: string
+                        criadoEm:
+                          type: string
+                          description: Instante ISO
+                      required:
+                        - id
+                        - tipo
+                        - status
+                        - texto
+                        - autor
+                        - classe
+                        - proposta
+                        - faixaAtual
+                        - resposta
+                        - respondidoPor
+                        - respondidoEm
+                        - criadoEm
+                      additionalProperties: false
+                required:
+                  - itens
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /sugestoes/{id}:
+    put:
+      summary: O gestor aprova ou recusa uma sugestão
+      tags:
+        - sugestoes
+      description: "Só o gestor. `resposta` é obrigatória ao recusar (até 1.000
+        caracteres) e opcional ao aprovar. Só sugestão aberta: já respondida dá
+        409. Aprovar NÃO muda o parâmetro: o front leva o gestor a Parâmetros
+        com a proposta preenchida e a mudança segue por PUT /parametros, com a
+        auditoria de sempre. Gera o aviso `sugestao_respondida` ao autor
+        (`referencia`: `{ sugestaoId, status }`). Auditoria `responder_sugestao`
+        só com ids e status."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                status:
+                  type: string
+                  enum:
+                    - aprovada
+                    - recusada
+                resposta:
+                  type: string
+                  maxLength: 1000
+              required:
+                - status
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            pattern: ^\d{1,18}$
+          in: path
+          name: id
+          required: true
+      security: *a10
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  tipo:
+                    type: string
+                    enum:
+                      - class_fit
+                      - parametro
+                      - sistema
+                  status:
+                    type: string
+                    enum:
+                      - aberta
+                      - aprovada
+                      - recusada
+                  texto:
+                    type: string
+                  autor:
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                    required:
+                      - nome
+                    additionalProperties: false
+                  classe:
+                    nullable: true
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  proposta:
+                    nullable: true
+                    description: "Só em `class_fit`: a faixa de peso proposta (kg)"
+                    type: object
+                    properties:
+                      pesoMinKg:
+                        type: number
+                      pesoMedioKg:
+                        type: number
+                      pesoMaxKg:
+                        type: number
+                    required:
+                      - pesoMinKg
+                      - pesoMedioKg
+                      - pesoMaxKg
+                    additionalProperties: false
+                  faixaAtual:
+                    nullable: true
+                    description: "Só em `class_fit`: a faixa de peso vigente da classe, para o
+                      gestor comparar"
+                    type: object
+                    properties:
+                      pesoMinKg:
+                        type: number
+                      pesoMedioKg:
+                        type: number
+                      pesoMaxKg:
+                        type: number
+                    required:
+                      - pesoMinKg
+                      - pesoMedioKg
+                      - pesoMaxKg
+                    additionalProperties: false
+                  resposta:
+                    nullable: true
+                    type: string
+                  respondidoPor:
+                    nullable: true
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                    required:
+                      - nome
+                    additionalProperties: false
+                  respondidoEm:
+                    nullable: true
+                    description: Instante ISO
+                    type: string
+                  criadoEm:
+                    type: string
+                    description: Instante ISO
+                required:
+                  - id
+                  - tipo
+                  - status
+                  - texto
+                  - autor
+                  - classe
+                  - proposta
+                  - faixaAtual
+                  - resposta
+                  - respondidoPor
+                  - respondidoEm
+                  - criadoEm
                 additionalProperties: false
         "400":
           description: Default Response

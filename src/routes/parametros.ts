@@ -75,7 +75,7 @@ const esquemaParametros = z.object({
   componentesCusto: z.array(z.object({ id: z.string(), nome: z.string() })),
 });
 
-const pesoKg = z
+export const pesoKg = z
   .number("Informe o peso em kg.")
   .min(0, "O peso da classe deve ficar entre 0 e 400 kg.")
   .max(400, "O peso da classe deve ficar entre 0 e 400 kg.");

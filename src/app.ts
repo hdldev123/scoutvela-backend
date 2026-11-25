@@ -39,6 +39,7 @@ import { rotasParametros } from "./routes/parametros.js";
 import { rotasRanking } from "./routes/ranking.js";
 import { rotasTitular } from "./routes/titular.js";
 import { criarArmazenamentoLocal, type ArmazenamentoEvidencias } from "./storage/index.js";
+import { rotasSugestoes } from "./routes/sugestoes.js";
 import { rotasTermo } from "./routes/termo.js";
 import { rotasUsuarios } from "./routes/usuarios.js";
 
@@ -101,6 +102,7 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasUsuarios,
   rotasTermo,
   rotasAvisos,
+  rotasSugestoes,
 ];
 
 export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
