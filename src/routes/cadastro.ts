@@ -453,6 +453,13 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
               classe: z.object({ id: z.string(), nome: z.string() }),
               treinador: z.object({ id: z.string(), nome: z.string() }).nullable(),
               numeroVela: z.string().nullable(),
+              idade: z
+                .number()
+                .int()
+                .nullable()
+                .describe(
+                  "Calculada no servidor; nula com o cadastro incompleto. A data de nascimento não sai na lista",
+                ),
               ativo: z.boolean(),
               termoAceito: z.boolean(),
               cadastroCompleto: z.boolean(),

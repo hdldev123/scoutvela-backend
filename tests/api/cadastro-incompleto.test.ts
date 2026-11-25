@@ -128,6 +128,7 @@ describe("atleta com cadastro incompleto", () => {
         nome: null,
         wsId: "BRAZZ99",
         velaid: null,
+        idade: null,
         cadastroCompleto: false,
         cadastroRecusado: false,
         termoAceito: true,

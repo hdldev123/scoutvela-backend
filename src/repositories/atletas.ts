@@ -1,4 +1,5 @@
 import { termoSql } from "./termo.js";
+import { idadeEm } from "../domain/classfit.js";
 import type { UsuarioAutenticado } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import type {
@@ -273,6 +274,8 @@ export interface AtletaGestao {
   classe: { id: string; nome: string };
   treinador: { id: string; nome: string } | null;
   numeroVela: string | null;
+  /** Calculada no servidor; nula com o cadastro incompleto. A data de nascimento não sai na lista. */
+  idade: number | null;
   ativo: boolean;
   termoAceito: boolean;
   cadastroCompleto: boolean;
@@ -336,6 +339,7 @@ export async function listarAtletasGestao(db: Db, filtros: FiltrosGestao): Promi
     treinador_id: string | null;
     treinador_nome: string | null;
     numero_vela: string | null;
+    data_nascimento: string | null;
     ativo: boolean;
     termo_aceito: boolean;
     cadastro_completo: boolean;
@@ -343,7 +347,8 @@ export async function listarAtletasGestao(db: Db, filtros: FiltrosGestao): Promi
     conta_vinculada: boolean;
   }>(
     `select a.id, a.nome, a.ws_id, a.velaid_codigo, c.id as classe_id, c.nome as classe_nome,
-            a.treinador_id, t.nome as treinador_nome, a.numero_vela, a.ativo,
+            a.treinador_id, t.nome as treinador_nome, a.numero_vela,
+            a.data_nascimento::text as data_nascimento, a.ativo,
             ${termoAceito} as termo_aceito,
             ${cadastroCompletoSql("a")} as cadastro_completo,
             (a.cadastro_recusado_em is not null) as cadastro_recusado,
@@ -363,6 +368,8 @@ export async function listarAtletasGestao(db: Db, filtros: FiltrosGestao): Promi
     classe: { id: l.classe_id, nome: l.classe_nome },
     treinador: l.treinador_id ? { id: l.treinador_id, nome: l.treinador_nome ?? "" } : null,
     numeroVela: l.numero_vela,
+    idade:
+      l.cadastro_completo && l.data_nascimento ? idadeEm(l.data_nascimento, filtros.agora) : null,
     ativo: l.ativo,
     termoAceito: l.termo_aceito,
     cadastroCompleto: l.cadastro_completo,

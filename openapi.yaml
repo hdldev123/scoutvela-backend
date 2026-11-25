@@ -4876,6 +4876,13 @@ paths:
                     numeroVela:
                       nullable: true
                       type: string
+                    idade:
+                      nullable: true
+                      description: Calculada no servidor; nula com o cadastro incompleto. A data de
+                        nascimento não sai na lista
+                      type: integer
+                      minimum: -9007199254740991
+                      maximum: 9007199254740991
                     ativo:
                       type: boolean
                     termoAceito:
@@ -4896,6 +4903,7 @@ paths:
                     - classe
                     - treinador
                     - numeroVela
+                    - idade
                     - ativo
                     - termoAceito
                     - cadastroCompleto

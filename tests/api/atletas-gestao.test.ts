@@ -78,6 +78,7 @@ describe("GET /atletas (lista de gestão)", () => {
         "classe",
         "contaVinculada",
         "id",
+        "idade",
         "nome",
         "numeroVela",
         "termoAceito",
@@ -86,6 +87,14 @@ describe("GET /atletas (lista de gestão)", () => {
         "wsId",
       ].sort(),
     );
+  });
+
+  it("idade calculada no servidor, sem a data de nascimento na resposta (D2)", async () => {
+    const { corpo, texto } = await listar(EMAILS_DEMO.gestor);
+    // Nascido em 05/05/2000; referência 06/11/2026.
+    expect((corpo.find((a) => a.id === semTermoId) as unknown as { idade: number }).idade).toBe(26);
+    expect(texto).not.toMatch(/2000-05-05/);
+    expect(texto).not.toMatch(/dataNascimento/);
   });
 
   it("conta vinculada e treinador vêm do cadastro", async () => {
