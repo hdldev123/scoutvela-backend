@@ -155,7 +155,7 @@ const esquemaAtualizacao = z
       .record(z.string().min(1).max(40), z.unknown())
       .optional()
       .describe(
-        "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4, RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_RESULTADOS. O valor segue o formato lido em GET /parametros. PERF_RESULTADOS (regra provisória P12): { edicoes_max (1 a 20), sem_resultado (nota 0 a 5 do nível sem resultado validado, padrão 0), niveis: { mundial, continental, nacional } }, cada nível uma lista de faixas { ate, nota } em ordem: ate crescente (inteiro, 1 a 500), só a última com ate nulo (qualquer colocação), nota inteira de 0 a 5 que não aumenta",
+        "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4, RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_RESULTADOS, META_EVOLUCAO, MIN_GRUPO_AGREGADO. META_EVOLUCAO (D12): { percentual (0 a 1000) }, meta de alta da média do score da turma sobre o ciclo fechado anterior. MIN_GRUPO_AGREGADO (D12): { minimo (inteiro, 1 a 1000) }, menor grupo que o IBVAR vê em agregado. O valor segue o formato lido em GET /parametros. PERF_RESULTADOS (regra provisória P12): { edicoes_max (1 a 20), sem_resultado (nota 0 a 5 do nível sem resultado validado, padrão 0), niveis: { mundial, continental, nacional } }, cada nível uma lista de faixas { ate, nota } em ordem: ate crescente (inteiro, 1 a 500), só a última com ate nulo (qualquer colocação), nota inteira de 0 a 5 que não aumenta",
       ),
     indicadores: z
       .array(

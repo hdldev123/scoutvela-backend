@@ -11857,6 +11857,352 @@ paths:
                   - erro
                   - mensagem
                 additionalProperties: false
+  /investimento/evolucao:
+    get:
+      summary: Evolução da turma entre ciclos fechados e meta de alta da média
+      tags:
+        - investimento
+      description: "Para cada ciclo fechado (mais antigo primeiro): atletas, média do
+        score, média por pilar, funil por faixa e aptos nos gates, a partir do
+        que o fechamento congelou. Ciclo fechado antes do congelamento completo
+        só tem score e faixa: pilares e gates vêm nulos. `meta` compara os dois
+        últimos ciclos fechados com META_EVOLUCAO (nula sem dois ciclos).
+        `?classeId=` recorta pela classe atual dos atletas (inexistente: 404).
+        Sigilo (D12): para o IBVAR, ciclo com menos de MIN_GRUPO_AGREGADO
+        atletas no recorte vem com `suprimido: true` e os números nulos (a meta
+        fica nula se um dos dois ciclos foi suprimido); o gestor vê tudo. Só
+        agregados: nenhum dado individual. GET /investimento não tem recorte
+        (soma todo o piloto), por isso não aplica o mínimo."
+      parameters:
+        - schema:
+            type: string
+            minLength: 1
+            maxLength: 40
+          in: query
+          name: classeId
+          required: false
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ciclos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        ciclo:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                              format: uuid
+                              pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                            nome:
+                              type: string
+                            fechadoEm:
+                              nullable: true
+                              description: Instante ISO do fechamento
+                              type: string
+                          required:
+                            - id
+                            - nome
+                            - fechadoEm
+                          additionalProperties: false
+                        atletas:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                          description: Atletas do recorte com score congelado neste ciclo
+                        scoreMedio:
+                          nullable: true
+                          description: Média do score; nula se suprimido ou sem atletas
+                          type: number
+                        mediaPorPilar:
+                          nullable: true
+                          description: Nulo em ciclo fechado antes do congelamento completo, ou se
+                            suprimido
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              pilarId:
+                                type: string
+                              nomeCurto:
+                                type: string
+                              media:
+                                nullable: true
+                                type: number
+                            required:
+                              - pilarId
+                              - nomeCurto
+                              - media
+                            additionalProperties: false
+                        funil:
+                          nullable: true
+                          description: Atletas por faixa de score; nulo se suprimido
+                          type: array
+                          items:
+                            type: object
+                            properties:
+                              faixaId:
+                                type: string
+                              nome:
+                                type: string
+                              n:
+                                type: integer
+                                minimum: -9007199254740991
+                                maximum: 9007199254740991
+                            required:
+                              - faixaId
+                              - nome
+                              - n
+                            additionalProperties: false
+                        aptosNosGates:
+                          nullable: true
+                          description: Aptos nos 4 gates; nulo sem congelamento completo ou se suprimido
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        congelamentoCompleto:
+                          type: boolean
+                        suprimido:
+                          type: boolean
+                          description: "true: grupo menor que MIN_GRUPO_AGREGADO para o IBVAR; os números
+                            vêm nulos"
+                      required:
+                        - ciclo
+                        - atletas
+                        - scoreMedio
+                        - mediaPorPilar
+                        - funil
+                        - aptosNosGates
+                        - congelamentoCompleto
+                        - suprimido
+                      additionalProperties: false
+                    description: Ciclos fechados, do mais antigo ao mais recente
+                  meta:
+                    type: object
+                    properties:
+                      percentual:
+                        type: number
+                        description: "META_EVOLUCAO: alta esperada da média, em %"
+                      cicloBase:
+                        nullable: true
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          nome:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                        additionalProperties: false
+                      cicloAtual:
+                        nullable: true
+                        type: object
+                        properties:
+                          id:
+                            type: string
+                            format: uuid
+                            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                          nome:
+                            type: string
+                        required:
+                          - id
+                          - nome
+                        additionalProperties: false
+                      mediaBase:
+                        nullable: true
+                        type: number
+                      mediaAtual:
+                        nullable: true
+                        type: number
+                      variacaoPercentual:
+                        nullable: true
+                        type: number
+                      atingida:
+                        nullable: true
+                        description: Nula sem dois ciclos fechados, com média oculta ou com média base
+                          zero
+                        type: boolean
+                    required:
+                      - percentual
+                      - cicloBase
+                      - cicloAtual
+                      - mediaBase
+                      - mediaAtual
+                      - variacaoPercentual
+                      - atingida
+                    additionalProperties: false
+                required:
+                  - ciclos
+                  - meta
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
   /parametros:
     get:
       summary: Parâmetros da metodologia (pesos, faixas, classes, rubricas, regras)
@@ -12232,15 +12578,19 @@ paths:
                     maxLength: 40
                 regras:
                   description: "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4,
-                    RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_RESULTADOS. O
-                    valor segue o formato lido em GET /parametros.
-                    PERF_RESULTADOS (regra provisória P12): { edicoes_max (1 a
-                    20), sem_resultado (nota 0 a 5 do nível sem resultado
-                    validado, padrão 0), niveis: { mundial, continental,
-                    nacional } }, cada nível uma lista de faixas { ate, nota }
-                    em ordem: ate crescente (inteiro, 1 a 500), só a última com
-                    ate nulo (qualquer colocação), nota inteira de 0 a 5 que não
-                    aumenta"
+                    RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_RESULTADOS,
+                    META_EVOLUCAO, MIN_GRUPO_AGREGADO. META_EVOLUCAO (D12): {
+                    percentual (0 a 1000) }, meta de alta da média do score da
+                    turma sobre o ciclo fechado anterior. MIN_GRUPO_AGREGADO
+                    (D12): { minimo (inteiro, 1 a 1000) }, menor grupo que o
+                    IBVAR vê em agregado. O valor segue o formato lido em GET
+                    /parametros. PERF_RESULTADOS (regra provisória P12): {
+                    edicoes_max (1 a 20), sem_resultado (nota 0 a 5 do nível sem
+                    resultado validado, padrão 0), niveis: { mundial,
+                    continental, nacional } }, cada nível uma lista de faixas {
+                    ate, nota } em ordem: ate crescente (inteiro, 1 a 500), só a
+                    última com ate nulo (qualquer colocação), nota inteira de 0
+                    a 5 que não aumenta"
                   type: object
                   additionalProperties: {}
                 indicadores:

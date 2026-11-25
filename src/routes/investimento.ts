@@ -12,6 +12,8 @@ import {
 } from "../repositories/investimento.js";
 import type { CicloDoPainel, CongeladoDoAtleta } from "../repositories/investimento.js";
 import { carregarParametros } from "../repositories/parametros.js";
+import { carregarCiclosCongelados, classeExiste, lerRegra } from "../repositories/evolucao.js";
+import { evolucaoDaTurma, metaDeEvolucao } from "../domain/index.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 
 const NOMES_GATES: Record<number, string> = {
@@ -115,6 +117,56 @@ const esquemaInvestimento = z.object({
     .describe(
       "Só para o IBVAR: atletas do recorte 'Onde investir' que ficaram fora da lista; nulo para o gestor (e sem congelamento completo)",
     ),
+});
+
+const esquemaEvolucao = z.object({
+  ciclos: z
+    .array(
+      z.object({
+        ciclo: z.object({
+          id: z.uuid(),
+          nome: z.string(),
+          fechadoEm: z.string().nullable().describe("Instante ISO do fechamento"),
+        }),
+        atletas: z.number().int().describe("Atletas do recorte com score congelado neste ciclo"),
+        scoreMedio: z
+          .number()
+          .nullable()
+          .describe("Média do score; nula se suprimido ou sem atletas"),
+        mediaPorPilar: z
+          .array(
+            z.object({ pilarId: z.string(), nomeCurto: z.string(), media: z.number().nullable() }),
+          )
+          .nullable()
+          .describe("Nulo em ciclo fechado antes do congelamento completo, ou se suprimido"),
+        funil: z
+          .array(z.object({ faixaId: z.string(), nome: z.string(), n: z.number().int() }))
+          .nullable()
+          .describe("Atletas por faixa de score; nulo se suprimido"),
+        aptosNosGates: z
+          .number()
+          .int()
+          .nullable()
+          .describe("Aptos nos 4 gates; nulo sem congelamento completo ou se suprimido"),
+        congelamentoCompleto: z.boolean(),
+        suprimido: z
+          .boolean()
+          .describe("true: grupo menor que MIN_GRUPO_AGREGADO para o IBVAR; os números vêm nulos"),
+      }),
+    )
+    .describe("Ciclos fechados, do mais antigo ao mais recente"),
+  meta: z.object({
+    percentual: z.number().describe("META_EVOLUCAO: alta esperada da média, em %"),
+    cicloBase: z.object({ id: z.uuid(), nome: z.string() }).nullable(),
+    cicloAtual: z.object({ id: z.uuid(), nome: z.string() }).nullable(),
+    mediaBase: z.number().nullable(),
+    mediaAtual: z.number().nullable(),
+    variacaoPercentual: z.number().nullable(),
+    atingida: z
+      .boolean()
+      .nullable()
+      .describe("Nula sem dois ciclos fechados, com média oculta ou com média base zero"),
+  }),
 });
 
 /** Um atleta no cálculo do painel, venha do cálculo na hora ou do congelamento do fechamento. */
@@ -309,6 +361,47 @@ export async function rotasInvestimento(app: FastifyInstance): Promise<void> {
         ocultosSemConsentimento:
           ibvar && congelamentoCompleto ? alvo.length - visiveis.length : null,
       };
+    },
+  );
+
+  app.withTypeProvider<ZodTypeProvider>().get(
+    "/investimento/evolucao",
+    {
+      preHandler: [app.autenticar, exigirPapel("gestor", "ibvar")],
+      schema: {
+        tags: ["investimento"],
+        summary: "Evolução da turma entre ciclos fechados e meta de alta da média",
+        description:
+          "Para cada ciclo fechado (mais antigo primeiro): atletas, média do score, média por pilar, funil por faixa e aptos nos gates, a partir do que o fechamento congelou. Ciclo fechado antes do congelamento completo só tem score e faixa: pilares e gates vêm nulos. `meta` compara os dois últimos ciclos fechados com META_EVOLUCAO (nula sem dois ciclos). `?classeId=` recorta pela classe atual dos atletas (inexistente: 404). Sigilo (D12): para o IBVAR, ciclo com menos de MIN_GRUPO_AGREGADO atletas no recorte vem com `suprimido: true` e os números nulos (a meta fica nula se um dos dois ciclos foi suprimido); o gestor vê tudo. Só agregados: nenhum dado individual. GET /investimento não tem recorte (soma todo o piloto), por isso não aplica o mínimo.",
+        security: [{ bearerAuth: [] }],
+        querystring: z.object({ classeId: z.string().min(1).max(40).optional() }),
+        response: {
+          200: esquemaEvolucao,
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+        },
+      },
+    },
+    async (req) => {
+      const classeId = req.query.classeId ?? null;
+      if (classeId && !(await classeExiste(app.db, classeId))) {
+        throw naoEncontrado("Classe não encontrada.");
+      }
+      const [parametros, ciclos, meta, minimo] = await Promise.all([
+        carregarParametros(app.db),
+        carregarCiclosCongelados(app.db, classeId),
+        lerRegra(app.db, "META_EVOLUCAO"),
+        lerRegra(app.db, "MIN_GRUPO_AGREGADO"),
+      ]);
+      const evolucao = evolucaoDaTurma(
+        ciclos,
+        parametros.faixas,
+        parametros.pilares,
+        req.usuario.papel === "ibvar" ? minimo.minimo : null,
+      );
+      return { ciclos: evolucao, meta: metaDeEvolucao(evolucao, meta.percentual) };
     },
   );
 }
