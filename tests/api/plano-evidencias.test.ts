@@ -254,8 +254,9 @@ describe("evidências anexadas", () => {
     ).toBe(400);
   });
 
-  it("acesso por papel: atleta e ibvar não anexam; treinador só nos próprios; falha do storage dá 503", async () => {
-    expect((await enviar(EMAILS_DEMO.atleta, await p.idDe("SP-T07"), corpoPdf())).status).toBe(403);
+  it("acesso por papel: atleta só no próprio cadastro (D11); ibvar não anexa; treinador só nos próprios; falha do storage dá 503", async () => {
+    // O atleta anexando no cadastro de outro atleta recebe 404 (a matriz de acesso fica no SQL).
+    expect((await enviar(EMAILS_DEMO.atleta, idT, corpoPdf())).status).toBe(404);
     expect((await enviar(EMAILS_DEMO.ibvar, idT, corpoPdf())).status).toBe(403);
     expect((await enviar(EMAILS_DEMO.treinadora, await p.idDe("RS-T02"), corpoPdf())).status).toBe(
       404,

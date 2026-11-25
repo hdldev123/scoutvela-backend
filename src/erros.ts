@@ -16,6 +16,8 @@ export const codigosDeErro = [
   "servico_indisponivel",
   /** 410: anexo removido de atleta ainda visível (ex.: DELETE /evidencias/:id); o registro fica, o arquivo não. */
   "evidencia_removida",
+  /** 413: o atleta passaria da cota de anexos (200 MB por padrão). */
+  "cota_excedida",
 ] as const;
 export type CodigoDeErro = (typeof codigosDeErro)[number];
 
@@ -58,6 +60,7 @@ export const mfaObrigatorio = (m = "Ative a verificação em duas etapas para co
 /** O recurso existia e foi removido de propósito. */
 export const evidenciaRemovida = (m = "Esta evidência foi removida.") =>
   new ErroApi(410, "evidencia_removida", m);
+export const cotaExcedida = (m: string) => new ErroApi(413, "cota_excedida", m);
 export const servicoIndisponivel = (m = "Serviço indisponível no momento.") =>
   new ErroApi(503, "servico_indisponivel", m);
 

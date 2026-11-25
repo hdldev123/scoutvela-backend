@@ -156,6 +156,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -194,6 +195,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -301,6 +303,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -339,6 +342,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -377,6 +381,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -415,6 +420,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -453,6 +459,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -533,6 +540,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -571,6 +579,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -646,6 +655,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -684,6 +694,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -722,6 +733,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -892,6 +904,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -930,6 +943,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1120,6 +1134,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1158,6 +1173,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1196,6 +1212,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1277,6 +1294,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1315,6 +1333,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1353,6 +1372,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1391,6 +1411,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1429,6 +1450,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1487,6 +1509,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1525,6 +1548,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1563,6 +1587,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1802,6 +1827,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1840,6 +1866,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -1878,6 +1905,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -2566,6 +2594,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -2604,6 +2633,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -2642,6 +2672,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -2680,6 +2711,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -2790,6 +2822,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -2828,6 +2861,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -2866,6 +2900,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -2904,6 +2939,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -2942,6 +2978,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3084,6 +3121,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3122,6 +3160,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3160,6 +3199,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3198,6 +3238,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3428,6 +3469,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3466,6 +3508,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3504,6 +3547,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3542,6 +3586,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3722,6 +3767,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3760,6 +3806,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3798,6 +3845,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3836,6 +3884,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -3874,6 +3923,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4006,6 +4056,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4044,6 +4095,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4082,6 +4134,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4120,6 +4173,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4158,6 +4212,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4277,6 +4332,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4315,6 +4371,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4353,6 +4410,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4391,6 +4449,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4453,6 +4512,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4491,6 +4551,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4639,6 +4700,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4677,6 +4739,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4715,6 +4778,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4753,6 +4817,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4791,6 +4856,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -4969,6 +5035,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5007,6 +5074,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5045,6 +5113,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5139,6 +5208,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5177,6 +5247,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5261,6 +5332,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5299,6 +5371,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5337,6 +5410,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5375,6 +5449,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5413,6 +5488,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5528,6 +5604,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5566,6 +5643,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5604,6 +5682,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5859,6 +5938,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5897,6 +5977,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -5935,6 +6016,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6021,6 +6103,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6059,6 +6142,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6097,6 +6181,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6135,6 +6220,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6228,6 +6314,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6266,6 +6353,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6304,6 +6392,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6342,6 +6431,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6425,6 +6515,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6463,6 +6554,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6501,6 +6593,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6539,6 +6632,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6684,6 +6778,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6722,6 +6817,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6827,6 +6923,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6865,6 +6962,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6903,6 +7001,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -6941,6 +7040,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -7110,6 +7210,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -7148,6 +7249,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -7186,6 +7288,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -7224,6 +7327,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -7262,6 +7366,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -7599,6 +7704,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -7637,6 +7743,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -7675,6 +7782,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -7713,6 +7821,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -7957,6 +8066,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -7995,6 +8105,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -8384,6 +8495,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -8422,6 +8534,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -8460,6 +8573,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -8556,6 +8670,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -8594,6 +8709,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -8632,6 +8748,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -8744,6 +8861,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -8782,6 +8900,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -8820,6 +8939,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -8858,6 +8978,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -8968,6 +9089,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9006,6 +9128,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9044,6 +9167,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9082,6 +9206,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9120,6 +9245,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9237,6 +9363,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9275,6 +9402,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9313,6 +9441,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9351,6 +9480,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9389,6 +9519,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9528,6 +9659,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9566,6 +9698,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9604,6 +9737,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9642,6 +9776,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9680,6 +9815,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9848,6 +9984,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9886,6 +10023,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9924,6 +10062,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -9962,6 +10101,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10000,6 +10140,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10146,6 +10287,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10184,6 +10326,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10222,6 +10365,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10260,6 +10404,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10298,6 +10443,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10462,6 +10608,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10500,6 +10647,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10538,6 +10686,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10719,6 +10868,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10757,6 +10907,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10795,6 +10946,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10881,6 +11033,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10919,6 +11072,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10957,6 +11111,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -10995,6 +11150,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11123,6 +11279,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11161,6 +11318,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11320,6 +11478,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11358,6 +11517,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11396,6 +11556,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11434,6 +11595,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11472,6 +11634,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11592,6 +11755,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11630,6 +11794,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11668,6 +11833,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11706,6 +11872,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11744,6 +11911,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11916,6 +12084,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11954,6 +12123,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -11992,6 +12162,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12030,6 +12201,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12068,6 +12240,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12089,13 +12262,16 @@ paths:
                 additionalProperties: false
   /atletas/{id}/evidencias:
     post:
-      summary: Anexa uma evidência (PDF, JPEG ou PNG de até 5 MB) ao atleta
+      summary: Anexa um arquivo (PDF, JPEG ou PNG de até 5 MB) ao atleta
       tags:
         - evidencias
-      description: Gestor, ou treinador dos próprios atletas. O arquivo vai em base64,
-        é conferido pelo tamanho e pela assinatura e fica no Storage privado.
-        Use o `id` retornado como `anexoId` ao lançar a nota. Limite de 20
-        envios por minuto por usuário (429 `limite_excedido`).
+      description: "Gestor, treinador dos próprios atletas, ou o atleta no próprio
+        cadastro (outro atleta: 404). IBVAR: 403. O arquivo vai em base64, é
+        conferido pelo tamanho e pela assinatura e fica no Storage privado.
+        `categoria`: evidencia (padrão), sumula ou balanca. Use o `id` retornado
+        como `anexoId` ao lançar a nota. Cota de 200 MB por atleta (soma dos
+        anexos não removidos): acima dela, 413 `cota_excedida`. Limite de 20
+        envios por minuto por usuário (429 `limite_excedido`)."
       requestBody:
         required: true
         content:
@@ -12121,6 +12297,13 @@ paths:
                   type: string
                   minLength: 1
                   maxLength: 64
+                categoria:
+                  default: evidencia
+                  type: string
+                  enum:
+                    - evidencia
+                    - sumula
+                    - balanca
               required:
                 - nomeArquivo
                 - tipoMime
@@ -12159,6 +12342,26 @@ paths:
                   indicadorId:
                     nullable: true
                     type: string
+                  categoria:
+                    type: string
+                    enum:
+                      - evidencia
+                      - sumula
+                      - balanca
+                    description: evidencia, sumula ou balanca
+                  enviadoPor:
+                    type: object
+                    properties:
+                      papel:
+                        type: string
+                        enum:
+                          - gestor
+                          - treinador
+                          - atleta
+                    required:
+                      - papel
+                    additionalProperties: false
+                    description: Papel de quem enviou o arquivo (sem nome nem e-mail)
                   enviadoEm:
                     type: string
                     description: Instante ISO
@@ -12174,6 +12377,8 @@ paths:
                   - tipoMime
                   - tamanhoBytes
                   - indicadorId
+                  - categoria
+                  - enviadoPor
                   - enviadoEm
                   - removidoEm
                 additionalProperties: false
@@ -12196,6 +12401,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12234,6 +12440,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12272,6 +12479,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12310,6 +12518,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12348,6 +12557,46 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "413":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12386,6 +12635,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12424,6 +12674,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12444,12 +12695,23 @@ paths:
                   - mensagem
                 additionalProperties: false
     get:
-      summary: Lista as evidências anexadas ao atleta (mais recentes primeiro)
+      summary: Lista os anexos do atleta (mais recentes primeiro)
       tags:
         - evidencias
       description: Gestor, treinador dos próprios atletas e o próprio atleta. IBVAR
-        não tem acesso.
+        não tem acesso. Cada item traz `categoria` e `enviadoPor.papel`. Filtro
+        opcional `categoria`. `usoBytes` e `cotaBytes` mostram a cota de anexos
+        do atleta (soma de todos os anexos não removidos, sem o filtro).
       parameters:
+        - schema:
+            type: string
+            enum:
+              - evidencia
+              - sumula
+              - balanca
+          in: query
+          name: categoria
+          required: false
         - schema:
             type: string
             format: uuid
@@ -12487,6 +12749,26 @@ paths:
                         indicadorId:
                           nullable: true
                           type: string
+                        categoria:
+                          type: string
+                          enum:
+                            - evidencia
+                            - sumula
+                            - balanca
+                          description: evidencia, sumula ou balanca
+                        enviadoPor:
+                          type: object
+                          properties:
+                            papel:
+                              type: string
+                              enum:
+                                - gestor
+                                - treinador
+                                - atleta
+                          required:
+                            - papel
+                          additionalProperties: false
+                          description: Papel de quem enviou o arquivo (sem nome nem e-mail)
                         enviadoEm:
                           type: string
                           description: Instante ISO
@@ -12503,11 +12785,64 @@ paths:
                         - tipoMime
                         - tamanhoBytes
                         - indicadorId
+                        - categoria
+                        - enviadoPor
                         - enviadoEm
                         - removidoEm
                       additionalProperties: false
+                  usoBytes:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                    description: Soma dos anexos não removidos do atleta
+                  cotaBytes:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                    description: Cota de anexos por atleta
                 required:
                   - anexos
+                  - usoBytes
+                  - cotaBytes
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
                 additionalProperties: false
         "401":
           description: Default Response
@@ -12528,6 +12863,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12566,6 +12902,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12604,6 +12941,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12678,6 +13016,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12716,6 +13055,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12754,6 +13094,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12792,6 +13133,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12830,6 +13172,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12854,13 +13197,14 @@ paths:
       summary: Remove um anexo que ainda não foi ligado a nenhuma avaliação
       tags:
         - evidencias
-      description: "Gestor, ou quem enviou o anexo (treinador) desde que ainda tenha
-        acesso ao atleta. Só vale para anexo sem avaliação ligada (`anexoId`):
-        anexo já ligado responde 409; inexistente ou de atleta fora do acesso,
-        404; já removido, 410. O arquivo sai do Storage primeiro (falha = 503 e
-        nada muda). O registro não é apagado: fica marcado como removido
-        (`removidoEm`, nome `removido`), a mesma marcação da anonimização.
-        Auditoria `remover_anexo` só com ids."
+      description: "Gestor, ou quem enviou o anexo (treinador, ou o próprio atleta no
+        próprio cadastro) desde que ainda tenha acesso ao atleta; anexo de outro
+        atleta dá 404 para o atleta. Só vale para anexo sem avaliação ligada
+        (`anexoId`): anexo já ligado responde 409; inexistente ou de atleta fora
+        do acesso, 404; já removido, 410. O arquivo sai do Storage primeiro
+        (falha = 503 e nada muda). O registro não é apagado: fica marcado como
+        removido (`removidoEm`, nome `removido`), a mesma marcação da
+        anonimização. Auditoria `remover_anexo` só com ids."
       parameters:
         - schema:
             type: string
@@ -12900,6 +13244,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12938,6 +13283,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -12976,6 +13322,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13014,6 +13361,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13052,6 +13400,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13090,6 +13439,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13189,6 +13539,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13227,6 +13578,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13369,6 +13721,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13407,6 +13760,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13445,6 +13799,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13483,6 +13838,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13521,6 +13877,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13642,6 +13999,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13680,6 +14038,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13718,6 +14077,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13756,6 +14116,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13794,6 +14155,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13863,6 +14225,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13901,6 +14264,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13939,6 +14303,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -13977,6 +14342,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14015,6 +14381,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14053,6 +14420,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14124,6 +14492,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14162,6 +14531,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14232,6 +14602,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14270,6 +14641,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14308,6 +14680,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14386,6 +14759,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14424,6 +14798,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14462,6 +14837,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14500,6 +14876,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14586,6 +14963,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14624,6 +15002,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14739,6 +15118,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14777,6 +15157,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:
@@ -14815,6 +15196,7 @@ paths:
                       - mfa_obrigatorio
                       - servico_indisponivel
                       - evidencia_removida
+                      - cota_excedida
                   mensagem:
                     type: string
                   campos:

@@ -284,7 +284,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
                from pedidos_titular where atleta_id = $1::uuid order by criado_em, id`,
         ),
         q<Record<string, unknown>>(
-          `select e.id, e.nome_arquivo as "nomeArquivo", e.tipo_mime as "tipoMime", e.tamanho_bytes as "tamanhoBytes",
+          `select e.id, e.nome_arquivo as "nomeArquivo", e.categoria, e.tipo_mime as "tipoMime", e.tamanho_bytes as "tamanhoBytes",
                     e.enviado_em as "enviadoEm", i.nome as indicador, u.nome as "enviadoPor",
                     (e.removido_em is not null) as removida, e.removido_em as "removidoEm"
                from evidencias_anexos e

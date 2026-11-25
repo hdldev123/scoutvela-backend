@@ -2,6 +2,19 @@ import type { Db } from "../db/db.js";
 import { travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { ErroArmazenamento, type ArmazenamentoEvidencias } from "../storage/index.js";
 
+export const CATEGORIAS_ANEXO = ["evidencia", "sumula", "balanca"] as const;
+export type CategoriaAnexo = (typeof CATEGORIAS_ANEXO)[number];
+
+/** Soma dos bytes dos anexos do atleta que ainda não foram removidos. */
+export async function bytesUsadosPeloAtleta(db: Db, atletaId: string): Promise<number> {
+  const r = await db.query<{ total: string }>(
+    `select coalesce(sum(tamanho_bytes), 0)::text as total
+       from evidencias_anexos where atleta_id = $1::uuid and removido_em is null`,
+    [atletaId],
+  );
+  return Number(r.rows[0]?.total ?? 0);
+}
+
 export type ResultadoRemocaoAnexo = "removido" | "vinculado" | "ja_removido" | "inexistente";
 
 export interface DepsRemocaoAnexo {

@@ -106,14 +106,15 @@ describe("DELETE /evidencias/:id e limpeza de anexos", () => {
     expect(await removidoEm(anexo)).toBeNull();
   });
 
-  it("acesso por papel: gestor remove de qualquer um; treinador só o que enviou e no próprio atleta; atleta e IBVAR não", async () => {
+  it("acesso por papel: gestor remove de qualquer um; treinador só o que enviou e no próprio atleta; atleta de outro cadastro 404; IBVAR 403", async () => {
     const doGestor = await enviar(EMAILS_DEMO.gestor);
     // Treinadora com acesso ao atleta, mas não foi quem enviou: 403.
     expect((await chamar(EMAILS_DEMO.treinadora, "DELETE", `/evidencias/${doGestor}`)).status).toBe(
       403,
     );
+    // Atleta (SP-T07) e anexo de outro atleta (SC-T01): 404, sem revelar que existe.
     expect((await chamar(EMAILS_DEMO.atleta, "DELETE", `/evidencias/${doGestor}`)).status).toBe(
-      403,
+      404,
     );
     expect((await chamar(EMAILS_DEMO.ibvar, "DELETE", `/evidencias/${doGestor}`)).status).toBe(403);
     // Anexo de atleta que não é dela: 404.
