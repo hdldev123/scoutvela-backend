@@ -32,15 +32,16 @@ describe("GET /me", () => {
         "parametros",
         "auditoria",
         "sugestoes",
+        "mensagens",
       ],
       telaInicial: "ranking",
     },
     {
       papel: "treinador",
-      telas: ["ranking", "avaliar", "revisoes", "sugestoes"],
+      telas: ["ranking", "avaliar", "revisoes", "sugestoes", "mensagens"],
       telaInicial: "ranking",
     },
-    { papel: "atleta", telas: ["painel", "ficha"], telaInicial: "painel" },
+    { papel: "atleta", telas: ["painel", "ficha", "mensagens"], telaInicial: "painel" },
     { papel: "ibvar", telas: ["investimento", "ranking"], telaInicial: "investimento" },
   ];
 
