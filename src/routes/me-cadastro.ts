@@ -5,6 +5,7 @@ import { exigirPapel } from "../auth/plugin.js";
 import { dataIso, idadeEm } from "../domain/index.js";
 import { conflito, esquemaErro, naoEncontrado, requisicaoInvalida } from "../erros.js";
 import { erroAtletaAnonimizado } from "../repositories/anonimizado.js";
+import { avisarTreinadorDoAtleta } from "../repositories/avisos.js";
 
 const IDADE_MINIMA_PILOTO = 18;
 const IDADE_MAXIMA_PLAUSIVEL = 100;
@@ -122,6 +123,12 @@ export async function rotasMeCadastro(app: FastifyInstance): Promise<void> {
            values ($1::uuid, 'completar_cadastro', 'atletas', $2, $3::jsonb, $4)`,
           [u.id, atletaId, JSON.stringify({ campos: ["nome", "genero", "dataNascimento"] }), agora],
         );
+        await avisarTreinadorDoAtleta(tx, atletaId, {
+          tipo: "atleta_completou_cadastro",
+          referencia: {},
+          autorId: u.id,
+          em: agora,
+        });
         return false;
       });
 

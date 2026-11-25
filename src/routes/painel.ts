@@ -12,6 +12,7 @@ import {
   lancamentoEhElegivel,
   listarLancamentosElegiveis,
 } from "../repositories/revisoes.js";
+import { avisarTreinadorDoAtleta } from "../repositories/avisos.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 
@@ -453,6 +454,12 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
             geraSugestao: notaSugerida !== null,
           },
         );
+        await avisarTreinadorDoAtleta(tx, usuario.atletaId!, {
+          tipo: "atleta_respondeu",
+          referencia: { indicadorId },
+          autorId: usuario.id,
+          em: agora,
+        });
       });
       return reply.code(201).send({ ok: true as const, notaSugerida });
     },

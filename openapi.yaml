@@ -486,17 +486,18 @@ paths:
         - sessao
       description: "Só as chaves do papel, sempre presentes (0 quando nada pede
         atenção). Gestor: `revisoes` (pedidos de revisão e do titular abertos),
-        `cadastro` (atletas ativos sem aceite da versão vigente do termo) e
-        `investimento`. Treinador: `revisoes` (pedidos de revisão abertos dos
-        próprios atletas) e `avaliar` (próprios atletas com indicadores
-        pendentes no ciclo aberto; 0 sem ciclo aberto). Atleta: `painel`
-        (perguntas ainda sem resposta, hoje contadas só com ciclo aberto, + 1 se
-        o termo vigente está pendente + respostas a pedidos de revisão e do
-        titular dadas depois da última marcação de visto). IBVAR: só
-        `investimento`. `investimento` (gestor e IBVAR) vale 1 quando há ciclo
-        fechado depois da última vez que a pessoa marcou a tela como vista (PUT
-        /me/notificacoes/vistas com chave `investimento`), senão 0. `total` é a
-        soma. Feito para consulta a cada 60 s."
+        `cadastro` (atletas ativos sem aceite da versão vigente do termo),
+        `investimento` e `avisos` (avisos não lidos, D8). Treinador: `revisoes`
+        (pedidos de revisão abertos dos próprios atletas), `avaliar` (próprios
+        atletas com indicadores pendentes no ciclo aberto; 0 sem ciclo aberto) e
+        `avisos`. Atleta: `avisos` e `painel` (perguntas ainda sem resposta,
+        hoje contadas só com ciclo aberto, + 1 se o termo vigente está pendente
+        + respostas a pedidos de revisão e do titular dadas depois da última
+        marcação de visto). IBVAR: só `investimento`. `investimento` (gestor e
+        IBVAR) vale 1 quando há ciclo fechado depois da última vez que a pessoa
+        marcou a tela como vista (PUT /me/notificacoes/vistas com chave
+        `investimento`), senão 0. `total` é a soma. Feito para consulta a cada
+        60 s."
       security: &a1
         - bearerAuth: []
       responses:
@@ -16117,6 +16118,723 @@ paths:
                   - mensagem
                 additionalProperties: false
         "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /me/avisos:
+    get:
+      summary: Meus avisos (sino), do mais recente para o mais antigo
+      tags:
+        - avisos
+      description: "Avisos do próprio usuário (gestor, treinador e atleta). IBVAR não
+        recebe avisos: lista vazia. Paginação por data: `antesDe` é o
+        `proximoAntesDe` da página anterior (instante ISO; só vêm avisos criados
+        antes dele). `limite` de 1 a 100 (padrão 20). Aviso que cita um atleta
+        só aparece enquanto o usuário pode ver esse atleta. Para `pedido_ajuste`
+        o item traz `mensagem` e `indicador` (o destinatário é o próprio
+        atleta); o front monta a frase dos demais tipos."
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          in: query
+          name: apenasNaoLidos
+          required: false
+        - schema:
+            default: 20
+            type: integer
+            minimum: 1
+            maximum: 100
+          in: query
+          name: limite
+          required: false
+        - schema:
+            type: string
+            format: date-time
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+          in: query
+          name: antesDe
+          required: false
+      security: &a9
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        tipo:
+                          type: string
+                          enum:
+                            - atleta_respondeu
+                            - atleta_anexou
+                            - atleta_atualizou_perfil
+                            - atleta_completou_cadastro
+                            - pedido_ajuste
+                            - sugestao_respondida
+                        criadoEm:
+                          type: string
+                          description: Instante ISO
+                        lidoEm:
+                          nullable: true
+                          description: Instante ISO; nulo = não lido
+                          type: string
+                        atleta:
+                          nullable: true
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                          required:
+                            - id
+                            - nome
+                          additionalProperties: false
+                        referencia:
+                          type: object
+                          additionalProperties: {}
+                          description: "Só ids e nomes de campo: `{ indicadorId }`, `{ anexoId, categoria
+                            }`, `{ campos }`, `{ pedidoAjusteId }`, `{
+                            sugestaoId, status }`"
+                        criadoPor:
+                          nullable: true
+                          type: object
+                          properties:
+                            nome:
+                              type: string
+                            papel:
+                              type: string
+                          required:
+                            - nome
+                            - papel
+                          additionalProperties: false
+                        mensagem:
+                          nullable: true
+                          description: Texto puro do pedido de ajuste (tipo `pedido_ajuste`); nulo nos
+                            demais tipos
+                          type: string
+                        indicador:
+                          nullable: true
+                          description: Indicador do pedido de ajuste ou da resposta
+                            (`referencia.indicadorId`)
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                          required:
+                            - id
+                            - nome
+                          additionalProperties: false
+                      required:
+                        - id
+                        - tipo
+                        - criadoEm
+                        - lidoEm
+                        - atleta
+                        - referencia
+                        - criadoPor
+                        - mensagem
+                        - indicador
+                      additionalProperties: false
+                  proximoAntesDe:
+                    nullable: true
+                    description: Passe em `antesDe` para a próxima página; nulo = não há mais
+                    type: string
+                  naoLidos:
+                    type: integer
+                    minimum: 0
+                    maximum: 9007199254740991
+                    description: Total de não lidos do usuário (não só da página)
+                required:
+                  - itens
+                  - proximoAntesDe
+                  - naoLidos
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /me/avisos/lidos:
+    put:
+      summary: Marca todos os meus avisos como lidos
+      tags:
+        - avisos
+      description: "Gestor, treinador e atleta. IBVAR: 403. Não gera auditoria (dado
+        de interface)."
+      security: *a9
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  marcados:
+                    type: integer
+                    minimum: 0
+                    maximum: 9007199254740991
+                required:
+                  - marcados
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /me/avisos/{id}/lido:
+    put:
+      summary: Marca um aviso meu como lido
+      tags:
+        - avisos
+      description: "Só o dono do aviso (o de outra pessoa responde 404). Repetir é
+        aceito e mantém a primeira data. Gestor, treinador e atleta; IBVAR: 403.
+        Não gera auditoria (dado de interface)."
+      parameters:
+        - schema:
+            type: string
+            pattern: ^\d{1,18}$
+          in: path
+          name: id
+          required: true
+      security: *a9
+      responses:
+        "204":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: string
+                nullable: true
+                enum:
+                  - null
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/pedidos-ajuste:
+    post:
+      summary: Pede ao atleta que revise algo (indicador ou perfil)
+      tags:
+        - avisos
+      description: "Gestor, ou o treinador do atleta (o de outro atleta recebe 404).
+        Atleta e IBVAR: 403. `indicadorId` é opcional: sem ele o pedido é sobre
+        o perfil ou algo geral. `mensagem` é texto puro de 1 a 300 caracteres (o
+        front não interpreta HTML). Grava o pedido (só inserção) e cria o aviso
+        `pedido_ajuste` na conta do atleta; se o atleta ainda não tem conta de
+        login, grava o pedido e responde `avisoEnviado: false`. A auditoria
+        guarda só ids (nunca a mensagem)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                mensagem:
+                  type: string
+                  minLength: 1
+                  maxLength: 300
+                indicadorId:
+                  type: string
+                  minLength: 1
+                  maxLength: 64
+              required:
+                - mensagem
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: *a9
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  avisoEnviado:
+                    type: boolean
+                    description: Falso quando o atleta ainda não tem conta de login (o pedido fica
+                      gravado)
+                required:
+                  - id
+                  - avisoEnviado
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
           description: Default Response
           content:
             application/json:

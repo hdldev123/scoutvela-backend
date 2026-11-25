@@ -20,6 +20,7 @@ import {
   bytesUsadosPeloAtleta,
   removerAnexoNaoVinculado,
 } from "../servicos/anexos.js";
+import { avisarTreinadorDoAtleta } from "../repositories/avisos.js";
 import { removerOuPendenciar } from "../servicos/arquivos-pendentes.js";
 import { ErroArmazenamento } from "../storage/index.js";
 import { TIPOS_ARQUIVO, decodificarArquivo, limparMetadados } from "../servicos/arquivo-base64.js";
@@ -237,6 +238,14 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
               referencia,
             ],
           );
+          if (usuario.papel === "atleta") {
+            await avisarTreinadorDoAtleta(tx, base.id, {
+              tipo: "atleta_anexou",
+              referencia: { anexoId: linha.id, categoria: body.categoria },
+              autorId: usuario.id,
+              em: referencia,
+            });
+          }
           return linha;
         });
       } catch (e) {

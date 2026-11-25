@@ -11,7 +11,7 @@ import type { ArmazenamentoEvidencias } from "../storage/index.js";
  * porque o campo é obrigatório e único), código VelaID (vira `ANON-xxxxxxxx`), a linha
  * do VelaID, os dados pessoais da conta de login, a conta no Supabase Auth, a foto de perfil, os
  * arquivos de evidência, os textos livres da série histórica (evidência das notas e das medidas,
- * justificativa de gate, plano individual, pedidos de revisão e do titular, nome do evento e link
+ * justificativa de gate, plano individual, pedidos de revisão, de ajuste e do titular, avisos, nome do evento e link
  * dos resultados de regata) e as chaves com dado pessoal da trilha de auditoria. A data de
  * nascimento vira 1º de julho do mesmo ano.
  * Fica: a série histórica (valores, datas, status), ligada ao atleta_id e sem identificação direta.
@@ -226,7 +226,7 @@ async function anonimizarNoBanco(
 export function textoDaResposta(em: Date): string {
   return [
     `Dados pessoais anonimizados em ${dataBr(em)}.`,
-    "Removidos: nome, e-mail de contato, telefone, validade do passaporte, clube, cidade, UF, número de vela, ID World Sailing e código VelaID (trocado por um código anônimo); o registro no VelaID; os dados da conta de login (nome, e-mail e acesso) e a conta no serviço de login; a foto de perfil e os arquivos de evidência; as aptidões conferidas (dado de saúde); os textos livres da série histórica (evidências das notas e das medidas, justificativas de gates, plano individual, pedidos de revisão e do titular, nome e link dos resultados de regata); e os dados pessoais da trilha de auditoria. O compartilhamento com o IBVAR e o aceite do termo foram revogados.",
+    "Removidos: nome, e-mail de contato, telefone, validade do passaporte, clube, cidade, UF, número de vela, ID World Sailing e código VelaID (trocado por um código anônimo); o registro no VelaID; os dados da conta de login (nome, e-mail e acesso) e a conta no serviço de login; a foto de perfil e os arquivos de evidência; as aptidões conferidas (dado de saúde); os pedidos de ajuste e os avisos sobre o atleta; os textos livres da série histórica (evidências das notas e das medidas, justificativas de gates, plano individual, pedidos de revisão e do titular, nome e link dos resultados de regata); e os dados pessoais da trilha de auditoria. O compartilhamento com o IBVAR e o aceite do termo foram revogados.",
     "Alterado: a data de nascimento foi generalizada para 1º de julho do mesmo ano.",
     "Mantidos, sem identificação direta e ligados apenas a um identificador interno: notas, respostas do questionário, medidas corporais, resultados de regata (nível, data, posição, tamanho da frota e pontos), status e datas das decisões de gate, financeiro da campanha, pontuações dos ciclos e a trilha de auditoria (quem fez o quê e quando, sem dados pessoais).",
   ].join(" ");
@@ -258,6 +258,10 @@ async function removerTextosLivres(
   // Aptidão é dado de saúde: as linhas saem (a tabela é só de inserção; o gatilho aceita este DELETE
   // só com a variável da anonimização igual ao atleta).
   await tx.query(`delete from aptidoes where atleta_id = $1::uuid`, [atletaId]);
+  // Pedidos de ajuste (texto livre sobre o atleta) e avisos que citam o atleta (do treinador e dele).
+  // `pedidos_ajuste` é só de inserção; o gatilho aceita este DELETE pela mesma variável da aptidão.
+  await tx.query(`delete from pedidos_ajuste where atleta_id = $1::uuid`, [atletaId]);
+  await tx.query(`delete from avisos where atleta_id = $1::uuid`, [atletaId]);
   await q(`update avaliacoes set evidencia = $2 where atleta_id = $1::uuid and evidencia <> $2`);
   await q(
     `update medidas_corporais set evidencia = $2 where atleta_id = $1::uuid and evidencia <> $2`,

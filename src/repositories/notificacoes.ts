@@ -1,5 +1,6 @@
 import type { UsuarioAutenticado } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
+import { contarAvisosNaoLidos } from "./avisos.js";
 import { pendenciasDoCiclo } from "./pendencias.js";
 import { termoSql } from "./termo.js";
 
@@ -35,7 +36,7 @@ export async function contarNotificacoes(
 ): Promise<Record<string, number>> {
   switch (usuario.papel) {
     case "gestor": {
-      const [r, investimento] = await Promise.all([
+      const [r, investimento, avisos] = await Promise.all([
         db.query<{ revisoes: string; cadastro: string }>(
           `select ((select count(*) from pedidos_revisao where status = 'aberto')
                + (select count(*) from pedidos_titular where status = 'aberto'))::text as revisoes,
@@ -46,15 +47,17 @@ export async function contarNotificacoes(
           [agora],
         ),
         avisoCicloFechado(db, usuario.id),
+        contarAvisosNaoLidos(db, usuario),
       ]);
       return {
         revisoes: contagem(r.rows[0]?.revisoes),
         cadastro: contagem(r.rows[0]?.cadastro),
         investimento,
+        avisos,
       };
     }
     case "treinador": {
-      const [rev, ciclo] = await Promise.all([
+      const [rev, ciclo, avisos] = await Promise.all([
         db.query<{ n: string }>(
           `select count(*)::text as n from pedidos_revisao r
              join atletas a on a.id = r.atleta_id
@@ -62,17 +65,18 @@ export async function contarNotificacoes(
           [usuario.id],
         ),
         cicloAbertoId(db),
+        contarAvisosNaoLidos(db, usuario),
       ]);
       // Mesma regra do job de lembretes e de GET /ciclos/:id/pendencias.
       const avaliar = ciclo
         ? ((await pendenciasDoCiclo(db, ciclo, agora, { treinadorId: usuario.id })).treinadores[0]
             ?.atletasPendentes.length ?? 0)
         : 0;
-      return { revisoes: contagem(rev.rows[0]?.n), avaliar };
+      return { revisoes: contagem(rev.rows[0]?.n), avaliar, avisos };
     }
     case "atleta": {
-      if (!usuario.atletaId) return { painel: 0 };
-      const [extras, ciclo] = await Promise.all([
+      if (!usuario.atletaId) return { painel: 0, avisos: await contarAvisosNaoLidos(db, usuario) };
+      const [extras, ciclo, avisos] = await Promise.all([
         db.query<{ termo: boolean; incompleto: boolean; respostas: string }>(
           `select not ${termoSql.aceitoVigente("$1::uuid", "$2")} as termo,
                   (select cadastro_completo_em is null from atletas where id = $1::uuid) as incompleto,
@@ -87,6 +91,7 @@ export async function contarNotificacoes(
           [usuario.atletaId, agora, usuario.id],
         ),
         cicloAbertoId(db),
+        contarAvisosNaoLidos(db, usuario),
       ]);
       // Perguntas ainda sem resposta (regra de repositories/pendencias.ts: não é por ciclo).
       const perguntas = ciclo
@@ -96,6 +101,7 @@ export async function contarNotificacoes(
       const l = extras.rows[0];
       return {
         painel: perguntas + (l?.termo ? 1 : 0) + (l?.incompleto ? 1 : 0) + contagem(l?.respostas),
+        avisos,
       };
     }
     case "ibvar":

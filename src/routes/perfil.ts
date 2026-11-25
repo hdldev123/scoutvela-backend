@@ -12,6 +12,7 @@ import {
   requisicaoInvalidaCampos,
   servicoIndisponivel,
 } from "../erros.js";
+import { avisarTreinadorDoAtleta } from "../repositories/avisos.js";
 import { lerContatoSensivel } from "../repositories/contato-sensivel.js";
 import { esquemaAptidao } from "./aptidao.js";
 import { TIPOS_ARQUIVO, decodificarArquivo, limparMetadados } from "../servicos/arquivo-base64.js";
@@ -294,6 +295,14 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
           await tx.query(`update atletas set ${sets.join(", ")} where id = $1::uuid`, params);
         }
         await auditar(tx, u.id, "editar_perfil", { campos }, app.agora());
+        if (u.papel === "atleta" && u.atletaId) {
+          await avisarTreinadorDoAtleta(tx, u.atletaId, {
+            tipo: "atleta_atualizou_perfil",
+            referencia: { campos },
+            autorId: u.id,
+            em: app.agora(),
+          });
+        }
       });
       return montarPerfil(app, u, req.log);
     },

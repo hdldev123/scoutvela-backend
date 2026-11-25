@@ -58,13 +58,18 @@ describe("notificações do menu (GET /me/notificacoes, PUT /me/notificacoes/vis
 
   it("chaves por papel (sempre presentes, mesmo com 0) e total é a soma", async () => {
     const g = await contagens(EMAILS_DEMO.gestor);
-    expect(Object.keys(g.contagens).sort()).toEqual(["cadastro", "investimento", "revisoes"]);
-    expect(g.total).toBe(g.contagens.cadastro! + g.contagens.revisoes! + g.contagens.investimento!);
+    expect(Object.keys(g.contagens).sort()).toEqual([
+      "avisos",
+      "cadastro",
+      "investimento",
+      "revisoes",
+    ]);
+    expect(g.total).toBe(Object.values(g.contagens).reduce((s, n) => s + n, 0));
     const t = await contagens(EMAILS_DEMO.treinadora);
-    expect(Object.keys(t.contagens).sort()).toEqual(["avaliar", "revisoes"]);
+    expect(Object.keys(t.contagens).sort()).toEqual(["avaliar", "avisos", "revisoes"]);
     const a = await contagens(EMAILS_DEMO.atleta);
-    expect(Object.keys(a.contagens)).toEqual(["painel"]);
-    expect(a.total).toBe(a.contagens.painel);
+    expect(Object.keys(a.contagens).sort()).toEqual(["avisos", "painel"]);
+    expect(a.total).toBe(a.contagens.painel! + a.contagens.avisos!);
   });
 
   it("treinador: avaliar conta os atletas próprios com indicador T sem nota no ciclo; sem ciclo aberto, 0", async () => {
