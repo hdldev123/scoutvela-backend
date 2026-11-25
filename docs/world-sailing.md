@@ -45,7 +45,7 @@ Investigação feita em 24/11/2026, a partir da reunião de alinhamento IBVAR de
   | Modo | Comportamento |
   | --- | --- |
   | `desligado` | Padrão em produção. A busca não roda |
-  | `simulado` | Padrão em desenvolvimento e homologação. Usa dados fictícios: `BRATESTE01` com resultados e ranking, `BRATESTE02` vazio. É recusado em produção |
+  | `simulado` | Padrão em desenvolvimento e homologação. Usa dados fictícios: `BRATESTE01` com resultados e ranking, `BRATESTE02` vazio e `BRASPT08` (Davi Moretto, atleta do seed) com o mesmo perfil do `BRATESTE01`. É recusado em produção |
   | `real` | Chama o site. Fora da produção gera um aviso no log |
 
 - **Validação com dado real:** um teste pontual com GBRHM15 no ambiente local, a pedido do usuário. Depois o ambiente volta ao simulador e o banco local é recriado.

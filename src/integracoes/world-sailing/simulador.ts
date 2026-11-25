@@ -3,8 +3,9 @@ import type { FonteWorldSailing } from "./tipos.js";
 
 /**
  * Fonte simulada: dados FICTÍCIOS (nomes, datas, eventos e posições inventados) para desenvolvimento,
- * homologação e testes. Nunca chama a rede. IDs reconhecidos: BRATESTE01 (perfil completo) e
- * BRATESTE02 (perfil sem resultados e sem ranking). Qualquer outro ID não existe.
+ * homologação e testes. Nunca chama a rede. IDs reconhecidos: BRATESTE01 (perfil completo),
+ * BRATESTE02 (perfil sem resultados e sem ranking) e BRASPT08 (atleta do seed, mesmo perfil do
+ * BRATESTE01). Qualquer outro ID não existe.
  */
 
 const BRATESTE01: PerfilWorldSailing = {
@@ -105,7 +106,19 @@ const BRATESTE02: PerfilWorldSailing = {
   ranking: [],
 };
 
-const PERFIS = new Map([BRATESTE01, BRATESTE02].map((p) => [p.wsId, p]));
+/**
+ * Atleta FICTÍCIO do seed com cadastro completo (Davi Moretto, VelaID SP-T08): o mesmo perfil do
+ * BRATESTE01, para a ficha completa poder ser vista no dev e no E2E (a ficha de atleta com cadastro
+ * incompleto, como o recém-cadastrado BRATESTE01, dá 404 até o primeiro acesso).
+ */
+const BRASPT08: PerfilWorldSailing = {
+  ...structuredClone(BRATESTE01),
+  sailorId: "00000000-0000-4000-8000-0000000000a8",
+  wsId: "BRASPT08",
+  nome: "Davi Moretto",
+};
+
+const PERFIS = new Map([BRATESTE01, BRATESTE02, BRASPT08].map((p) => [p.wsId, p]));
 
 export function criarFonteSimulada(): FonteWorldSailing {
   return {
