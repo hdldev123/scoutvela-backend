@@ -77,7 +77,7 @@ describe("notasEfetivas", () => {
       ],
     });
     expect(n.perf_mundial).toBe(3); // 12º: até o 25º vale 3
-    expect(n.perf_continental).toBeNull(); // sem resultado continental: sem nota, mesmo com 5 lançado
+    expect(n.perf_continental).toBe(0); // sem resultado continental: vale 0, mesmo com 5 lançado
     expect(n.perf_nacional).toBe(0); // fora do pódio
   });
   it("sem peso, cf_peso_kg fica sem nota", () => {
@@ -243,15 +243,25 @@ describe("calcularAtleta", () => {
     expect(r.completo).toBe(false);
     expect(r.classFit).toBeNull();
   });
-  it("sem resultado validado em um nível, o indicador fica sem nota e o atleta incompleto", () => {
+  it("sem resultado validado em um nível, o indicador vale 0 e conta como preenchido (atleta completo)", () => {
     const parametros = parametrosDeTeste();
     const r = calcularAtleta(
       parametros,
       entradaDeTeste({ resultados: RESULTADOS_DOS_3_NIVEIS.slice(0, 2) }),
     );
-    expect(r.notas.perf_nacional).toBeNull();
-    expect(r.notasResultados.nacional).toBeNull();
+    expect(r.notas.perf_nacional).toBe(0);
+    expect(r.notasResultados.nacional).toMatchObject({ nota: 0, posicao: null });
     expect(r.notasResultados.mundial).toMatchObject({ nota: 5, posicao: 2, edicao: 2026 });
-    expect(r.completo).toBe(false);
+    expect(r.completo).toBe(true);
+    expect(r.preenchidos).toBe(r.total);
+  });
+  it("sem nenhum resultado, os três valem 0 e o pilar de Performance não ignora o nível sem resultado", () => {
+    const r = calcularAtleta(parametrosDeTeste(), entradaDeTeste());
+    expect([r.notas.perf_mundial, r.notas.perf_continental, r.notas.perf_nacional]).toEqual([
+      0, 0, 0,
+    ]);
+    // média de (0, 0, 0, 4, 4) = 1,6 — e não 4, que seria a média só de consistência e frota
+    expect(r.pilares.find((x) => x.pilarId === "perf")!.nota).toBeCloseTo(1.6, 9);
+    expect(r.completo).toBe(true);
   });
 });

@@ -341,10 +341,12 @@ describe("D10: resultados informados pelo atleta, validados pelo treinador", () 
     it("pendente não conta: a nota do indicador e o score não mudam", async () => {
       const f = await ficha(EMAILS_DEMO.gestor);
       expect(f.score).toBe(notaAntes);
+      // Sem resultado validado no nível, o indicador vale 0 (não fica sem nota) e a ficha diz por quê.
       expect(indicador(f, "perf_mundial")).toMatchObject({
-        nota: null,
-        origem: null,
-        explicacao: null,
+        nota: 0,
+        origem: "calculado",
+        explicacao: "Sem resultado validado no Mundial nas últimas 4 edições",
+        resultado: null,
       });
       const lista = await listar(EMAILS_DEMO.gestor, helena, "?status=pendente");
       expect(lista.corpo.itens.some((x: Resultado) => x.id === mundial.id)).toBe(true);
@@ -451,7 +453,7 @@ describe("D10: resultados informados pelo atleta, validados pelo treinador", () 
           })
         ).status,
       ).toBe(200);
-      expect(indicador(await ficha(EMAILS_DEMO.gestor), "perf_mundial").nota).toBeNull();
+      expect(indicador(await ficha(EMAILS_DEMO.gestor), "perf_mundial").nota).toBe(0);
       avancar(5);
       expect(
         (await decidir(EMAILS_DEMO.treinadora, mundial.id, { decisao: "validar" })).status,

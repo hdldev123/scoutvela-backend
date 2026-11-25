@@ -97,6 +97,7 @@ describe("Parâmetros iniciais (migration 0004)", () => {
       rankingCbvela: { janelaSemanas: 52 },
       perfResultados: {
         edicoesMax: 4,
+        semResultado: 0,
         niveis: {
           mundial: [
             { ate: 3, nota: 5 },

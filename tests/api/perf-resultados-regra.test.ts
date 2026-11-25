@@ -5,6 +5,7 @@ import type { Piloto } from "../apoio/piloto.js";
 const faixas = (...f: [number | null, number][]) => f.map(([ate, nota]) => ({ ate, nota }));
 const PADRAO = {
   edicoes_max: 4,
+  sem_resultado: 0,
   niveis: {
     mundial: faixas([3, 5], [10, 4], [25, 3], [null, 2]),
     continental: faixas([3, 5], [10, 4], [25, 3], [null, 2]),
@@ -52,6 +53,7 @@ describe("D10: regra PERF_RESULTADOS e remoção da PERF_PONTOS", () => {
     expect(regra.valor).toEqual(PADRAO);
     expect(regra.descricao).toContain("provisórios");
     expect(regra.descricao).toContain("Juan");
+    expect(regra.descricao).toContain("sem_resultado");
   });
 
   it("a ficha e a prévia não têm mais sugestaoPontos; os pontos do Ranking seguem como informação", async () => {
@@ -81,6 +83,7 @@ describe("D10: regra PERF_RESULTADOS e remoção da PERF_PONTOS", () => {
   it("o gestor edita a regra, a nota recalcula e a auditoria guarda antes e depois", async () => {
     const nova = {
       edicoes_max: 2,
+      sem_resultado: 1,
       niveis: {
         ...PADRAO.niveis,
         mundial: faixas([8, 5], [15, 4], [null, 1]),
@@ -139,6 +142,9 @@ describe("D10: regra PERF_RESULTADOS e remoção da PERF_PONTOS", () => {
         { ...PADRAO, niveis: { ...PADRAO.niveis, estadual: faixas([null, 1]) } },
       ],
       ["edicoes_max zero", { ...PADRAO, edicoes_max: 0 }],
+      ["sem_resultado acima de 5", { ...PADRAO, sem_resultado: 6 }],
+      ["sem_resultado negativo", { ...PADRAO, sem_resultado: -1 }],
+      ["sem sem_resultado", { edicoes_max: 4, niveis: PADRAO.niveis }],
       ["edicoes_max fracionário", { ...PADRAO, edicoes_max: 2.5 }],
       ["campo extra", { ...PADRAO, ativa: true }],
       ["lista vazia", { ...PADRAO, niveis: { ...PADRAO.niveis, mundial: [] } }],

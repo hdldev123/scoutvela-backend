@@ -81,7 +81,7 @@ const esquemaIndicador = z.object({
     .string()
     .nullable()
     .describe(
-      "Só nos indicadores de resultado (perf_mundial, perf_continental, perf_nacional): de onde veio a nota calculada, em texto. Nulo sem resultado validado no nível",
+      "Só nos indicadores de resultado (perf_mundial, perf_continental, perf_nacional): de onde veio a nota calculada, em texto. Sem resultado validado no nível, a nota vale `sem_resultado` (0) e o texto diz isso",
     ),
   resultado: z
     .object({
@@ -318,15 +318,16 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
                   lancadoEm: null,
                   resposta: null,
                   sugestaoPendente: null,
-                  explicacao: origem ? explicacaoDaNota(origem) : null,
-                  resultado: origem
-                    ? {
-                        nivel: origem.nivel,
-                        posicao: origem.posicao,
-                        edicao: origem.edicao,
-                        evento: origem.evento,
-                      }
-                    : null,
+                  explicacao: explicacaoDaNota(origem, parametros.regras.perfResultados.edicoesMax),
+                  resultado:
+                    origem.posicao !== null && origem.edicao !== null && origem.evento !== null
+                      ? {
+                          nivel: origem.nivel,
+                          posicao: origem.posicao,
+                          edicao: origem.edicao,
+                          evento: origem.evento,
+                        }
+                      : null,
                   anexo: null,
                 };
               }

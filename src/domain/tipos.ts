@@ -182,6 +182,6 @@ export interface ResultadoCalculo {
   gates: Gate[];
   statusFinal: StatusFinal;
   pontosCbvela: number;
-  /** De onde veio a nota de cada nível de resultado (nulo = sem resultado validado no nível). */
-  notasResultados: Record<NivelDeNota, NotaDeResultado | null>;
+  /** De onde veio a nota de cada nível de resultado (sem resultado validado no nível: nota `semResultado`, posição nula). */
+  notasResultados: Record<NivelDeNota, NotaDeResultado>;
 }

@@ -65,21 +65,33 @@ describe("notaDaColocacao (tabela de casos, sem depender da frota)", () => {
 });
 
 describe("notaDeResultados", () => {
-  it("sem resultado validado no nível: nota nula", () => {
+  it("sem resultado validado no nível: vale semResultado (0), com posição nula", () => {
+    const vazio = (nivel: "mundial" | "continental" | "nacional") => ({
+      nota: 0,
+      nivel,
+      posicao: null,
+      edicao: null,
+      evento: null,
+    });
     expect(notaDeResultados([], regra)).toEqual({
-      mundial: null,
-      continental: null,
-      nacional: null,
+      mundial: vazio("mundial"),
+      continental: vazio("continental"),
+      nacional: vazio("nacional"),
     });
     const so = notaDeResultados([r("mundial", 2026, 2)], regra);
-    expect(so.mundial?.nota).toBe(5);
-    expect(so.continental).toBeNull();
-    expect(so.nacional).toBeNull();
+    expect(so.mundial.nota).toBe(5);
+    expect(so.continental).toEqual(vazio("continental"));
+    expect(so.nacional).toEqual(vazio("nacional"));
+  });
+
+  it("o valor do nível sem resultado é parâmetro (semResultado)", () => {
+    const n = notaDeResultados([], { ...regra, semResultado: 1 });
+    expect([n.mundial.nota, n.continental.nota, n.nacional.nota]).toEqual([1, 1, 1]);
   });
 
   it("vale a MELHOR colocação (exemplo da reunião: cinco mundiais sem pódio não dão 5)", () => {
     const cinco = [2022, 2023, 2024, 2025, 2026].map((ano, i) => r("mundial", ano, 12 + i));
-    const n = notaDeResultados(cinco, { ...regra, edicoesMax: 5 }).mundial!;
+    const n = notaDeResultados(cinco, { ...regra, edicoesMax: 5 }).mundial;
     expect(n.nota).toBe(3);
     expect(n.posicao).toBe(12);
     expect(n.edicao).toBe(2022);
@@ -118,7 +130,7 @@ describe("notaDeResultados", () => {
       ],
       regra,
     );
-    expect(n.mundial).toBeNull();
+    expect(n.mundial).toMatchObject({ nota: 0, posicao: null });
     expect(n.continental).toMatchObject({ nota: 5, posicao: 2 });
     expect(n.nacional).toMatchObject({ nota: 5, posicao: 1 });
   });
@@ -133,6 +145,7 @@ describe("notaDeResultados", () => {
   it("usa a regra recebida (faixas e limite de edições são parâmetro)", () => {
     const outra: RegraResultados = {
       edicoesMax: 1,
+      semResultado: 0,
       niveis: {
         ...regra.niveis,
         mundial: [
@@ -146,9 +159,12 @@ describe("notaDeResultados", () => {
   });
 
   it("explicação traz nível, colocação e edição", () => {
-    const n = notaDeResultados([r("mundial", 2026, 12, "Mundial de ILCA 6")], regra).mundial!;
-    expect(explicacaoDaNota(n)).toBe(
+    const n = notaDeResultados([r("mundial", 2026, 12, "Mundial de ILCA 6")], regra).mundial;
+    expect(explicacaoDaNota(n, 4)).toBe(
       "Melhor colocação validada no Mundial: 12º em 2026 (Mundial de ILCA 6)",
+    );
+    expect(explicacaoDaNota(notaDeResultados([], regra).nacional, 4)).toBe(
+      "Sem resultado validado no Campeonato Brasileiro nas últimas 4 edições",
     );
   });
 });

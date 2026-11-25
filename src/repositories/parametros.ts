@@ -98,6 +98,7 @@ function perfResultadosDoBanco(valor: ValorRegra): Regras["perfResultados"] {
   ];
   return {
     edicoesMax: numero(valor.edicoes_max, "PERF_RESULTADOS", "edicoes_max"),
+    semResultado: numero(valor.sem_resultado, "PERF_RESULTADOS", "sem_resultado"),
     niveis: { mundial, continental, nacional },
   };
 }

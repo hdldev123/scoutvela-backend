@@ -23,8 +23,7 @@ export function notasEfetivas(
   const doResultado = notaDeResultados(entrada.resultados, parametros.regras.perfResultados);
   const notaDeResultado = new Map<string, number>();
   for (const nivel of NIVEIS_DE_NOTA) {
-    const n = doResultado[nivel];
-    if (n) notaDeResultado.set(INDICADOR_DO_NIVEL[nivel], n.nota);
+    notaDeResultado.set(INDICADOR_DO_NIVEL[nivel], doResultado[nivel].nota);
   }
   for (const pilar of parametros.pilares) {
     for (const ind of pilar.indicadores) {

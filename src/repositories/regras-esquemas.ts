@@ -77,6 +77,7 @@ export const ESQUEMAS_REGRAS = {
   TERMO_EXIGE_REACEITE: z.strictObject({ ativa: z.boolean() }),
   PERF_RESULTADOS: z.strictObject({
     edicoes_max: z.number().int().min(1).max(20),
+    sem_resultado: z.number().int().min(0).max(5),
     niveis: z.strictObject({
       mundial: faixasColocacao("mundial"),
       continental: faixasColocacao("continental"),

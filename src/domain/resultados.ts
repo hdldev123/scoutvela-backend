@@ -52,6 +52,8 @@ export interface FaixaColocacao {
 export interface RegraResultados {
   /** Quantos resultados mais recentes de cada nível entram no cálculo. */
   edicoesMax: number;
+  /** Nota do nível sem resultado validado (0 na escala da reunião: "ou zero, ou 4, ou 5"). */
+  semResultado: number;
   niveis: Record<NivelDeNota, FaixaColocacao[]>;
 }
 
@@ -66,13 +68,16 @@ export interface ResultadoParaNota {
   data: string;
 }
 
-/** De onde veio a nota de um nível: o resultado que a definiu. */
+/**
+ * Nota de um nível e o resultado que a definiu. Sem resultado validado no nível, `posicao`, `edicao`
+ * e `evento` são nulos e a nota é `semResultado`.
+ */
 export interface NotaDeResultado {
   nota: number;
   nivel: NivelDeNota;
-  posicao: number;
-  edicao: number;
-  evento: string;
+  posicao: number | null;
+  edicao: number | null;
+  evento: string | null;
 }
 
 /** Nota de uma colocação: primeira faixa com colocação <= `ate`. Sem faixa que sirva, 0. */
@@ -84,17 +89,25 @@ export function notaDaColocacao(posicao: number, faixas: FaixaColocacao[]): numb
 /**
  * Nota de cada nível pelos resultados validados. Por nível, entram os `edicoesMax` resultados mais
  * recentes (edição, depois data) e vale a MELHOR colocação entre eles; empate de colocação fica com o
- * mais recente. O tamanho da frota não entra. Sem resultado validado no nível, o nível fica nulo
- * (indicador sem nota). Resultado de nível que não gera nota é ignorado.
+ * mais recente. O tamanho da frota não entra. Sem resultado validado no nível, vale `semResultado`
+ * (0 por padrão): o indicador sempre tem nota, para a média do pilar (P2) não ignorar o nível.
+ * Resultado de nível que não gera nota é ignorado.
  */
 export function notaDeResultados(
   resultadosValidados: ResultadoParaNota[],
   regra: RegraResultados,
-): Record<NivelDeNota, NotaDeResultado | null> {
-  const saida: Record<NivelDeNota, NotaDeResultado | null> = {
-    mundial: null,
-    continental: null,
-    nacional: null,
+): Record<NivelDeNota, NotaDeResultado> {
+  const vazio = (nivel: NivelDeNota): NotaDeResultado => ({
+    nota: regra.semResultado,
+    nivel,
+    posicao: null,
+    edicao: null,
+    evento: null,
+  });
+  const saida: Record<NivelDeNota, NotaDeResultado> = {
+    mundial: vazio("mundial"),
+    continental: vazio("continental"),
+    nacional: vazio("nacional"),
   };
   for (const nivel of NIVEIS_DE_NOTA) {
     const doNivel = resultadosValidados
@@ -118,11 +131,14 @@ export function notaDeResultados(
 }
 
 /** Texto curto de onde veio a nota, para a ficha. */
-export function explicacaoDaNota(n: NotaDeResultado): string {
+export function explicacaoDaNota(n: NotaDeResultado, edicoesMax: number): string {
   const nome: Record<NivelDeNota, string> = {
     mundial: "Mundial",
     continental: "campeonato continental",
     nacional: "Campeonato Brasileiro",
   };
+  if (n.posicao === null) {
+    return `Sem resultado validado no ${nome[n.nivel]} nas últimas ${edicoesMax} edições`;
+  }
   return `Melhor colocação validada no ${nome[n.nivel]}: ${n.posicao}º em ${n.edicao} (${n.evento})`;
 }

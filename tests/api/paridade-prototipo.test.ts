@@ -41,7 +41,7 @@ const corrigir = (motivo: string) => motivo.replace("internacionalis", "internac
  * do domínio: melhor colocação entre as 4 edições mais recentes do nível, sem olhar a frota.
  *   mundial e continental: até o 3º = 5, até o 10º = 4, até o 25º = 3, demais = 2
  *   nacional: 1º = 5, 2º = 4, 3º = 3, fora do pódio = 0
- * Sem resultado no nível, o indicador fica sem nota.
+ * Sem resultado no nível, o indicador vale 0 (sem_resultado).
  */
 const NIVEL_DA_NOTA: Record<string, "mundial" | "continental" | "nacional"> = {
   Mundial: "mundial",
@@ -72,12 +72,12 @@ const INDICADOR: Record<string, string> = {
   nacional: "perf_nacional",
 };
 
-function notaDoNivel(g: AtletaGabarito, nivel: string): number | null {
+function notaDoNivel(g: AtletaGabarito, nivel: string): number {
   const doNivel = g.resultados
     .filter((r) => NIVEL_DA_NOTA[r.nivel] === nivel)
     .sort((a, b) => b.data.localeCompare(a.data))
     .slice(0, 4);
-  if (doNivel.length === 0) return null;
+  if (doNivel.length === 0) return 0; // sem resultado validado no nível: vale 0 (semResultado)
   const melhor = Math.min(...doNivel.map((r) => r.posicao));
   return (TABELA[nivel]!.find(([ate]) => melhor <= ate)?.[1] ?? FUNDO[nivel])!;
 }
