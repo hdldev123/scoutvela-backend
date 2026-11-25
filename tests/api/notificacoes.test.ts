@@ -49,14 +49,17 @@ describe("notificações do menu (GET /me/notificacoes, PUT /me/notificacoes/vis
     ).toBe(401);
   });
 
-  it("IBVAR: objeto vazio e total 0", async () => {
-    expect(await contagens(EMAILS_DEMO.ibvar)).toEqual({ contagens: {}, total: 0 });
+  it("IBVAR: só a chave investimento (o seed tem ciclo fechado e a tela ainda não foi vista)", async () => {
+    expect(await contagens(EMAILS_DEMO.ibvar)).toEqual({
+      contagens: { investimento: 1 },
+      total: 1,
+    });
   });
 
   it("chaves por papel (sempre presentes, mesmo com 0) e total é a soma", async () => {
     const g = await contagens(EMAILS_DEMO.gestor);
-    expect(Object.keys(g.contagens).sort()).toEqual(["cadastro", "revisoes"]);
-    expect(g.total).toBe(g.contagens.cadastro! + g.contagens.revisoes!);
+    expect(Object.keys(g.contagens).sort()).toEqual(["cadastro", "investimento", "revisoes"]);
+    expect(g.total).toBe(g.contagens.cadastro! + g.contagens.revisoes! + g.contagens.investimento!);
     const t = await contagens(EMAILS_DEMO.treinadora);
     expect(Object.keys(t.contagens).sort()).toEqual(["avaliar", "revisoes"]);
     const a = await contagens(EMAILS_DEMO.atleta);
@@ -207,12 +210,15 @@ describe("notificações do menu (GET /me/notificacoes, PUT /me/notificacoes/vis
   });
 
   it("PUT vistas: chave fora do papel ou do enum -> 400", async () => {
-    for (const email of [EMAILS_DEMO.gestor, EMAILS_DEMO.treinadora, EMAILS_DEMO.ibvar]) {
+    for (const email of [EMAILS_DEMO.gestor, EMAILS_DEMO.ibvar]) {
       for (const chave of ["painel", "revisoes", "cadastro", "avaliar"]) {
         expect((await vista(email, chave)).status, `${email} ${chave}`).toBe(400);
       }
     }
-    for (const chave of ["revisoes", "cadastro", "avaliar", "outra"]) {
+    for (const chave of ["painel", "revisoes", "cadastro", "avaliar", "investimento"]) {
+      expect((await vista(EMAILS_DEMO.treinadora, chave)).status, chave).toBe(400);
+    }
+    for (const chave of ["revisoes", "cadastro", "avaliar", "investimento", "outra"]) {
       expect((await vista(EMAILS_DEMO.atleta, chave)).status, chave).toBe(400);
     }
     expect((await chamar(EMAILS_DEMO.atleta, "PUT", "/me/notificacoes/vistas", {})).status).toBe(

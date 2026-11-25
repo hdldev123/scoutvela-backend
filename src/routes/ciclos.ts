@@ -8,6 +8,7 @@ import { listarAtletasVisiveis } from "../repositories/atletas.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { diasParaPrazo, pendenciasDoCiclo } from "../repositories/pendencias.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
+import { avisarCicloFechado } from "../servicos/aviso-ciclo-fechado.js";
 import { congelarCiclo } from "../servicos/congelamento-ciclo.js";
 
 const dataIso = z.iso.date().describe("AAAA-MM-DD");
@@ -173,7 +174,7 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
         summary:
           "Fecha o ciclo e congela score, faixa, pilares, gates, status final e perfil de suporte",
         description:
-          "Calcula score e faixa de todos os atletas ativos com o termo do piloto aceito, grava em scores_ciclo e congela também a nota de cada pilar, o status de cada gate, o status final e o perfil de suporte; marca o ciclo como fechado (fechadoEm) numa só transação. Alimenta o histórico de score da ficha e o painel de investimento (GET /investimento?ciclo=). Se nenhum atleta tiver o termo aceito mas houver atletas ativos, recusa com 409 (nada a congelar).",
+          "Calcula score e faixa de todos os atletas ativos com o termo do piloto aceito, grava em scores_ciclo e congela também a nota de cada pilar, o status de cada gate, o status final e o perfil de suporte; marca o ciclo como fechado (fechadoEm) numa só transação. Alimenta o histórico de score da ficha e o painel de investimento (GET /investimento?ciclo=). Depois do commit, avisa por e-mail as contas ativas de gestor e IBVAR (sem score nem nome de atleta); falha no envio não desfaz o fechamento nem muda a resposta. Se nenhum atleta tiver o termo aceito mas houver atletas ativos, recusa com 409 (nada a congelar).",
         security: seguranca,
         params,
         response: {
@@ -228,6 +229,14 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
           [req.usuario.id, atual.id, JSON.stringify({ atletas: avaliados.length }), agora],
         );
         return { ciclo: (await buscarCiclo(tx, atual.id))!, atletas: avaliados.length };
+      });
+      // Depois do commit: o aviso nunca desfaz o fechamento nem muda a resposta.
+      await avisarCicloFechado({
+        db: app.db,
+        email: app.email,
+        frontUrl: app.config.FRONT_URL,
+        cicloNome: resposta.ciclo.nome,
+        log: req.log,
       });
       return resposta;
     },

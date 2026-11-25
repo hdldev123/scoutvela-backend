@@ -478,15 +478,18 @@ paths:
       tags:
         - sessao
       description: "Só as chaves do papel, sempre presentes (0 quando nada pede
-        atenção). Gestor: `revisoes` (pedidos de revisão e do titular abertos) e
-        `cadastro` (atletas ativos sem aceite da versão vigente do termo).
-        Treinador: `revisoes` (pedidos de revisão abertos dos próprios atletas)
-        e `avaliar` (próprios atletas com indicadores pendentes no ciclo aberto;
-        0 sem ciclo aberto). Atleta: `painel` (perguntas ainda sem resposta,
-        hoje contadas só com ciclo aberto, + 1 se o termo vigente está pendente
-        + respostas a pedidos de revisão e do titular dadas depois da última
-        marcação de visto). IBVAR: objeto vazio. `total` é a soma. Feito para
-        consulta a cada 60 s."
+        atenção). Gestor: `revisoes` (pedidos de revisão e do titular abertos),
+        `cadastro` (atletas ativos sem aceite da versão vigente do termo) e
+        `investimento`. Treinador: `revisoes` (pedidos de revisão abertos dos
+        próprios atletas) e `avaliar` (próprios atletas com indicadores
+        pendentes no ciclo aberto; 0 sem ciclo aberto). Atleta: `painel`
+        (perguntas ainda sem resposta, hoje contadas só com ciclo aberto, + 1 se
+        o termo vigente está pendente + respostas a pedidos de revisão e do
+        titular dadas depois da última marcação de visto). IBVAR: só
+        `investimento`. `investimento` (gestor e IBVAR) vale 1 quando há ciclo
+        fechado depois da última vez que a pessoa marcou a tela como vista (PUT
+        /me/notificacoes/vistas com chave `investimento`), senão 0. `total` é a
+        soma. Feito para consulta a cada 60 s."
       security: &a1
         - bearerAuth: []
       responses:
@@ -592,9 +595,10 @@ paths:
       summary: Marca uma tela como vista (zera as respostas novas do balão)
       tags:
         - sessao
-      description: "Grava o instante atual como última visita à tela. Por enquanto só
-        o atleta marca `painel`; qualquer outra combinação de papel e chave
-        responde 400. Não gera auditoria: é dado de interface, não de decisão."
+      description: "Grava o instante atual como última visita à tela. O atleta marca
+        `painel`; gestor e IBVAR marcam `investimento` (zera o aviso de ciclo
+        fechado); qualquer outra combinação de papel e chave responde 400. Não
+        gera auditoria: é dado de interface, não de decisão."
       requestBody:
         required: true
         content:
@@ -609,6 +613,7 @@ paths:
                     - revisoes
                     - cadastro
                     - avaliar
+                    - investimento
               required:
                 - chave
       security: *a1
@@ -9070,8 +9075,11 @@ paths:
         pilar, o status de cada gate, o status final e o perfil de suporte;
         marca o ciclo como fechado (fechadoEm) numa só transação. Alimenta o
         histórico de score da ficha e o painel de investimento (GET
-        /investimento?ciclo=). Se nenhum atleta tiver o termo aceito mas houver
-        atletas ativos, recusa com 409 (nada a congelar).
+        /investimento?ciclo=). Depois do commit, avisa por e-mail as contas
+        ativas de gestor e IBVAR (sem score nem nome de atleta); falha no envio
+        não desfaz o fechamento nem muda a resposta. Se nenhum atleta tiver o
+        termo aceito mas houver atletas ativos, recusa com 409 (nada a
+        congelar).
       parameters:
         - schema:
             type: string

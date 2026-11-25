@@ -3,12 +3,20 @@ import type { Db } from "../db/db.js";
 import { pendenciasDoCiclo } from "./pendencias.js";
 import { termoSql } from "./termo.js";
 
-export const CHAVES_NOTIFICACAO = ["painel", "revisoes", "cadastro", "avaliar"] as const;
+export const CHAVES_NOTIFICACAO = [
+  "painel",
+  "revisoes",
+  "cadastro",
+  "avaliar",
+  "investimento",
+] as const;
 export type ChaveNotificacao = (typeof CHAVES_NOTIFICACAO)[number];
 
 /** Chaves que cada papel pode marcar como vistas (PUT /me/notificacoes/vistas). */
 export const CHAVES_VISTAS_POR_PAPEL: Partial<Record<string, ChaveNotificacao[]>> = {
   atleta: ["painel"],
+  gestor: ["investimento"],
+  ibvar: ["investimento"],
 };
 
 type UsuarioDeAcesso = Pick<UsuarioAutenticado, "id" | "papel" | "atletaId">;
@@ -27,16 +35,23 @@ export async function contarNotificacoes(
 ): Promise<Record<string, number>> {
   switch (usuario.papel) {
     case "gestor": {
-      const r = await db.query<{ revisoes: string; cadastro: string }>(
-        `select ((select count(*) from pedidos_revisao where status = 'aberto')
+      const [r, investimento] = await Promise.all([
+        db.query<{ revisoes: string; cadastro: string }>(
+          `select ((select count(*) from pedidos_revisao where status = 'aberto')
                + (select count(*) from pedidos_titular where status = 'aberto'))::text as revisoes,
                 ((select count(*) from atletas a
                    where a.ativo and not ${termoSql.aceitoVigente("a.id", "$1")})
                + (select count(*) from atletas a
                    where a.cadastro_recusado_em is not null and a.anonimizado_em is null))::text as cadastro`,
-        [agora],
-      );
-      return { revisoes: contagem(r.rows[0]?.revisoes), cadastro: contagem(r.rows[0]?.cadastro) };
+          [agora],
+        ),
+        avisoCicloFechado(db, usuario.id),
+      ]);
+      return {
+        revisoes: contagem(r.rows[0]?.revisoes),
+        cadastro: contagem(r.rows[0]?.cadastro),
+        investimento,
+      };
     }
     case "treinador": {
       const [rev, ciclo] = await Promise.all([
@@ -83,10 +98,29 @@ export async function contarNotificacoes(
         painel: perguntas + (l?.termo ? 1 : 0) + (l?.incompleto ? 1 : 0) + contagem(l?.respostas),
       };
     }
+    case "ibvar":
+      return { investimento: await avisoCicloFechado(db, usuario.id) };
     default:
-      // IBVAR e demais papéis: nada.
       return {};
   }
+}
+
+/**
+ * Balão de Investimento (gestor e IBVAR): 1 se há ciclo fechado depois da última vez que a pessoa
+ * marcou a tela como vista (nunca marcou: qualquer ciclo fechado conta); senão 0.
+ */
+async function avisoCicloFechado(db: Db, usuarioId: string): Promise<number> {
+  const r = await db.query<{ novo: boolean }>(
+    `select exists (
+              select 1 from ciclos_avaliacao c
+               where c.status = 'fechado' and c.fechado_em is not null
+                 and c.fechado_em > coalesce(
+                       (select v.visto_em from notificacoes_vistas v
+                         where v.usuario_id = $1::uuid and v.chave = 'investimento'),
+                       '-infinity'::timestamptz)) as novo`,
+    [usuarioId],
+  );
+  return r.rows[0]?.novo ? 1 : 0;
 }
 
 async function cicloAbertoId(db: Db): Promise<string | null> {
