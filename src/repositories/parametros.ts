@@ -119,8 +119,9 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
       evidencia: Indicador["evidencia"];
       exige_anexo: boolean;
       autoavaliacao: boolean;
+      orientacao: string | null;
     }>(
-      "select id, pilar_id, nome, tipo, calculado, evidencia, exige_anexo, autoavaliacao from indicadores order by pilar_id, ordem",
+      "select id, pilar_id, nome, tipo, calculado, evidencia, exige_anexo, autoavaliacao, orientacao from indicadores order by pilar_id, ordem",
     )
   ).rows;
   const faixasRows = (
@@ -163,6 +164,7 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
         evidencia: i.evidencia,
         exigeAnexo: i.exige_anexo,
         autoavaliacao: i.autoavaliacao,
+        orientacao: i.orientacao,
       })),
   }));
   const faixas: FaixaScore[] = faixasRows.map((f) => ({
@@ -200,13 +202,21 @@ export interface ParametrosCompletos {
   componentesCusto: { id: string; nome: string }[];
 }
 
+/** Rubricas da escala de 0 a 5: a geral (`pilarId` nulo) e as dos pilares com escala própria, em ordem. */
+export async function carregarRubricas(
+  db: Db,
+): Promise<{ pilarId: string | null; nota: number; descricao: string }[]> {
+  const r = await db.query<{ pilar_id: string | null; nota: number; descricao: string }>(
+    "select pilar_id, nota, descricao from rubricas order by pilar_id nulls first, nota",
+  );
+  return r.rows.map((x) => ({ pilarId: x.pilar_id, nota: x.nota, descricao: x.descricao }));
+}
+
 /** Leitura completa para a tela de parâmetros e para a escala de avaliação (inclui rubricas, regras brutas e componentes). */
 export async function carregarParametrosCompletos(db: Db): Promise<ParametrosCompletos> {
   const base = await carregarParametros(db);
   const [rubricas, regras, componentes, ativas] = await Promise.all([
-    db.query<{ pilar_id: string | null; nota: number; descricao: string }>(
-      "select pilar_id, nota, descricao from rubricas order by pilar_id nulls first, nota",
-    ),
+    carregarRubricas(db),
     db.query<{ codigo: string; descricao: string; valor: unknown; atualizado_em: Date }>(
       "select codigo, descricao, valor, atualizado_em from regras order by codigo",
     ),
@@ -234,11 +244,7 @@ export async function carregarParametrosCompletos(db: Db): Promise<ParametrosCom
         alturaMaxCm: num(x?.altura_max_cm),
       };
     }),
-    rubricas: rubricas.rows.map((r) => ({
-      pilarId: r.pilar_id,
-      nota: r.nota,
-      descricao: r.descricao,
-    })),
+    rubricas,
     regras: regras.rows.map((r) => ({
       codigo: r.codigo,
       descricao: r.descricao,
@@ -262,6 +268,8 @@ export interface AtualizacaoParametros {
         id: string;
         evidencia?: Indicador["evidencia"] | undefined;
         autoavaliacao?: boolean | undefined;
+        /** Texto de ajuda; nulo remove. */
+        orientacao?: string | null | undefined;
       }[]
     | undefined;
   classes?:
@@ -495,6 +503,9 @@ export async function atualizarParametros(
       const depois: Record<string, string> = {};
       const autoAntes: Record<string, boolean> = {};
       const autoDepois: Record<string, boolean> = {};
+      // Só ids e se há texto; o texto da orientação é parâmetro público, mas a auditoria não precisa dele.
+      const orientacaoAntes: Record<string, boolean> = {};
+      const orientacaoDepois: Record<string, boolean> = {};
       for (const i of dados.indicadores) {
         const atual = (
           await tx.query<{
@@ -502,9 +513,11 @@ export async function atualizarParametros(
             autoavaliacao: boolean;
             tipo: string;
             calculado: boolean;
-          }>("select evidencia, autoavaliacao, tipo, calculado from indicadores where id = $1", [
-            i.id,
-          ])
+            orientacao: string | null;
+          }>(
+            "select evidencia, autoavaliacao, tipo, calculado, orientacao from indicadores where id = $1",
+            [i.id],
+          )
         ).rows[0];
         if (!atual) throw new ErroParametros(`Indicador desconhecido: ${i.id}.`);
         if (i.evidencia !== undefined) {
@@ -528,8 +541,23 @@ export async function atualizarParametros(
             i.autoavaliacao,
           ]);
         }
+        if (i.orientacao !== undefined) {
+          orientacaoAntes[i.id] = atual.orientacao !== null;
+          orientacaoDepois[i.id] = i.orientacao !== null;
+          await tx.query("update indicadores set orientacao = $2 where id = $1", [
+            i.id,
+            i.orientacao,
+          ]);
+        }
       }
       if (Object.keys(depois).length > 0) detalhes.indicadores = { antes, depois };
+      if (Object.keys(orientacaoDepois).length > 0) {
+        detalhes.orientacao = {
+          indicadores: Object.keys(orientacaoDepois),
+          comTextoAntes: orientacaoAntes,
+          comTextoDepois: orientacaoDepois,
+        };
+      }
       if (Object.keys(autoDepois).length > 0) {
         detalhes.autoavaliacao = { antes: autoAntes, depois: autoDepois };
       }

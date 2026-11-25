@@ -162,6 +162,7 @@ export function pilaresDeTeste(): Pilar[] {
       evidencia: /^(tec|tat|pot)_/.test(iid) ? ("opcional" as const) : ("obrigatoria" as const),
       exigeAnexo: iid === "cf_peso_kg",
       autoavaliacao: tipo === "T" && iid !== "cf_peso_kg",
+      orientacao: null,
     })),
   }));
 }

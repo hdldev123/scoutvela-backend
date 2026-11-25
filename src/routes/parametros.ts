@@ -37,6 +37,12 @@ const esquemaParametros = z.object({
             .describe(
               "O atleta pode sugerir a nota deste indicador (POST /autoavaliacoes). O gestor muda em PUT /parametros (indicadores)",
             ),
+          orientacao: z
+            .string()
+            .nullable()
+            .describe(
+              "Texto de ajuda do indicador, mostrado embaixo do campo; nulo = sem orientação. O gestor muda em PUT /parametros (indicadores)",
+            ),
         }),
       ),
     }),
@@ -167,11 +173,22 @@ const esquemaAtualizacao = z
               .describe(
                 "Liga ou desliga a autoavaliação do indicador (só tipo T não calculado pode ligar)",
               ),
+            orientacao: z
+              .string("A orientação deve ser um texto.")
+              .trim()
+              .min(1, "A orientação não pode ficar vazia: envie null para remover.")
+              .max(1000, "A orientação pode ter no máximo 1.000 caracteres.")
+              .nullable()
+              .optional()
+              .describe("Texto de ajuda do indicador (até 1.000 caracteres); null remove"),
           })
           .strict()
           .refine(
-            (i) => i.evidencia !== undefined || i.autoavaliacao !== undefined,
-            "Informe a evidência ou a autoavaliação do indicador.",
+            (i) =>
+              i.evidencia !== undefined ||
+              i.autoavaliacao !== undefined ||
+              i.orientacao !== undefined,
+            "Informe a evidência, a autoavaliação ou a orientação do indicador.",
           ),
       )
       .min(1)
@@ -179,7 +196,7 @@ const esquemaAtualizacao = z
       .refine((l) => new Set(l.map((i) => i.id)).size === l.length, "Indicador repetido.")
       .optional()
       .describe(
-        "Regra por indicador: `evidencia` (obrigatoria ou opcional) e/ou `autoavaliacao` (boolean). A auditoria guarda antes e depois",
+        "Regra por indicador: `evidencia` (obrigatoria ou opcional), `autoavaliacao` (boolean) e/ou `orientacao` (texto de ajuda, até 1.000 caracteres; null remove). A auditoria guarda antes e depois (da orientação, só se havia texto)",
       ),
     classes: z
       .array(

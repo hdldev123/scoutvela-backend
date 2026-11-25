@@ -38,6 +38,8 @@ export interface Indicador {
   exigeAnexo: boolean;
   /** O atleta pode sugerir a nota deste indicador (autoavaliação). Editável pelo gestor em Parâmetros. */
   autoavaliacao: boolean;
+  /** Texto de ajuda do indicador, editável pelo gestor. Nulo = sem orientação. */
+  orientacao: string | null;
 }
 
 export interface Pilar {
