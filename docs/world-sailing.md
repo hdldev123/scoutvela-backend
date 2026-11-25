@@ -4,7 +4,64 @@ Investigação feita em 24/11/2026, a partir da reunião de alinhamento IBVAR de
 
 **Pergunta:** dá para puxar automaticamente os resultados de um atleta a partir do World Sailing ID?
 
-**Resposta curta:** não há como fazer isso hoje sem um acordo com a World Sailing. O atleta lança os resultados com a súmula ou o link oficial, e o treinador valida (D10). O sistema só monta o link para o perfil público do atleta.
+**Resposta curta (24/11):** não há como fazer isso hoje sem um acordo com a World Sailing. O atleta lança os resultados com a súmula ou o link oficial, e o treinador valida (D10). O sistema só monta o link para o perfil público do atleta.
+
+**Atualização de 25/11/2026 (D19):** o perfil público é montado a partir de uma API de dados do próprio site, aberta e sem login, mas sem documentação. A pedido do usuário, a API passou a importar o perfil pelo WS ID. Ver a seção "D19" abaixo.
+
+## D19: importação automática pelo WS ID (25/11/2026)
+
+### A API de dados do site
+
+| Item | Valor |
+| --- | --- |
+| Base | `https://datafeed.sailing.org/stats/api`, achada no código do site, em `statsAPIUrl` |
+| Perfil e resultados | `GET /sailor?filter[worldSailingId]=<ID>&include=images,crews.event.regatta.level,crews.event.boatClass&paginate=1`. Cada `crew` é um resultado, com `position` (texto), regata, data e nível |
+| Histórico de ranking | `GET /ranking?filter[sailor.id]=<UUID>&filter[rankingReference.status]=final&include=rankingReference.boatClass,rankingReference.type` |
+| Formato | JSON:API, sem autenticação |
+| Contrato | Não há: a API pode mudar sem aviso. O parse descarta o que não reconhece, e a falha vira `falhou`, sem quebrar o cadastro nem a ficha |
+
+### Decisões do usuário
+
+- **Resultados:**
+  - entram validados, com a fonte `world_sailing`, porque a World Sailing é a fonte oficial;
+  - o treinador do atleta ou o gestor pode invalidar um resultado, com motivo, e revalidar;
+  - a vigência fica em `SQL_STATUS_RESULTADO` (`src/repositories/atletas.ts`).
+- **Spotlight (minimização, LGPD):**
+  - só nome, gênero e data de nascimento, como sugestão do primeiro acesso (o VelaID tem prioridade);
+  - foto e bio também como sugestão, que o atleta aceita ou dispensa no perfil;
+  - a foto é baixada pelo servidor, só de `https://assets.sailing.org/`, e passa pela limpeza de metadados.
+  - Nunca entram estado civil, local de nascimento, altura, peso, perguntas do perfil, redes sociais ou categorização.
+- **Histórico de ranking:** só informação, sem entrar na nota, em `world_sailing_ranking`.
+- **Nível da regata (regra provisória P13, `WS_NIVEIS`, editável em Parâmetros):**
+
+  | Nível na World Sailing | Nível no Scout Vela |
+  | --- | --- |
+  | Olympic Games, World Championships, Sailing World Championships e Youth Sailing World Championships | mundial |
+  | Continental | continental |
+  | Qualquer outro, inclusive sem nível (World Cup, SailGP, Princesa Sofia…) | internacional aberto, que fica registrado e não pontua |
+
+- **Ativação (`WORLD_SAILING_MODO`):**
+
+  | Modo | Comportamento |
+  | --- | --- |
+  | `desligado` | Padrão em produção. A busca não roda |
+  | `simulado` | Padrão em desenvolvimento e homologação. Usa dados fictícios: `BRATESTE01` com resultados e ranking, `BRATESTE02` vazio. É recusado em produção |
+  | `real` | Chama o site. Fora da produção gera um aviso no log |
+
+- **Validação com dado real:** um teste pontual com GBRHM15 no ambiente local, a pedido do usuário. Depois o ambiente volta ao simulador e o banco local é recriado.
+- **Limites:**
+  - tempo limite de 8 s por chamada e de 15 s no total;
+  - resposta de até 5 MB;
+  - redirecionamentos não são seguidos;
+  - no máximo uma busca por atleta a cada 60 s.
+- **Rastro:**
+  - cada busca fica em `world_sailing_importacoes` e na auditoria (`importar_world_sailing`), só com o modo, o status e as contagens;
+  - a anonimização apaga o ranking e a sugestão e zera a referência externa dos resultados.
+- **Limitação:** a World Sailing não informa o tamanho da frota. Por isso o resultado importado não entra na fração colocação/frota do G2; pontua só pela colocação, na P12.
+
+### Pendente
+
+A CBVela precisa confirmar com a World Sailing a autorização para o uso automatizado, conforme a seção "Próximo passo, fora do código" abaixo. Até lá, produção fica com `WORLD_SAILING_MODO=desligado`.
 
 ## O que foi encontrado
 
@@ -21,7 +78,7 @@ Investigação feita em 24/11/2026, a partir da reunião de alinhamento IBVAR de
 
 - **Validação do ID (D1):** `^[A-Z]{3}[A-Z0-9]{2,12}$`, depois de normalizar para maiúsculas e tirar os espaços. A regra é tolerante de propósito, porque o formato foi inferido de exemplos.
 - **Link (D1):** um único helper no front monta `https://www.sailing.org/sailor/?ref=` com o ID codificado (`encodeURIComponent`), aberto em nova aba com `rel="noopener noreferrer"`. Se a World Sailing mudar o padrão, a mudança fica num lugar só.
-- **Sem leitura automática:** a API não acessa o sailing.org. Não há raspagem do site: ela é frágil (o site é carregado por JavaScript) e pode ferir os termos de uso.
+- **Sem leitura automática (24/11, substituída pela D19 em 25/11):** a API não acessa o sailing.org. Não há raspagem do site: ela é frágil (o site é carregado por JavaScript) e pode ferir os termos de uso.
 - **Resultados (D10):** o atleta lança evento, nível, edição e colocação, com a súmula anexada ou o link oficial, e o treinador valida.
 
 ## Próximo passo, fora do código
