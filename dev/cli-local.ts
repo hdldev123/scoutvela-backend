@@ -82,6 +82,12 @@ const config = lerConfig({
   SUPABASE_SERVICE_ROLE_KEY: serviceRoleKey,
   EXIGIR_MFA: exigirMfa ? "true" : "false",
   FRONT_URL: ORIGENS[0]!,
+  // World Sailing (D19): simulador com dados fictícios por padrão. Para o teste real pontual, suba com
+  // WORLD_SAILING_MODO=real no ambiente (a API pública é chamada de verdade) e depois volte ao padrão.
+  WORLD_SAILING_MODO: process.env.WORLD_SAILING_MODO ?? "simulado",
+  ...(process.env.WORLD_SAILING_API_URL
+    ? { WORLD_SAILING_API_URL: process.env.WORLD_SAILING_API_URL }
+    : {}),
 });
 
 const auth = await criarAuthLocal({

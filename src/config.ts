@@ -64,8 +64,25 @@ const esquemaConfig = z
       .int()
       .positive()
       .default(200 * 1024 * 1024),
+    /**
+     * Importação do perfil World Sailing pelo WS ID (D19). desligado: sem busca. simulado: dados
+     * fictícios, sem rede (desenvolvimento e homologação). real: API pública da World Sailing.
+     * Padrão: simulado fora da produção e desligado na produção.
+     */
+    WORLD_SAILING_MODO: z.enum(["desligado", "simulado", "real"]).optional(),
+    WORLD_SAILING_API_URL: z
+      .url("WORLD_SAILING_API_URL precisa ser uma URL")
+      .refine((u) => u.startsWith("https://"), "WORLD_SAILING_API_URL precisa começar com https://")
+      .default("https://datafeed.sailing.org/stats/api"),
   })
   .superRefine((c, ctx) => {
+    if (c.APP_ENV === "producao" && c.WORLD_SAILING_MODO === "simulado") {
+      ctx.addIssue({
+        code: "custom",
+        path: ["WORLD_SAILING_MODO"],
+        message: "o simulador (dados fictícios) não pode rodar em produção",
+      });
+    }
     if (c.APP_ENV === "desenvolvimento") return;
     // O disco do Render é efêmero: fora do desenvolvimento, evidência vai para o Supabase Storage.
     if (c.STORAGE_PROVEDOR !== "supabase") {
@@ -93,6 +110,8 @@ const esquemaConfig = z
   .transform((c) => ({
     ...c,
     TRUST_PROXY_HOPS: c.TRUST_PROXY_HOPS ?? (c.APP_ENV === "desenvolvimento" ? 0 : 1),
+    WORLD_SAILING_MODO:
+      c.WORLD_SAILING_MODO ?? (c.APP_ENV === "producao" ? "desligado" : "simulado"),
   }));
 
 export type Config = z.infer<typeof esquemaConfig>;
