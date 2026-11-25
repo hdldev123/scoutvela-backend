@@ -487,17 +487,20 @@ paths:
       description: "Só as chaves do papel, sempre presentes (0 quando nada pede
         atenção). Gestor: `revisoes` (pedidos de revisão e do titular abertos),
         `cadastro` (atletas ativos sem aceite da versão vigente do termo),
-        `investimento`, `sugestoes` (sugestões dos treinadores ainda abertas) e
-        `avisos` (avisos não lidos, D8). Treinador: `revisoes` (pedidos de
+        `investimento`, `sugestoes` (sugestões dos treinadores ainda abertas),
+        `avisos` (avisos não lidos, D8) e `conversas` (mensagens não lidas das
+        caixas compartilhadas da gestão, D16). Treinador: `revisoes` (pedidos de
         revisão abertos dos próprios atletas), `avaliar` (próprios atletas com
-        indicadores pendentes no ciclo aberto; 0 sem ciclo aberto) e `avisos`.
-        Atleta: `avisos` e `painel` (perguntas ainda sem resposta, hoje contadas
-        só com ciclo aberto, + 1 se o termo vigente está pendente + respostas a
-        pedidos de revisão e do titular dadas depois da última marcação de
-        visto). IBVAR: só `investimento`. `investimento` (gestor e IBVAR) vale 1
-        quando há ciclo fechado depois da última vez que a pessoa marcou a tela
-        como vista (PUT /me/notificacoes/vistas com chave `investimento`), senão
-        0. `total` é a soma. Feito para consulta a cada 60 s."
+        indicadores pendentes no ciclo aberto; 0 sem ciclo aberto), `avisos` e
+        `conversas` (mensagens não lidas, D16). Atleta: `avisos`, `conversas`
+        (mensagens não lidas) e `painel` (perguntas ainda sem resposta, hoje
+        contadas só com ciclo aberto, + 1 se o termo vigente está pendente +
+        respostas a pedidos de revisão e do titular dadas depois da última
+        marcação de visto). IBVAR: só `investimento`. `investimento` (gestor e
+        IBVAR) vale 1 quando há ciclo fechado depois da última vez que a pessoa
+        marcou a tela como vista (PUT /me/notificacoes/vistas com chave
+        `investimento`), senão 0. `total` é a soma. Feito para consulta a cada
+        60 s."
       security: &a1
         - bearerAuth: []
       responses:
@@ -3163,7 +3166,7 @@ paths:
           in: path
           name: id
           required: true
-      security: &a11
+      security: &a12
         - bearerAuth: []
       responses:
         "200":
@@ -7332,6 +7335,1612 @@ paths:
                   - erro
                   - mensagem
                 additionalProperties: false
+  /conversas:
+    get:
+      summary: Minhas conversas (chat), da mais recente para a mais antiga
+      tags:
+        - conversas
+      description: "Gestor, treinador e atleta; IBVAR: 403. Atleta: a conversa com o
+        treinador atual, as de treinadores antigos (somente leitura) e a com a
+        gestão. Treinador: as com os próprios atletas, as de pares antigos
+        (somente leitura) e a com a gestão. Gestor: as caixas compartilhadas
+        `gestao_atleta` e `gestao_treinador` (todos os gestores ativos veem e
+        respondem; `naoLidas` é por gestor). `naoLidas` conta as mensagens de
+        outras pessoas depois de PUT /conversas/{id}/lidas. Com
+        `?supervisao=true` (só gestor; outros 403): as conversas
+        `treinador_atleta` só com metadados (participantes e datas; `naoLidas`
+        sempre 0, sem trecho nem contagem de mensagens), para o gestor saber que
+        existem; a leitura exige POST /conversas/{id}/acesso-supervisao."
+      parameters:
+        - schema:
+            type: string
+            enum:
+              - "true"
+              - "false"
+          in: query
+          name: supervisao
+          required: false
+      security: &a5
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        tipo:
+                          type: string
+                          enum:
+                            - treinador_atleta
+                            - gestao_atleta
+                            - gestao_treinador
+                        com:
+                          anyOf:
+                            - type: object
+                              properties:
+                                nome:
+                                  type: string
+                                papel:
+                                  type: string
+                                  enum:
+                                    - atleta
+                                    - treinador
+                              required:
+                                - nome
+                                - papel
+                              additionalProperties: false
+                            - type: object
+                              properties:
+                                gestao:
+                                  type: boolean
+                                  enum:
+                                    - true
+                              required:
+                                - gestao
+                              additionalProperties: false
+                          description: "Com quem a pessoa conversa: o outro lado (nome e papel) ou `{
+                            gestao: true }` (caixa compartilhada da gestão da
+                            CBVela)"
+                        atleta:
+                          nullable: true
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                          required:
+                            - id
+                            - nome
+                          additionalProperties: false
+                        treinador:
+                          nullable: true
+                          description: Treinador do par (tipos `treinador_atleta` e `gestao_treinador`)
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            nome:
+                              type: string
+                          required:
+                            - id
+                            - nome
+                          additionalProperties: false
+                        criadaEm:
+                          type: string
+                          description: Instante ISO
+                        ultimaMensagemEm:
+                          nullable: true
+                          description: Instante ISO; nulo = ainda sem mensagens
+                          type: string
+                        naoLidas:
+                          type: integer
+                          minimum: 0
+                          maximum: 9007199254740991
+                        somenteLeitura:
+                          type: boolean
+                          description: "Verdadeiro quando não dá para enviar: par antigo (troca de
+                            treinador), conta desativada ou gestor lendo por
+                            supervisão"
+                        supervisaoAte:
+                          nullable: true
+                          description: "Só para o gestor: até quando vale o acesso de supervisão dele;
+                            nulo = sem acesso"
+                          type: string
+                      required:
+                        - id
+                        - tipo
+                        - com
+                        - atleta
+                        - treinador
+                        - criadaEm
+                        - ultimaMensagemEm
+                        - naoLidas
+                        - somenteLeitura
+                        - supervisaoAte
+                      additionalProperties: false
+                required:
+                  - itens
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    post:
+      summary: Abre uma conversa (ou devolve a que já existe)
+      tags:
+        - conversas
+      description: "`tipo`: `treinador_atleta`, `gestao_atleta` ou `gestao_treinador`.
+        Quem pode abrir com quem (regra no SQL): o atleta abre
+        `treinador_atleta` com o próprio treinador atual e `gestao_atleta`
+        (`atletaId` e `treinadorId` são dispensáveis; apontar outra pessoa dá
+        403); o treinador abre `treinador_atleta` com atleta próprio e ativo
+        (`atletaId` obrigatório; de outro treinador, 404) e `gestao_treinador`;
+        o gestor abre `gestao_atleta` com qualquer atleta ativo (`atletaId`) e
+        `gestao_treinador` com qualquer treinador ativo (`treinadorId`), e não
+        abre `treinador_atleta` (403). Atleta com atleta não existe; IBVAR: 403.
+        Há uma conversa por par, uma `gestao_atleta` por atleta e uma
+        `gestao_treinador` por treinador: se já existe, devolve a existente com
+        200; se criou, 201. Auditoria `abrir_conversa` só com ids e tipo."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                tipo:
+                  type: string
+                  enum:
+                    - treinador_atleta
+                    - gestao_atleta
+                    - gestao_treinador
+                atletaId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                treinadorId:
+                  type: string
+                  format: uuid
+                  pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+              required:
+                - tipo
+              additionalProperties: false
+      security: *a5
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  tipo:
+                    type: string
+                    enum:
+                      - treinador_atleta
+                      - gestao_atleta
+                      - gestao_treinador
+                  com:
+                    anyOf:
+                      - type: object
+                        properties:
+                          nome:
+                            type: string
+                          papel:
+                            type: string
+                            enum:
+                              - atleta
+                              - treinador
+                        required:
+                          - nome
+                          - papel
+                        additionalProperties: false
+                      - type: object
+                        properties:
+                          gestao:
+                            type: boolean
+                            enum:
+                              - true
+                        required:
+                          - gestao
+                        additionalProperties: false
+                    description: "Com quem a pessoa conversa: o outro lado (nome e papel) ou `{
+                      gestao: true }` (caixa compartilhada da gestão da CBVela)"
+                  atleta:
+                    nullable: true
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  treinador:
+                    nullable: true
+                    description: Treinador do par (tipos `treinador_atleta` e `gestao_treinador`)
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  criadaEm:
+                    type: string
+                    description: Instante ISO
+                  ultimaMensagemEm:
+                    nullable: true
+                    description: Instante ISO; nulo = ainda sem mensagens
+                    type: string
+                  naoLidas:
+                    type: integer
+                    minimum: 0
+                    maximum: 9007199254740991
+                  somenteLeitura:
+                    type: boolean
+                    description: "Verdadeiro quando não dá para enviar: par antigo (troca de
+                      treinador), conta desativada ou gestor lendo por
+                      supervisão"
+                  supervisaoAte:
+                    nullable: true
+                    description: "Só para o gestor: até quando vale o acesso de supervisão dele;
+                      nulo = sem acesso"
+                    type: string
+                required:
+                  - id
+                  - tipo
+                  - com
+                  - atleta
+                  - treinador
+                  - criadaEm
+                  - ultimaMensagemEm
+                  - naoLidas
+                  - somenteLeitura
+                  - supervisaoAte
+                additionalProperties: false
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  tipo:
+                    type: string
+                    enum:
+                      - treinador_atleta
+                      - gestao_atleta
+                      - gestao_treinador
+                  com:
+                    anyOf:
+                      - type: object
+                        properties:
+                          nome:
+                            type: string
+                          papel:
+                            type: string
+                            enum:
+                              - atleta
+                              - treinador
+                        required:
+                          - nome
+                          - papel
+                        additionalProperties: false
+                      - type: object
+                        properties:
+                          gestao:
+                            type: boolean
+                            enum:
+                              - true
+                        required:
+                          - gestao
+                        additionalProperties: false
+                    description: "Com quem a pessoa conversa: o outro lado (nome e papel) ou `{
+                      gestao: true }` (caixa compartilhada da gestão da CBVela)"
+                  atleta:
+                    nullable: true
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  treinador:
+                    nullable: true
+                    description: Treinador do par (tipos `treinador_atleta` e `gestao_treinador`)
+                    type: object
+                    properties:
+                      id:
+                        type: string
+                      nome:
+                        type: string
+                    required:
+                      - id
+                      - nome
+                    additionalProperties: false
+                  criadaEm:
+                    type: string
+                    description: Instante ISO
+                  ultimaMensagemEm:
+                    nullable: true
+                    description: Instante ISO; nulo = ainda sem mensagens
+                    type: string
+                  naoLidas:
+                    type: integer
+                    minimum: 0
+                    maximum: 9007199254740991
+                  somenteLeitura:
+                    type: boolean
+                    description: "Verdadeiro quando não dá para enviar: par antigo (troca de
+                      treinador), conta desativada ou gestor lendo por
+                      supervisão"
+                  supervisaoAte:
+                    nullable: true
+                    description: "Só para o gestor: até quando vale o acesso de supervisão dele;
+                      nulo = sem acesso"
+                    type: string
+                required:
+                  - id
+                  - tipo
+                  - com
+                  - atleta
+                  - treinador
+                  - criadaEm
+                  - ultimaMensagemEm
+                  - naoLidas
+                  - somenteLeitura
+                  - supervisaoAte
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /conversas/{id}/mensagens:
+    get:
+      summary: Mensagens de uma conversa, em ordem cronológica
+      tags:
+        - conversas
+      description: "Só as partes da conversa; o gestor lê uma `treinador_atleta` só
+        com supervisão vigente (POST /conversas/{id}/acesso-supervisao); sem
+        acesso, 404 (não revela que a conversa existe). Sem filtros: as `limite`
+        mais recentes. `antesDe` (instante ISO): as mensagens anteriores a ele,
+        para rolar o histórico (`proximoAntesDe` da resposta anterior).
+        `depoisDe` (instante ISO): só as mais novas, para consulta a cada 15 a
+        30 segundos. `propria` é verdadeiro nas mensagens de quem chama. O texto
+        é puro: o front escapa."
+      parameters:
+        - schema:
+            type: string
+            format: date-time
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+          in: query
+          name: depoisDe
+          required: false
+        - schema:
+            type: string
+            format: date-time
+            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))T(?:(?:[01]\d|2[0-3]):[0-5]\d:[0-5]\d(?:\.\d+)?(?:Z|([+-](?:[01]\d|2[0-3]):[0-5]\d)))$
+          in: query
+          name: antesDe
+          required: false
+        - schema:
+            default: 50
+            type: integer
+            minimum: 1
+            maximum: 100
+          in: query
+          name: limite
+          required: false
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: *a5
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  itens:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                        autor:
+                          type: object
+                          properties:
+                            nome:
+                              type: string
+                            papel:
+                              type: string
+                          required:
+                            - nome
+                            - papel
+                          additionalProperties: false
+                        propria:
+                          type: boolean
+                          description: Verdadeiro quando quem chama é o autor
+                        texto:
+                          type: string
+                          description: "Texto puro: o front escapa, nunca monta HTML"
+                        enviadaEm:
+                          type: string
+                          description: Instante ISO
+                      required:
+                        - id
+                        - autor
+                        - propria
+                        - texto
+                        - enviadaEm
+                      additionalProperties: false
+                  proximoAntesDe:
+                    nullable: true
+                    description: Passe em `antesDe` para a página anterior; nulo = não há mais
+                    type: string
+                required:
+                  - itens
+                  - proximoAntesDe
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    post:
+      summary: Envia uma mensagem
+      tags:
+        - conversas
+      description: "Só quem é parte da conversa e ela não está somente leitura: par
+        antigo (troca de treinador) ou conta desativada dão 409; o gestor lendo
+        por supervisão não envia (403). Sem acesso à conversa, 404. `texto`:
+        texto puro de 1 a 2000 caracteres (sem HTML; o texto é guardado como
+        veio e o front escapa). Limite de 30 mensagens por minuto por usuário
+        (429 `limite_excedido`). Avisa o outro lado (`mensagem_nova`,
+        `referencia: { conversaId }`), só se a pessoa ainda não tem aviso não
+        lido desta conversa; na caixa compartilhada, avisa os gestores ativos. A
+        auditoria guarda só ids e tipo, nunca o texto."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                texto:
+                  type: string
+                  maxLength: 2000
+              required:
+                - texto
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: *a5
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  id:
+                    type: string
+                  autor:
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                      papel:
+                        type: string
+                    required:
+                      - nome
+                      - papel
+                    additionalProperties: false
+                  propria:
+                    type: boolean
+                    description: Verdadeiro quando quem chama é o autor
+                  texto:
+                    type: string
+                    description: "Texto puro: o front escapa, nunca monta HTML"
+                  enviadaEm:
+                    type: string
+                    description: Instante ISO
+                required:
+                  - id
+                  - autor
+                  - propria
+                  - texto
+                  - enviadaEm
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "429":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /conversas/{id}/lidas:
+    put:
+      summary: Marca a conversa como lida, até agora, para quem chama
+      tags:
+        - conversas
+      description: Vale só para quem chama (na caixa compartilhada, cada gestor tem a
+        sua marca). Também marca como lidos os avisos `mensagem_nova` desta
+        conversa. O gestor em supervisão não grava marca (204 sem efeito). Não
+        gera auditoria (dado de interface).
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: *a5
+      responses:
+        "204":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: string
+                nullable: true
+                enum:
+                  - null
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /conversas/{id}/acesso-supervisao:
+    post:
+      summary: Gestor pede acesso de leitura a uma conversa entre treinador e atleta
+      tags:
+        - conversas
+      description: "Só o gestor, só conversas `treinador_atleta` (as outras dão 400;
+        conversa inexistente, 404). `motivo` obrigatório, de 5 a 500 caracteres
+        (ex.: denúncia). Libera a leitura daquela conversa, para aquele gestor,
+        por 24 horas (GET /conversas/{id}/mensagens); durante a supervisão ele
+        só lê, não envia. Pedir de novo renova o prazo e registra outro acesso.
+        Cada pedido vai para a auditoria (`acessar_conversa_supervisao`) com o
+        motivo e sem o conteúdo das mensagens. Os participantes veem na tela que
+        a conversa pode ser lida pelo gestor em caso de denúncia."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                motivo:
+                  type: string
+                  minLength: 5
+                  maxLength: 500
+              required:
+                - motivo
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: *a5
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  conversaId:
+                    type: string
+                    format: uuid
+                    pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                  expiraEm:
+                    type: string
+                    description: "Instante ISO: fim da leitura liberada"
+                required:
+                  - conversaId
+                  - expiraEm
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
   /me/resultados:
     post:
       summary: O atleta informa um resultado (uma edição de um evento), com a súmula
@@ -7407,7 +9016,7 @@ paths:
                 - ano
                 - posicao
               additionalProperties: false
-      security: &a5
+      security: &a6
         - bearerAuth: []
       responses:
         "201":
@@ -7758,7 +9367,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a5
+      security: *a6
       responses:
         "200":
           description: Default Response
@@ -8095,7 +9704,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a5
+      security: *a6
       responses:
         "200":
           description: Default Response
@@ -8433,7 +10042,7 @@ paths:
           in: path
           name: id
           required: true
-      security: &a9
+      security: &a10
         - bearerAuth: []
       responses:
         "201":
@@ -8764,7 +10373,7 @@ paths:
                     normalizados"
               required:
                 - codigo
-      security: &a6
+      security: &a7
         - bearerAuth: []
       responses:
         "200":
@@ -8985,7 +10594,7 @@ paths:
       summary: Treinadores ativos (para escolher o responsável no cadastro)
       tags:
         - cadastro
-      security: *a6
+      security: *a7
       responses:
         "200":
           description: Default Response
@@ -9141,7 +10750,7 @@ paths:
                 - classeId
                 - treinadorId
                 - confirmaMaioridade
-      security: *a6
+      security: *a7
       responses:
         "201":
           description: Default Response
@@ -9445,7 +11054,7 @@ paths:
           name: busca
           required: false
           description: Parte do nome, do ID World Sailing ou do VelaID
-      security: *a6
+      security: *a7
       responses:
         "200":
           description: Default Response
@@ -9651,7 +11260,7 @@ paths:
         - cadastro
       description: Quem nunca aceitou (termoAceitoVersao nulo) e quem aceitou só uma
         versão anterior à vigente (termoAceitoVersao preenchido).
-      security: *a6
+      security: *a7
       responses:
         "200":
           description: Default Response
@@ -9808,7 +11417,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a6
+      security: *a7
       responses:
         "200":
           description: Default Response
@@ -10053,7 +11662,7 @@ paths:
               required:
                 - tipo
                 - conteudo
-      security: *a6
+      security: *a7
       responses:
         "201":
           description: Default Response
@@ -10220,7 +11829,7 @@ paths:
         - painel
       description: "Não expõe as notas sugeridas das opções: a resposta só vira nota
         quando o treinador confirma."
-      security: &a7
+      security: &a8
         - bearerAuth: []
       responses:
         "200":
@@ -10573,7 +12182,7 @@ paths:
               required:
                 - indicadorId
                 - resposta
-      security: *a7
+      security: *a8
       responses:
         "201":
           description: Default Response
@@ -10768,7 +12377,7 @@ paths:
                   type: boolean
               required:
                 - compartilharIbvar
-      security: *a7
+      security: *a8
       responses:
         "200":
           description: Default Response
@@ -10988,7 +12597,7 @@ paths:
                   maxLength: 2000
               required:
                 - motivo
-      security: *a7
+      security: *a8
       responses:
         "201":
           description: Default Response
@@ -11180,7 +12789,7 @@ paths:
           in: query
           name: status
           required: false
-      security: *a7
+      security: *a8
       responses:
         "200":
           description: Default Response
@@ -11446,7 +13055,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a7
+      security: *a8
       responses:
         "200":
           description: Default Response
@@ -11695,7 +13304,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a7
+      security: *a8
       responses:
         "200":
           description: Default Response
@@ -12088,7 +13697,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a7
+      security: *a8
       responses:
         "200":
           description: Default Response
@@ -14125,7 +15734,7 @@ paths:
       summary: Lista os ciclos de avaliação, do mais recente ao mais antigo
       tags:
         - ciclos
-      security: &a8
+      security: &a9
         - bearerAuth: []
       responses:
         "200":
@@ -14325,7 +15934,7 @@ paths:
                 - inicio
                 - prazo
               additionalProperties: false
-      security: *a8
+      security: *a9
       responses:
         "201":
           description: Default Response
@@ -14553,7 +16162,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a8
+      security: *a9
       responses:
         "200":
           description: Default Response
@@ -14816,7 +16425,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a8
+      security: *a9
       responses:
         "200":
           description: Default Response
@@ -15083,7 +16692,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a8
+      security: *a9
       responses:
         "200":
           description: Default Response
@@ -15438,7 +17047,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a9
+      security: *a10
       responses:
         "200":
           description: Default Response
@@ -15939,11 +17548,11 @@ paths:
         resultados (com a edição e a situação da validação), decisões de gate,
         financeiro, pedidos de revisão (com o recurso, se houve) e pedidos do
         titular, telefone, validade do passaporte e aptidões conferidas,
-        pesagens informadas, pedidos de ajuste recebidos, foto de perfil (tipo e
-        link de 5 minutos), lista de evidências anexadas (metadados, sem o
-        arquivo) e plano individual (todas as versões). Só o atleta logado, só
-        os próprios dados."
-      security: &a10
+        pesagens informadas, pedidos de ajuste recebidos, mensagens das
+        conversas (D16), foto de perfil (tipo e link de 5 minutos), lista de
+        evidências anexadas (metadados, sem o arquivo) e plano individual (todas
+        as versões). Só o atleta logado, só os próprios dados."
+      security: &a11
         - bearerAuth: []
       responses:
         "200":
@@ -16057,6 +17666,14 @@ paths:
                       additionalProperties: {}
                     description: "Pedidos de ajuste recebidos do treinador ou do gestor: mensagem,
                       indicador, quem pediu e quando"
+                  mensagens:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: {}
+                    description: "Mensagens das conversas do atleta (com o treinador, atuais e
+                      antigas, e com a gestão): conversa, tipo, texto, autor
+                      (nome e papel) e data"
                   foto:
                     nullable: true
                     description: Foto de perfil da conta do atleta (o caminho interno não é
@@ -16107,6 +17724,7 @@ paths:
                   - pesagens
                   - conquistas
                   - pedidosAjuste
+                  - mensagens
                   - foto
                   - evidencias
                   - plano
@@ -16257,7 +17875,7 @@ paths:
               required:
                 - tipo
                 - descricao
-      security: *a10
+      security: *a11
       responses:
         "201":
           description: Default Response
@@ -16437,7 +18055,7 @@ paths:
         seus)"
       tags:
         - titular
-      security: *a10
+      security: *a11
       responses:
         "200":
           description: Default Response
@@ -16638,7 +18256,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a10
+      security: *a11
       responses:
         "200":
           description: Default Response
@@ -18726,7 +20344,7 @@ paths:
       summary: Lista as contas do sistema
       tags:
         - usuarios
-      security: *a11
+      security: *a12
       responses:
         "200":
           description: Default Response
@@ -18898,7 +20516,7 @@ paths:
                 - nome
                 - email
                 - papel
-      security: *a11
+      security: *a12
       responses:
         "201":
           description: Default Response
@@ -19188,7 +20806,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a11
+      security: *a12
       responses:
         "200":
           description: Default Response
@@ -19452,7 +21070,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a11
+      security: *a12
       responses:
         "200":
           description: Default Response
@@ -19710,7 +21328,7 @@ paths:
       description: Texto da versão vigente (a de maior vigente_desde que já começou).
         Qualquer usuário autenticado lê. A próxima versão publicada, ainda sem
         vigência, vem em GET /termo/proxima.
-      security: &a12
+      security: &a13
         - bearerAuth: []
       responses:
         "200":
@@ -19825,7 +21443,7 @@ paths:
       description: A de menor vigente_desde no futuro, com o texto, para o atleta ler
         e aceitar antes de ela valer (POST /termo/aceite). Só atleta e gestor.
         404 quando não há versão futura publicada.
-      security: *a12
+      security: *a13
       responses:
         "200":
           description: Default Response
@@ -19994,7 +21612,7 @@ paths:
                   maxLength: 100
               required:
                 - versao
-      security: *a12
+      security: *a13
       responses:
         "200":
           description: Default Response
@@ -20173,7 +21791,7 @@ paths:
         - termo
       description: Da mais nova para a mais antiga, com a quantidade de aceites de
         cada uma. Sem o texto (o vigente vem em GET /termo).
-      security: *a12
+      security: *a13
       responses:
         "200":
           description: Default Response
@@ -20343,7 +21961,7 @@ paths:
                 - texto
                 - vigenteDesde
               additionalProperties: false
-      security: *a12
+      security: *a13
       responses:
         "201":
           description: Default Response
@@ -20541,7 +22159,7 @@ paths:
           in: query
           name: antesDe
           required: false
-      security: &a13
+      security: &a14
         - bearerAuth: []
       responses:
         "200":
@@ -20578,6 +22196,7 @@ paths:
                             - atleta_registrou_conquista
                             - conquista_validada
                             - conquista_recusada
+                            - mensagem_nova
                         criadoEm:
                           type: string
                           description: Instante ISO
@@ -20745,7 +22364,7 @@ paths:
         - avisos
       description: "Gestor, treinador e atleta. IBVAR: 403. Não gera auditoria (dado
         de interface)."
-      security: *a13
+      security: *a14
       responses:
         "200":
           description: Default Response
@@ -20854,7 +22473,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a13
+      security: *a14
       responses:
         "204":
           description: Default Response
@@ -21020,7 +22639,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a13
+      security: *a14
       responses:
         "201":
           description: Default Response
@@ -21291,7 +22910,7 @@ paths:
                 - tipo
                 - texto
               additionalProperties: false
-      security: &a14
+      security: &a15
         - bearerAuth: []
       responses:
         "201":
@@ -21577,7 +23196,7 @@ paths:
           in: query
           name: status
           required: false
-      security: *a14
+      security: *a15
       responses:
         "200":
           description: Default Response
@@ -21850,7 +23469,7 @@ paths:
           in: path
           name: id
           required: true
-      security: *a14
+      security: *a15
       responses:
         "200":
           description: Default Response
