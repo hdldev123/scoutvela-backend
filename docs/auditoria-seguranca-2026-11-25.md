@@ -2,7 +2,7 @@
 
 Auditoria de ponta a ponta do Scout Vela (`vela-back` e `vela-front`, branch `release-24-11`, com as 18 demandas da reunião IBVAR). Feita só em ambiente local, com o seed fictício. Nenhum teste tocou produção, serviços de terceiros ou dados reais.
 
-As provas de conceito são testes automatizados contra a API local (`tests/seguranca/`). Cada uma falhou antes da correção e passa depois.
+As provas de conceito são testes automatizados contra a API local (`tests/seguranca/`). Cada uma falhou antes da correção e passa depois. O A7, achado no teste manual logo depois e corrigido no front, tem a prova no E2E do `vela-front`.
 
 ## 1. Superfície de ataque
 
@@ -83,6 +83,7 @@ O sistema não tem pagamento, saldo, transferência nem webhook financeiro. O "f
 | A2 | Log de acesso grava a query string, com dado pessoal | Baixa, 2,7 (AV:N/AC:L/PR:H/UI:N/S:U/C:L/I:N/A:N) | `src/app.ts:126-135` (logger sem serializer de `req`), ex.: `GET /atletas?busca=` | Pequeno |
 | A3 | Respostas da API sem `Cache-Control: no-store` | Baixa, 2,4 (AV:P/AC:L/PR:N/UI:R/S:U/C:L/I:N/A:N) | `src/app.ts` (nenhum cabeçalho de cache), todas as rotas | Pequeno |
 | A6 | `minimatch` com ReDoS na cadeia do ESLint | Baixa, só desenvolvimento (GHSA-g3hv-75wg-m249, moderada no pacote) | `package-lock.json` (dependência de desenvolvimento) | Pequeno |
+| A7 | Link de senha inválido troca a senha da conta já logada no navegador | Média, 5,4 (AV:N/AC:L/PR:N/UI:R/S:U/C:N/I:L/A:L), CWE-620 | Front: `src/components/scout/TelaRedefinirSenha.tsx` (antes da correção), rota `/redefinir-senha` | Pequeno |
 
 ### A1. Primeiro login assume cadastro sem e-mail confirmado no token
 
@@ -122,6 +123,26 @@ O sistema não tem pagamento, saldo, transferência nem webhook financeiro. O "f
 - **Impacto:** só na máquina de quem desenvolve e no CI. Não entra no build de produção.
 - **Correção:** `npm audit fix` com o npm 11, que mexe só no `package-lock.json`. Depois dela, `npm audit` dá 0.
 
+### A7. Link de senha inválido troca a senha da conta já logada
+
+- **Como apareceu:** no teste manual, depois da auditoria. O gestor cadastrou um atleta, mandou o convite e abriu o link no mesmo navegador em que estava logado. A senha trocada foi a do gestor.
+- **Descrição:**
+  - um link de convite ou de redefinição inválido, expirado ou já usado não cria sessão;
+  - a sessão que já estava aberta no navegador continua valendo;
+  - a tela `/redefinir-senha` só conferia se existia uma sessão, então mostrava o formulário, e `updateUser` trocava a senha da conta logada;
+  - o mesmo valia para a página aberta sem link nenhum.
+- **Ataque:** um terceiro manda a quem está logado um link para `/redefinir-senha` ("defina a senha da conta nova"). A pessoa digita uma senha pensando em outra conta e troca a própria. O terceiro não fica sabendo a senha nova, mas a pessoa perde o acesso até pedir outra redefinição.
+- **Prova:**
+  - no navegador real (Playwright), com o gestor logado, o convite já usado de teste@teste.com mostrava o formulário, e a senha nova passava a valer para o gestor;
+  - `e2e/login.spec.ts` do front, casos "link de senha … com o gestor logado": falham sem a correção.
+- **Impacto:** troca não intencional da senha da conta logada, que pode ser a do gestor. Não expõe dado nem dá acesso a terceiros.
+- **Correção (front, `src/lib/auth/link-senha.ts` e `TelaRedefinirSenha`):**
+  - a tela guarda o hash do link antes de o supabase-js consumi-lo;
+  - o formulário só aparece quando a sessão ativa é a conta que o link autenticou (claim `sub` do token), e isso é conferido de novo na hora de salvar;
+  - link com erro ou de outra conta mostra "Link inválido";
+  - a página aberta sem link manda trocar a senha em "Meu perfil".
+- **Causa raiz:** a tela confiava em "existe uma sessão" em vez de "a sessão é a do link". Agora exige a conta do link.
+
 ## 4. Falsos positivos e itens verificados sem falha
 
 | Candidato | Por que não é falha |
@@ -156,6 +177,7 @@ O sistema não tem pagamento, saldo, transferência nem webhook financeiro. O "f
 - Typecheck, lint, Prettier e a suíte completa do back passam.
 - O E2E do front (Playwright, com axe) passa contra o back corrigido.
 - `npm audit` dá 0 vulnerabilidades, inclusive nas de desenvolvimento.
+- A7: testes unitários (`src/test/senha.test.tsx`) e E2E (`e2e/login.spec.ts`) no front, mais a verificação no navegador real. O link usado mostra "Link inválido", um link válido troca só a senha da conta dele, e a senha do gestor fica intacta.
 
 ## 7. Endurecimento contínuo recomendado
 
