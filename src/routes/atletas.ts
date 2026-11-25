@@ -28,6 +28,7 @@ import { carregarParametros } from "../repositories/parametros.js";
 import { buscarPlanoAtual } from "../repositories/plano.js";
 import { esquemaAptidao } from "./aptidao.js";
 import { esquemaResultadoDetalhe } from "./esquemas-resultado.js";
+import { esquemaFonteFaixa } from "./parametros.js";
 import { esquemaPlanoRegistrado, esquemaTextosPlano } from "./plano.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 import { caminhoDaFotoDoAtleta, linkDaFoto } from "../servicos/foto-perfil.js";
@@ -225,6 +226,11 @@ const esquemaFicha = z.object({
       pesoMaxKg: z.number(),
       deltaKg: z.number(),
       distanciaRelativa: z.number(),
+      fonte: esquemaFonteFaixa
+        .nullable()
+        .describe(
+          "De onde vem a faixa de peso da classe (documento, versão e data); nula se não informada. Vai junto com a faixa: o IBVAR não recebe (classFit inteiro nulo)",
+        ),
       altura: z
         .object({
           cm: z.number().nullable().describe("Altura do atleta; nula se não medida"),
@@ -439,6 +445,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
               pesoMaxKg: atleta.classe.pesoMaxKg,
               deltaKg: calculo.classFit.deltaKg,
               distanciaRelativa: calculo.classFit.distanciaRelativa,
+              fonte: atleta.classe.fonte,
               altura: {
                 cm: dados.medida.alturaCm,
                 minCm: atleta.classe.alturaMinCm,

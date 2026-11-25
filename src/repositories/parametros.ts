@@ -199,10 +199,32 @@ export interface FaixaAlturaClasse {
   alturaMaxCm: number | null;
 }
 
+/** De onde vem a faixa de peso da classe (informativa; não entra no cálculo). */
+export interface FonteFaixa {
+  documento: string | null;
+  versao: string | null;
+  /** AAAA-MM-DD. */
+  data: string | null;
+}
+
+/** Fonte da faixa a partir das três colunas; nula se nenhuma foi preenchida. */
+export function fonteDaFaixa(l: {
+  faixa_fonte_documento: string | null;
+  faixa_fonte_versao: string | null;
+  faixa_fonte_data: string | null;
+}): FonteFaixa | null {
+  if (!l.faixa_fonte_documento && !l.faixa_fonte_versao && !l.faixa_fonte_data) return null;
+  return {
+    documento: l.faixa_fonte_documento,
+    versao: l.faixa_fonte_versao,
+    data: l.faixa_fonte_data,
+  };
+}
+
 export interface ParametrosCompletos {
   pilares: Pilar[];
   faixas: FaixaScore[];
-  classes: (Classe & { ativa: boolean } & FaixaAlturaClasse)[];
+  classes: (Classe & { ativa: boolean } & FaixaAlturaClasse & { fonte: FonteFaixa | null })[];
   rubricas: { pilarId: string | null; nota: number; descricao: string }[];
   regras: { codigo: string; descricao: string; valor: unknown; atualizadoEm: string }[];
   componentesCusto: { id: string; nome: string }[];
@@ -233,7 +255,14 @@ export async function carregarParametrosCompletos(db: Db): Promise<ParametrosCom
       altura_min_cm: string | null;
       altura_media_cm: string | null;
       altura_max_cm: string | null;
-    }>("select id, ativa, altura_min_cm, altura_media_cm, altura_max_cm from classes"),
+      faixa_fonte_documento: string | null;
+      faixa_fonte_versao: string | null;
+      faixa_fonte_data: string | null;
+    }>(
+      `select id, ativa, altura_min_cm, altura_media_cm, altura_max_cm,
+              faixa_fonte_documento, faixa_fonte_versao, faixa_fonte_data::text as faixa_fonte_data
+         from classes`,
+    ),
   ]);
   const extraPorId = new Map(ativas.rows.map((c) => [c.id, c]));
   const num = (v: string | null | undefined) => (v == null ? null : Number(v));
@@ -248,6 +277,7 @@ export async function carregarParametrosCompletos(db: Db): Promise<ParametrosCom
         alturaMinCm: num(x?.altura_min_cm),
         alturaMediaCm: num(x?.altura_media_cm),
         alturaMaxCm: num(x?.altura_max_cm),
+        fonte: x ? fonteDaFaixa(x) : null,
       };
     }),
     rubricas,
@@ -289,6 +319,9 @@ export interface AtualizacaoParametros {
         alturaMediaCm?: number | null | undefined;
         alturaMaxCm?: number | null | undefined;
         ativa?: boolean | undefined;
+        /** Fonte da faixa de peso; nulo limpa. */
+        fonte?:
+          { documento: string; versao?: string | null; data?: string | null } | null | undefined;
       }[]
     | undefined;
 }
@@ -595,7 +628,7 @@ export async function atualizarParametros(
             alturaNova = [amin, amedia, amax];
           }
         }
-        if (!comFaixa && alturaNova === undefined && c.ativa === undefined)
+        if (!comFaixa && alturaNova === undefined && c.ativa === undefined && c.fonte === undefined)
           throw new ErroParametros(`Classe ${c.id}: nada para alterar.`);
         if (comFaixa && !(min <= medio && medio <= max)) {
           throw new ErroParametros(MSG_ORDEM_PESO_CLASSE);
@@ -609,8 +642,12 @@ export async function atualizarParametros(
             altura_media_cm: string | null;
             altura_max_cm: string | null;
             ativa: boolean;
+            faixa_fonte_documento: string | null;
+            faixa_fonte_versao: string | null;
+            faixa_fonte_data: string | null;
           }>(
-            `select peso_min_kg, peso_medio_kg, peso_max_kg, altura_min_cm, altura_media_cm, altura_max_cm, ativa
+            `select peso_min_kg, peso_medio_kg, peso_max_kg, altura_min_cm, altura_media_cm, altura_max_cm, ativa,
+                    faixa_fonte_documento, faixa_fonte_versao, faixa_fonte_data::text as faixa_fonte_data
                from classes where id = $1`,
             [c.id],
           )
@@ -642,16 +679,42 @@ export async function atualizarParametros(
               ];
         // A altura só entra na auditoria quando a requisição a altera.
         const comAltura = alturaNova !== undefined;
+        // A fonte só entra na auditoria quando a requisição a altera.
+        const comFonte = c.fonte !== undefined;
+        const fonteAntes = fonteDaFaixa(atual);
+        const fonteDepois: FonteFaixa | null | undefined =
+          c.fonte === undefined
+            ? undefined
+            : c.fonte === null
+              ? null
+              : {
+                  documento: c.fonte.documento.trim(),
+                  versao: c.fonte.versao?.trim() || null,
+                  data: c.fonte.data ?? null,
+                };
         antes[c.id] = {
           pesoKg: pesoAtual,
           ...(comAltura ? { alturaCm: alturaAtual } : {}),
+          ...(comFonte ? { fonte: fonteAntes } : {}),
           ativa: atual.ativa,
         };
         depois[c.id] = {
           pesoKg: comFaixa ? [min, medio, max] : pesoAtual,
           ...(comAltura ? { alturaCm: alturaNova } : {}),
+          ...(comFonte ? { fonte: fonteDepois } : {}),
           ativa: c.ativa ?? atual.ativa,
         };
+        if (fonteDepois !== undefined) {
+          await tx.query(
+            "update classes set faixa_fonte_documento = $1, faixa_fonte_versao = $2, faixa_fonte_data = $3::date where id = $4",
+            [
+              fonteDepois?.documento ?? null,
+              fonteDepois?.versao ?? null,
+              fonteDepois?.data ?? null,
+              c.id,
+            ],
+          );
+        }
         if (alturaNova !== undefined) {
           await tx.query(
             "update classes set altura_min_cm = $1, altura_media_cm = $2, altura_max_cm = $3 where id = $4",

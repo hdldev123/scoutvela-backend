@@ -1,3 +1,4 @@
+import { fonteDaFaixa, type FonteFaixa } from "./parametros.js";
 import { termoSql } from "./termo.js";
 import { idadeEm } from "../domain/classfit.js";
 import type { UsuarioAutenticado } from "../auth/plugin.js";
@@ -18,6 +19,8 @@ export interface ClasseAltura {
   alturaMinCm: number | null;
   alturaMediaCm: number | null;
   alturaMaxCm: number | null;
+  /** De onde vem a faixa de peso da classe (D18); nula se não informada. */
+  fonte: FonteFaixa | null;
 }
 
 /** Atleta com o que o cadastro, a classe e o treinador respondem. */
@@ -179,6 +182,9 @@ interface LinhaBase {
   altura_min_cm: string | null;
   altura_media_cm: string | null;
   altura_max_cm: string | null;
+  faixa_fonte_documento: string | null;
+  faixa_fonte_versao: string | null;
+  faixa_fonte_data: string | null;
 }
 
 export interface FiltrosListagem {
@@ -226,7 +232,8 @@ export async function listarAtletasVisiveis(
             ${termoAceito} as termo_aceito,
             c.id as classe_id, c.nome as classe_nome, c.evento as classe_evento, c.posicao as classe_posicao,
             c.peso_min_kg, c.peso_medio_kg, c.peso_max_kg,
-            c.altura_min_cm, c.altura_media_cm, c.altura_max_cm
+            c.altura_min_cm, c.altura_media_cm, c.altura_max_cm,
+            c.faixa_fonte_documento, c.faixa_fonte_versao, c.faixa_fonte_data::text as faixa_fonte_data
        from atletas a
        join classes c on c.id = a.classe_id
        left join usuarios t on t.id = a.treinador_id
@@ -252,6 +259,7 @@ export async function listarAtletasVisiveis(
       alturaMinCm: l.altura_min_cm === null ? null : Number(l.altura_min_cm),
       alturaMediaCm: l.altura_media_cm === null ? null : Number(l.altura_media_cm),
       alturaMaxCm: l.altura_max_cm === null ? null : Number(l.altura_max_cm),
+      fonte: fonteDaFaixa(l),
     },
     clube: l.clube,
     cidade: l.cidade,

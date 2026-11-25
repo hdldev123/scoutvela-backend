@@ -9,6 +9,12 @@ import {
   carregarParametrosCompletos,
 } from "../repositories/parametros.js";
 
+export const esquemaFonteFaixa = z.object({
+  documento: z.string().nullable().describe("Documento que traz a faixa de peso"),
+  versao: z.string().nullable().describe("Versão do documento, como ele a informa"),
+  data: z.string().nullable().describe("Data do documento (AAAA-MM-DD)"),
+});
+
 const esquemaParametros = z.object({
   pilares: z.array(
     z.object({
@@ -66,6 +72,9 @@ const esquemaParametros = z.object({
         .describe("Altura de referência (informativa); nula se não definida"),
       alturaMediaCm: z.number().nullable(),
       alturaMaxCm: z.number().nullable(),
+      fonte: esquemaFonteFaixa
+        .nullable()
+        .describe("De onde vem a faixa de peso da classe; nula se não informada"),
     }),
   ),
   rubricas: z.array(
@@ -213,6 +222,27 @@ const esquemaAtualizacao = z
           alturaMediaCm: alturaCm.optional(),
           alturaMaxCm: alturaCm.optional(),
           ativa: z.boolean().optional().describe("Não dá para desativar classe com atleta ativo"),
+          fonte: z
+            .object({
+              documento: z
+                .string("Informe o documento.")
+                .trim()
+                .min(1, "Informe o documento.")
+                .max(200, "O documento aceita até 200 caracteres."),
+              versao: z
+                .string()
+                .trim()
+                .min(1, "Informe a versão ou deixe em branco.")
+                .max(40, "A versão aceita até 40 caracteres.")
+                .nullable()
+                .optional(),
+              data: z.iso.date("Informe a data no formato AAAA-MM-DD.").nullable().optional(),
+            })
+            .nullable()
+            .optional()
+            .describe(
+              "Fonte da faixa de peso (documento, versão e data), só informativa. Nulo limpa. A auditoria guarda antes e depois",
+            ),
         }),
       )
       .max(50)

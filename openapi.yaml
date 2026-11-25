@@ -2569,6 +2569,30 @@ paths:
                         type: number
                       distanciaRelativa:
                         type: number
+                      fonte:
+                        nullable: true
+                        description: "De onde vem a faixa de peso da classe (documento, versão e data);
+                          nula se não informada. Vai junto com a faixa: o IBVAR
+                          não recebe (classFit inteiro nulo)"
+                        type: object
+                        properties:
+                          documento:
+                            nullable: true
+                            description: Documento que traz a faixa de peso
+                            type: string
+                          versao:
+                            nullable: true
+                            description: Versão do documento, como ele a informa
+                            type: string
+                          data:
+                            nullable: true
+                            description: Data do documento (AAAA-MM-DD)
+                            type: string
+                        required:
+                          - documento
+                          - versao
+                          - data
+                        additionalProperties: false
                       altura:
                         type: object
                         properties:
@@ -2612,6 +2636,7 @@ paths:
                       - pesoMaxKg
                       - deltaKg
                       - distanciaRelativa
+                      - fonte
                       - altura
                     additionalProperties: false
                   resultados:
@@ -12416,6 +12441,28 @@ paths:
                         alturaMaxCm:
                           nullable: true
                           type: number
+                        fonte:
+                          nullable: true
+                          description: De onde vem a faixa de peso da classe; nula se não informada
+                          type: object
+                          properties:
+                            documento:
+                              nullable: true
+                              description: Documento que traz a faixa de peso
+                              type: string
+                            versao:
+                              nullable: true
+                              description: Versão do documento, como ele a informa
+                              type: string
+                            data:
+                              nullable: true
+                              description: Data do documento (AAAA-MM-DD)
+                              type: string
+                          required:
+                            - documento
+                            - versao
+                            - data
+                          additionalProperties: false
                       required:
                         - id
                         - ativa
@@ -12428,6 +12475,7 @@ paths:
                         - alturaMinCm
                         - alturaMediaCm
                         - alturaMaxCm
+                        - fonte
                       additionalProperties: false
                   rubricas:
                     type: array
@@ -12739,6 +12787,28 @@ paths:
                       ativa:
                         description: Não dá para desativar classe com atleta ativo
                         type: boolean
+                      fonte:
+                        description: Fonte da faixa de peso (documento, versão e data), só informativa.
+                          Nulo limpa. A auditoria guarda antes e depois
+                        nullable: true
+                        type: object
+                        properties:
+                          documento:
+                            type: string
+                            minLength: 1
+                            maxLength: 200
+                          versao:
+                            nullable: true
+                            type: string
+                            minLength: 1
+                            maxLength: 40
+                          data:
+                            nullable: true
+                            type: string
+                            format: date
+                            pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                        required:
+                          - documento
                     required:
                       - id
       security:
@@ -12880,6 +12950,28 @@ paths:
                         alturaMaxCm:
                           nullable: true
                           type: number
+                        fonte:
+                          nullable: true
+                          description: De onde vem a faixa de peso da classe; nula se não informada
+                          type: object
+                          properties:
+                            documento:
+                              nullable: true
+                              description: Documento que traz a faixa de peso
+                              type: string
+                            versao:
+                              nullable: true
+                              description: Versão do documento, como ele a informa
+                              type: string
+                            data:
+                              nullable: true
+                              description: Data do documento (AAAA-MM-DD)
+                              type: string
+                          required:
+                            - documento
+                            - versao
+                            - data
+                          additionalProperties: false
                       required:
                         - id
                         - ativa
@@ -12892,6 +12984,7 @@ paths:
                         - alturaMinCm
                         - alturaMediaCm
                         - alturaMaxCm
+                        - fonte
                       additionalProperties: false
                   rubricas:
                     type: array
