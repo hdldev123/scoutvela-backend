@@ -80,10 +80,49 @@ paths:
                       id:
                         type: string
                       nome:
+                        nullable: true
+                        description: Nulo até o atleta completar o cadastro
                         type: string
                     required:
                       - id
                       - nome
+                    additionalProperties: false
+                  cadastroPendente:
+                    nullable: true
+                    description: "Só para o atleta que ainda não completou o cadastro: ele informa
+                      nome, gênero e data de nascimento em PUT /me/cadastro
+                      antes do painel. Nulo nos demais casos."
+                    type: object
+                    properties:
+                      wsId:
+                        type: string
+                      velaid:
+                        nullable: true
+                        type: string
+                      sugestao:
+                        nullable: true
+                        description: Dados do VelaID para o atleta confirmar; nula sem VelaID
+                        type: object
+                        properties:
+                          nome:
+                            type: string
+                          genero:
+                            type: string
+                            enum:
+                              - F
+                              - M
+                          dataNascimento:
+                            type: string
+                            description: AAAA-MM-DD
+                        required:
+                          - nome
+                          - genero
+                          - dataNascimento
+                        additionalProperties: false
+                    required:
+                      - wsId
+                      - velaid
+                      - sugestao
                     additionalProperties: false
                   telas:
                     type: array
@@ -94,6 +133,7 @@ paths:
                 required:
                   - usuario
                   - atleta
+                  - cadastroPendente
                   - telas
                   - telaInicial
                 additionalProperties: false
@@ -136,6 +176,265 @@ paths:
                   - mensagem
                 additionalProperties: false
         "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /me/cadastro:
+    put:
+      summary: "O atleta completa o cadastro: nome, gênero e data de nascimento (uma
+        vez)"
+      tags:
+        - sessao
+      description: "Só o atleta, e só uma vez: depois de completo, a segunda chamada
+        devolve 409 (a correção é pelo pedido do titular). Os dados sugeridos do
+        VelaID vêm em GET /me (cadastroPendente.sugestao). Menor de 18 anos: a
+        API recusa com 400 sem gravar a data, o nome nem o gênero, inativa o
+        atleta e a conta, abre um pedido de exclusão para o gestor anonimizar e
+        soma no balão `cadastro` do gestor; a auditoria não guarda a data. Data
+        futura ou de mais de 100 anos: 400. Ao completar, o atleta passa a
+        entrar no ranking depois do aceite do termo."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                nome:
+                  type: string
+                  minLength: 2
+                  maxLength: 120
+                genero:
+                  type: string
+                  enum:
+                    - F
+                    - M
+                dataNascimento:
+                  type: string
+                  format: date
+                  pattern: ^(?:(?:\d\d[2468][048]|\d\d[13579][26]|\d\d0[48]|[02468][048]00|[13579][26]00)-02-29|\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\d|30)|(?:02)-(?:0[1-9]|1\d|2[0-8])))$
+                  description: AAAA-MM-DD
+              required:
+                - nome
+                - genero
+                - dataNascimento
+              additionalProperties: false
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  nome:
+                    type: string
+                  genero:
+                    type: string
+                    enum:
+                      - F
+                      - M
+                  dataNascimento:
+                    type: string
+                  cadastroCompleto:
+                    type: boolean
+                    enum:
+                      - true
+                required:
+                  - nome
+                  - genero
+                  - dataNascimento
+                  - cadastroCompleto
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
           description: Default Response
           content:
             application/json:
@@ -475,8 +774,17 @@ paths:
                     nullable: true
                     type: object
                     properties:
-                      velaid:
+                      wsId:
                         type: string
+                        description: ID World Sailing (a chave do atleta)
+                      velaid:
+                        nullable: true
+                        description: Nulo se o atleta não tem VelaID
+                        type: string
+                      cadastroCompleto:
+                        type: boolean
+                        description: Falso até o atleta informar nome, gênero e data de nascimento (PUT
+                          /me/cadastro)
                       classe:
                         type: object
                         properties:
@@ -492,8 +800,9 @@ paths:
                         nullable: true
                         type: string
                       dataNascimento:
+                        nullable: true
+                        description: AAAA-MM-DD; nula com o cadastro incompleto
                         type: string
-                        description: AAAA-MM-DD
                       clube:
                         nullable: true
                         type: string
@@ -525,7 +834,9 @@ paths:
                       compartilharIbvar:
                         type: boolean
                     required:
+                      - wsId
                       - velaid
+                      - cadastroCompleto
                       - classe
                       - numeroVela
                       - dataNascimento
@@ -637,9 +948,10 @@ paths:
       summary: "Edita o perfil: nome (treinador e gestor) ou e-mail de contato (atleta)"
       tags:
         - sessao
-      description: "Os dados vindos do VelaID não são editáveis aqui: a correção é
-        pelo pedido do titular (tipo `correcao`). A auditoria guarda só os nomes
-        dos campos."
+      description: "Nome, gênero e data de nascimento do atleta (informados em PUT
+        /me/cadastro) e o ID World Sailing não são editáveis aqui: a correção é
+        pelo pedido do titular (tipo `correcao`); só o gestor troca o WS ID. A
+        auditoria guarda só os nomes dos campos."
       requestBody:
         required: true
         content:
@@ -690,8 +1002,17 @@ paths:
                     nullable: true
                     type: object
                     properties:
-                      velaid:
+                      wsId:
                         type: string
+                        description: ID World Sailing (a chave do atleta)
+                      velaid:
+                        nullable: true
+                        description: Nulo se o atleta não tem VelaID
+                        type: string
+                      cadastroCompleto:
+                        type: boolean
+                        description: Falso até o atleta informar nome, gênero e data de nascimento (PUT
+                          /me/cadastro)
                       classe:
                         type: object
                         properties:
@@ -707,8 +1028,9 @@ paths:
                         nullable: true
                         type: string
                       dataNascimento:
+                        nullable: true
+                        description: AAAA-MM-DD; nula com o cadastro incompleto
                         type: string
-                        description: AAAA-MM-DD
                       clube:
                         nullable: true
                         type: string
@@ -740,7 +1062,9 @@ paths:
                       compartilharIbvar:
                         type: boolean
                     required:
+                      - wsId
                       - velaid
+                      - cadastroCompleto
                       - classe
                       - numeroVela
                       - dataNascimento
@@ -1259,7 +1583,8 @@ paths:
       tags:
         - ranking
       description: Gestor vê todos; treinador, os próprios; IBVAR, só atletas com
-        consentimento (os demais entram apenas na contagem).
+        consentimento (os demais entram apenas na contagem). Atleta com cadastro
+        incompleto não entra.
       parameters:
         - schema:
             type: string
@@ -1335,7 +1660,12 @@ paths:
                               type: string
                             nome:
                               type: string
+                            wsId:
+                              type: string
+                              description: ID World Sailing; para o IBVAR só de quem consentiu (como o item)
                             velaid:
+                              nullable: true
+                              description: Nulo se o atleta não tem VelaID
                               type: string
                             numeroVela:
                               nullable: true
@@ -1374,6 +1704,7 @@ paths:
                           required:
                             - id
                             - nome
+                            - wsId
                             - velaid
                             - numeroVela
                             - uf
@@ -1567,12 +1898,14 @@ paths:
       tags:
         - atletas
       description: "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo
-        404. IBVAR: só vê quem consentiu E está dentro do piloto (mesma regra do
-        ranking: aceite do termo, que segue TERMO_EXIGE_REACEITE); fora do
-        piloto dá 404, também no histórico do indicador. Gestor, treinador e o
-        próprio atleta mantêm o acesso. IBVAR: sem indicadores sensíveis, Class
-        Fit, contato, financeiro detalhado nem texto de evidência; o motivo do
-        gate G1 vem genérico, sem a diferença em kg."
+        404; atleta com cadastro incompleto também dá 404 (o próprio atleta lê a
+        sugestão em GET /me). IBVAR: só vê quem consentiu E está dentro do
+        piloto (mesma regra do ranking: aceite do termo, que segue
+        TERMO_EXIGE_REACEITE); fora do piloto dá 404, também no histórico do
+        indicador. Gestor, treinador e o próprio atleta mantêm o acesso. IBVAR:
+        sem indicadores sensíveis, Class Fit, contato, financeiro detalhado nem
+        texto de evidência; o motivo do gate G1 vem genérico, sem a diferença em
+        kg."
       parameters:
         - schema:
             type: string
@@ -1598,7 +1931,12 @@ paths:
                         type: string
                       nome:
                         type: string
+                      wsId:
+                        type: string
+                        description: ID World Sailing; o IBVAR só vê atleta que consentiu
                       velaid:
+                        nullable: true
+                        description: Nulo se o atleta não tem VelaID
                         type: string
                       numeroVela:
                         nullable: true
@@ -1654,6 +1992,7 @@ paths:
                     required:
                       - id
                       - nome
+                      - wsId
                       - velaid
                       - numeroVela
                       - genero
@@ -2340,11 +2679,14 @@ paths:
                   - mensagem
                 additionalProperties: false
     put:
-      summary: Edita classe, treinador, número de vela ou situação do atleta
+      summary: Edita WS ID, classe, treinador, número de vela ou situação do atleta
       tags:
         - usuarios
       description: "Valida classe ativa e treinador ativo. numeroVela vazio limpa o
-        campo. Atleta anonimizado não pode ser alterado nem reativado: 409."
+        campo. wsId (ID World Sailing, a chave do atleta): só o gestor troca;
+        vira maiúsculas e sem espaços, segue ^[A-Z]{3}[A-Z0-9]{2,12}$ (400) e
+        não pode repetir o de outro atleta (409); a auditoria guarda só o nome
+        do campo. Atleta anonimizado não pode ser alterado nem reativado: 409."
       requestBody:
         required: true
         content:
@@ -2352,6 +2694,9 @@ paths:
             schema:
               type: object
               properties:
+                wsId:
+                  type: string
+                  maxLength: 40
                 classeId:
                   type: string
                   minLength: 1
@@ -2385,6 +2730,8 @@ paths:
                 properties:
                   id:
                     type: string
+                  wsId:
+                    type: string
                   classeId:
                     type: string
                   treinadorId:
@@ -2397,6 +2744,7 @@ paths:
                     type: boolean
                 required:
                   - id
+                  - wsId
                   - classeId
                   - treinadorId
                   - numeroVela
@@ -4124,12 +4472,17 @@ paths:
                 additionalProperties: false
   /atletas:
     post:
-      summary: Cadastra o atleta a partir do VelaID e registra o envio do termo
+      summary: Cadastra o atleta pelo ID World Sailing e registra o envio do termo
       tags:
         - cadastro
-      description: "Revalida tudo no servidor: existe no VelaID, 18+, ainda não
-        cadastrado, classe ativa e treinador válido. O atleta só entra no
-        ranking depois do aceite do termo."
+      description: "O atleta nasce com cadastro incompleto (sem nome, gênero e data de
+        nascimento): ele os informa no primeiro acesso, em PUT /me/cadastro. Até
+        lá fica fora do ranking, do score, das pendências, do fechamento de
+        ciclo e do investimento. wsId duplicado ou velaid já usado dão 409.
+        confirmaMaioridade deve ser true. Se o velaid vier e existir no VelaID,
+        o vínculo é guardado e os dados de lá ficam como sugestão para o atleta;
+        velaid de menor de 18 anos é recusado. Código fora do VelaID importado é
+        aceito, sem sugestão. Revalida classe ativa e treinador válido."
       requestBody:
         required: true
         content:
@@ -4137,9 +4490,17 @@ paths:
             schema:
               type: object
               properties:
-                velaidCodigo:
+                wsId:
                   type: string
                   maxLength: 40
+                  description: "ID World Sailing (ex.: BRARB51). Vira maiúsculas e sem espaços;
+                    formato ^[A-Z]{3}[A-Z0-9]{2,12}$"
+                email:
+                  type: string
+                  maxLength: 254
+                  format: email
+                  pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+                  description: "E-mail do atleta: conta de login, convite e termo"
                 classeId:
                   type: string
                   minLength: 1
@@ -4148,15 +4509,26 @@ paths:
                   type: string
                   format: uuid
                   pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                velaid:
+                  description: Código VelaID, opcional. Se existir em velaid_registros, os dados
+                    de lá viram sugestão para o atleta confirmar no primeiro
+                    acesso
+                  type: string
+                  maxLength: 40
+                confirmaMaioridade:
+                  type: boolean
+                  enum:
+                    - true
                 criarConta:
                   default: true
-                  description: Cria a conta do atleta (papel atleta) e envia o convite, se houver
-                    e-mail no VelaID
+                  description: Cria a conta do atleta (papel atleta) e envia o convite
                   type: boolean
               required:
-                - velaidCodigo
+                - wsId
+                - email
                 - classeId
                 - treinadorId
+                - confirmaMaioridade
       security: *a2
       responses:
         "201":
@@ -4168,8 +4540,15 @@ paths:
                 properties:
                   id:
                     type: string
-                  nome:
+                  wsId:
                     type: string
+                  velaid:
+                    nullable: true
+                    type: string
+                  cadastroCompleto:
+                    type: boolean
+                    enum:
+                      - false
                   termo:
                     type: object
                     properties:
@@ -4190,12 +4569,14 @@ paths:
                       - sem_email
                       - indisponivel
                     description: "convite_enviado: conta criada e convite enviado. sem_email:
-                      nenhuma conta criada (VelaID sem e-mail, e-mail já em uso
-                      ou criarConta=false). indisponivel: conta criada, mas o
+                      nenhuma conta criada (e-mail já em uso ou
+                      criarConta=false). indisponivel: conta criada, mas o
                       convite não foi enviado (use POST /usuarios/:id/convite)."
                 required:
                   - id
-                  - nome
+                  - wsId
+                  - velaid
+                  - cadastroCompleto
                   - termo
                   - conta
                 additionalProperties: false
@@ -4396,7 +4777,11 @@ paths:
       description: "Inclui inativos e quem não aceitou o termo. Sem dado sensível nem
         e-mail. termoAceito segue a regra do ranking (TERMO_EXIGE_REACEITE).
         contaVinculada: já existe conta de atleta ligada a ele. busca procura no
-        nome e no código VelaID."
+        nome, no ID World Sailing e no código VelaID. cadastroCompleto: o atleta
+        já informou nome, gênero e data de nascimento; incompleto aparece com
+        nome nulo. cadastroRecusado: o atleta informou menos de 18 anos no
+        primeiro acesso (inativado; o gestor remove o cadastro pela
+        anonimização)."
       parameters:
         - schema:
             type: string
@@ -4430,11 +4815,19 @@ paths:
           required: false
         - schema:
             type: string
+            enum:
+              - "true"
+              - "false"
+          in: query
+          name: cadastroCompleto
+          required: false
+        - schema:
+            type: string
             maxLength: 80
           in: query
           name: busca
           required: false
-          description: Parte do nome ou do VelaID
+          description: Parte do nome, do ID World Sailing ou do VelaID
       security: *a2
       responses:
         "200":
@@ -4449,8 +4842,13 @@ paths:
                     id:
                       type: string
                     nome:
+                      nullable: true
+                      description: Nulo enquanto o cadastro está incompleto
+                      type: string
+                    wsId:
                       type: string
                     velaid:
+                      nullable: true
                       type: string
                     classe:
                       type: object
@@ -4482,17 +4880,26 @@ paths:
                       type: boolean
                     termoAceito:
                       type: boolean
+                    cadastroCompleto:
+                      type: boolean
+                    cadastroRecusado:
+                      type: boolean
+                      description: "Menor de 18 anos no primeiro acesso: inativado, aguarda
+                        anonimização"
                     contaVinculada:
                       type: boolean
                   required:
                     - id
                     - nome
+                    - wsId
                     - velaid
                     - classe
                     - treinador
                     - numeroVela
                     - ativo
                     - termoAceito
+                    - cadastroCompleto
+                    - cadastroRecusado
                     - contaVinculada
                   additionalProperties: false
         "400":
@@ -4630,8 +5037,13 @@ paths:
                     id:
                       type: string
                     nome:
+                      nullable: true
+                      description: Nulo enquanto o cadastro está incompleto
+                      type: string
+                    wsId:
                       type: string
                     velaid:
+                      nullable: true
                       type: string
                     classe:
                       type: object
@@ -4654,6 +5066,7 @@ paths:
                   required:
                     - id
                     - nome
+                    - wsId
                     - velaid
                     - classe
                     - criadoEm

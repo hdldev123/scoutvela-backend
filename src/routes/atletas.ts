@@ -59,7 +59,8 @@ const esquemaFicha = z.object({
   atleta: z.object({
     id: z.string(),
     nome: z.string(),
-    velaid: z.string(),
+    wsId: z.string().describe("ID World Sailing; o IBVAR só vê atleta que consentiu"),
+    velaid: z.string().nullable().describe("Nulo se o atleta não tem VelaID"),
     numeroVela: z.string().nullable(),
     genero: z.enum(["F", "M"]),
     idade: z.number().int(),
@@ -191,7 +192,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         tags: ["atletas"],
         summary: "Ficha do atleta, conforme a matriz de acesso do papel",
         description:
-          "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo 404. IBVAR: só vê quem consentiu E está dentro do piloto (mesma regra do ranking: aceite do termo, que segue TERMO_EXIGE_REACEITE); fora do piloto dá 404, também no histórico do indicador. Gestor, treinador e o próprio atleta mantêm o acesso. IBVAR: sem indicadores sensíveis, Class Fit, contato, financeiro detalhado nem texto de evidência; o motivo do gate G1 vem genérico, sem a diferença em kg.",
+          "Atleta fora do acesso do usuário e atleta inexistente dão o mesmo 404; atleta com cadastro incompleto também dá 404 (o próprio atleta lê a sugestão em GET /me). IBVAR: só vê quem consentiu E está dentro do piloto (mesma regra do ranking: aceite do termo, que segue TERMO_EXIGE_REACEITE); fora do piloto dá 404, também no histórico do indicador. Gestor, treinador e o próprio atleta mantêm o acesso. IBVAR: sem indicadores sensíveis, Class Fit, contato, financeiro detalhado nem texto de evidência; o motivo do gate G1 vem genérico, sem a diferença em kg.",
         security: [{ bearerAuth: [] }],
         params: z.object({ id: z.uuid() }),
         response: {
@@ -354,6 +355,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         atleta: {
           id: atleta.id,
           nome: atleta.nome,
+          wsId: atleta.wsId,
           velaid: atleta.velaid,
           numeroVela: atleta.numeroVela,
           genero: atleta.genero,

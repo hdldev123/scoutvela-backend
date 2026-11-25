@@ -63,6 +63,11 @@ async function inserirUsuario(
   return rows[0]!.id;
 }
 
+/** ID World Sailing FICTÍCIO do atleta do seed: `BRA` + o código VelaID sem o hífen (ex.: SP-T07 vira BRASPT07). */
+export function wsIdFicticio(velaId: string): string {
+  return `BRA${velaId.replace(/[^A-Z0-9]/g, "")}`;
+}
+
 /**
  * Semeia dados fictícios do protótipo (14 atletas, 5 usuários, 3 ciclos).
  * Só para desenvolvimento e homologação: recusa produção e banco que já tem atletas.
@@ -126,9 +131,9 @@ export async function semear(db: Db): Promise<void> {
       if (!treinadorId) throw new Error(`Treinador ${a.treinador} sem usuário no seed`);
 
       const { rows } = await tx.query<{ id: string }>(
-        `insert into atletas (velaid_codigo, nome, genero, data_nascimento, classe_id, clube, cidade, uf, numero_vela,
-                              treinador_id, email_contato, criado_por)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning id`,
+        `insert into atletas (velaid_codigo, ws_id, nome, genero, data_nascimento, classe_id, clube, cidade, uf, numero_vela,
+                              treinador_id, email_contato, criado_por, cadastro_completo_em)
+         values ($1, $13, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, '2026-10-14T12:00:00-03:00') returning id`,
         [
           a.velaId,
           a.nome,
@@ -142,14 +147,25 @@ export async function semear(db: Db): Promise<void> {
           treinadorId,
           a.emailContato,
           gestorId,
+          wsIdFicticio(a.velaId),
         ],
       );
       const atletaId = rows[0]!.id;
 
       await tx.query(
-        `insert into velaid_registros (codigo, nome, genero, data_nascimento, clube, cidade, uf, email, fonte)
-         values ($1, $2, $3, $4, $5, $6, $7, $8, 'simulado')`,
-        [a.velaId, a.nome, a.genero, a.nascimento, a.clube, a.cidade, a.uf, a.emailContato],
+        `insert into velaid_registros (codigo, nome, genero, data_nascimento, clube, cidade, uf, ws_id, email, fonte)
+         values ($1, $2, $3, $4, $5, $6, $7, $8, $9, 'simulado')`,
+        [
+          a.velaId,
+          a.nome,
+          a.genero,
+          a.nascimento,
+          a.clube,
+          a.cidade,
+          a.uf,
+          wsIdFicticio(a.velaId),
+          a.emailContato,
+        ],
       );
 
       if (a.velaId === "SP-T07") {

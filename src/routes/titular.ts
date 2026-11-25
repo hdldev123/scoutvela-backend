@@ -109,7 +109,7 @@ interface LinhaPedido {
   anonimizado_em: Date | null;
 }
 
-const SQL_PEDIDO = `select p.id::text as id, p.atleta_id, a.nome as atleta_nome, p.tipo, p.descricao,
+const SQL_PEDIDO = `select p.id::text as id, p.atleta_id, coalesce(a.nome, a.ws_id) as atleta_nome, p.tipo, p.descricao,
          p.status, p.criado_em, p.resposta, p.respondido_em,
          case when a.anonimizado_pedido_id = p.id then a.anonimizado_em end as anonimizado_em
     from pedidos_titular p join atletas a on a.id = p.atleta_id`;

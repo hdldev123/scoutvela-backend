@@ -24,10 +24,16 @@ const esquemaPerfil = z.object({
   mfaAtivo: z.boolean().describe("A sessão atual passou pelo segundo fator (aal2)"),
   atleta: z
     .object({
-      velaid: z.string(),
+      wsId: z.string().describe("ID World Sailing (a chave do atleta)"),
+      velaid: z.string().nullable().describe("Nulo se o atleta não tem VelaID"),
+      cadastroCompleto: z
+        .boolean()
+        .describe(
+          "Falso até o atleta informar nome, gênero e data de nascimento (PUT /me/cadastro)",
+        ),
       classe: z.object({ id: z.string(), nome: z.string() }),
       numeroVela: z.string().nullable(),
-      dataNascimento: z.string().describe("AAAA-MM-DD"),
+      dataNascimento: z.string().nullable().describe("AAAA-MM-DD; nula com o cadastro incompleto"),
       clube: z.string().nullable(),
       cidade: z.string().nullable(),
       uf: z.string().nullable(),
@@ -43,11 +49,13 @@ const esquemaPerfil = z.object({
 const esquemaFoto = z.object({ fotoUrl: z.string().nullable() });
 
 interface LinhaAtletaPerfil {
-  velaid_codigo: string;
+  ws_id: string;
+  cadastro_completo: boolean;
+  velaid_codigo: string | null;
   classe_id: string;
   classe_nome: string;
   numero_vela: string | null;
-  data_nascimento: string;
+  data_nascimento: string | null;
   clube: string | null;
   cidade: string | null;
   uf: string | null;
@@ -60,7 +68,8 @@ interface LinhaAtletaPerfil {
 
 async function dadosDoAtleta(db: Db, atletaId: string) {
   const r = await db.query<LinhaAtletaPerfil>(
-    `select a.velaid_codigo, a.classe_id, c.nome as classe_nome, a.numero_vela,
+    `select a.ws_id, (a.cadastro_completo_em is not null) as cadastro_completo,
+            a.velaid_codigo, a.classe_id, c.nome as classe_nome, a.numero_vela,
             to_char(a.data_nascimento, 'YYYY-MM-DD') as data_nascimento,
             a.clube, a.cidade, a.uf, a.email_contato,
             t.id::text as treinador_id, t.nome as treinador_nome,
@@ -77,7 +86,9 @@ async function dadosDoAtleta(db: Db, atletaId: string) {
   const l = r.rows[0];
   if (!l) return null;
   return {
+    wsId: l.ws_id,
     velaid: l.velaid_codigo,
+    cadastroCompleto: l.cadastro_completo,
     classe: { id: l.classe_id, nome: l.classe_nome },
     numeroVela: l.numero_vela,
     dataNascimento: l.data_nascimento,
@@ -170,7 +181,7 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
         tags: ["sessao"],
         summary: "Edita o perfil: nome (treinador e gestor) ou e-mail de contato (atleta)",
         description:
-          "Os dados vindos do VelaID não são editáveis aqui: a correção é pelo pedido do titular (tipo `correcao`). A auditoria guarda só os nomes dos campos.",
+          "Nome, gênero e data de nascimento do atleta (informados em PUT /me/cadastro) e o ID World Sailing não são editáveis aqui: a correção é pelo pedido do titular (tipo `correcao`); só o gestor troca o WS ID. A auditoria guarda só os nomes dos campos.",
         security: [{ bearerAuth: [] }],
         body: z
           .object({

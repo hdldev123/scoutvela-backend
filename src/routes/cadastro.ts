@@ -2,7 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
-import { idadeEm } from "../domain/index.js";
+import { idadeEm, normalizarWsId, wsIdValido } from "../domain/index.js";
 import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
 import { ContaJaExiste } from "../integracoes/supabase-admin.js";
 import { erroAtletaAnonimizado, recusarAtletaAnonimizado } from "../repositories/anonimizado.js";
@@ -12,6 +12,10 @@ import { ArquivoRejeitado, importarCsv } from "../importacao/index.js";
 
 const IDADE_MINIMA_PILOTO = 18;
 const CODIGO_VELAID = /^[A-Z]{2}-[A-Z0-9]{2,10}$/;
+
+const MENSAGEM_WS_ID_INVALIDO =
+  "ID World Sailing inválido. Use 3 letras do país seguidas de 2 a 12 letras ou números, por exemplo BRARB51.";
+const MENSAGEM_WS_ID_DUPLICADO = "Já existe um atleta com este ID World Sailing.";
 
 const requisicaoInvalida = (m: string) => new ErroApi(400, "requisicao_invalida", m);
 /** Conflito de estado (já cadastrado, já aceito). Usa o código `requisicao_invalida` com status 409. */
@@ -67,15 +71,29 @@ const esquemaRespostaBusca = z.object({
 });
 
 const esquemaCadastro = z.object({
-  velaidCodigo: z.string().max(40),
+  wsId: z
+    .string()
+    .max(40)
+    .describe(
+      "ID World Sailing (ex.: BRARB51). Vira maiúsculas e sem espaços; formato ^[A-Z]{3}[A-Z0-9]{2,12}$",
+    ),
+  email: z.email().max(254).describe("E-mail do atleta: conta de login, convite e termo"),
   classeId: z.string().min(1).max(40),
   treinadorId: z.uuid(),
+  velaid: z
+    .string()
+    .max(40)
+    .optional()
+    .describe(
+      "Código VelaID, opcional. Se existir em velaid_registros, os dados de lá viram sugestão para o atleta confirmar no primeiro acesso",
+    ),
+  confirmaMaioridade: z.literal(true, {
+    error: "Confirme que o atleta tem 18 anos ou mais.",
+  }),
   criarConta: z
     .boolean()
     .default(true)
-    .describe(
-      "Cria a conta do atleta (papel atleta) e envia o convite, se houver e-mail no VelaID",
-    ),
+    .describe("Cria a conta do atleta (papel atleta) e envia o convite"),
 });
 
 const esquemaImportacao = z.object({
@@ -186,20 +204,22 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       preHandler: soGestor,
       schema: {
         tags: ["cadastro"],
-        summary: "Cadastra o atleta a partir do VelaID e registra o envio do termo",
+        summary: "Cadastra o atleta pelo ID World Sailing e registra o envio do termo",
         description:
-          "Revalida tudo no servidor: existe no VelaID, 18+, ainda não cadastrado, classe ativa e treinador válido. O atleta só entra no ranking depois do aceite do termo.",
+          "O atleta nasce com cadastro incompleto (sem nome, gênero e data de nascimento): ele os informa no primeiro acesso, em PUT /me/cadastro. Até lá fica fora do ranking, do score, das pendências, do fechamento de ciclo e do investimento. wsId duplicado ou velaid já usado dão 409. confirmaMaioridade deve ser true. Se o velaid vier e existir no VelaID, o vínculo é guardado e os dados de lá ficam como sugestão para o atleta; velaid de menor de 18 anos é recusado. Código fora do VelaID importado é aceito, sem sugestão. Revalida classe ativa e treinador válido.",
         security: seguranca,
         body: esquemaCadastro,
         response: {
           201: z.object({
             id: z.string(),
-            nome: z.string(),
+            wsId: z.string(),
+            velaid: z.string().nullable(),
+            cadastroCompleto: z.literal(false),
             termo: z.object({ status: z.literal("aguardando_aceite"), versao: z.string() }),
             conta: z
               .enum(["convite_enviado", "sem_email", "indisponivel"])
               .describe(
-                "convite_enviado: conta criada e convite enviado. sem_email: nenhuma conta criada (VelaID sem e-mail, e-mail já em uso ou criarConta=false). indisponivel: conta criada, mas o convite não foi enviado (use POST /usuarios/:id/convite).",
+                "convite_enviado: conta criada e convite enviado. sem_email: nenhuma conta criada (e-mail já em uso ou criarConta=false). indisponivel: conta criada, mas o convite não foi enviado (use POST /usuarios/:id/convite).",
               ),
           }),
           400: esquemaErro,
@@ -211,28 +231,38 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       },
     },
     async (req, reply) => {
-      const codigo = normalizarCodigo(req.body.velaidCodigo);
+      const wsId = normalizarWsId(req.body.wsId);
+      if (!wsIdValido(wsId)) throw requisicaoInvalida(MENSAGEM_WS_ID_INVALIDO);
+      const velaidInformado = req.body.velaid?.trim() ? normalizarCodigo(req.body.velaid) : null;
       const { classeId, treinadorId, criarConta } = req.body;
+      const email = req.body.email.trim().toLowerCase();
       const usuarioId = req.usuario.id;
       const referencia = app.agora();
       const termo = await buscarTermoVigente(app.db, referencia);
 
       const criado = await app.db
         .transacao(async (tx) => {
-          const v = (
-            await tx.query<LinhaVelaId>(
-              `select ${COLUNAS_VELAID_SQL} from velaid_registros where codigo = $1`,
-              [codigo],
-            )
-          ).rows[0];
-          if (!v) throw naoEncontrado(`Nenhum atleta com o código ${codigo} no VelaID.`);
-          const idade = idadeEm(v.data_nascimento, referencia);
-          if (idade < IDADE_MINIMA_PILOTO) throw requisicaoInvalida(motivoMenor(v.nome, idade));
-          if (
-            (await tx.query("select 1 from atletas where velaid_codigo = $1", [codigo])).rows
-              .length > 0
-          ) {
-            throw conflito(`O código ${codigo} já está no piloto.`);
+          let v: LinhaVelaId | undefined;
+          if (velaidInformado) {
+            v = (
+              await tx.query<LinhaVelaId>(
+                `select ${COLUNAS_VELAID_SQL} from velaid_registros where codigo = $1`,
+                [velaidInformado],
+              )
+            ).rows[0];
+            if (v) {
+              const idade = idadeEm(v.data_nascimento, referencia);
+              if (idade < IDADE_MINIMA_PILOTO) throw requisicaoInvalida(motivoMenor(v.nome, idade));
+            }
+            if (
+              (await tx.query("select 1 from atletas where velaid_codigo = $1", [velaidInformado]))
+                .rows.length > 0
+            ) {
+              throw conflito(`O código ${velaidInformado} já está no piloto.`);
+            }
+          }
+          if ((await tx.query("select 1 from atletas where ws_id = $1", [wsId])).rows.length > 0) {
+            throw conflito(MENSAGEM_WS_ID_DUPLICADO);
           }
           if (
             (await tx.query("select 1 from classes where id = $1 and ativa", [classeId])).rows
@@ -247,43 +277,44 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
           if (trein.rows.length === 0) throw requisicaoInvalida("Treinador inválido ou inativo.");
 
           const ins = await tx.query<{ id: string }>(
-            `insert into atletas (velaid_codigo, nome, genero, data_nascimento, classe_id, clube, cidade, uf, ws_id,
+            `insert into atletas (ws_id, velaid_codigo, classe_id, clube, cidade, uf,
                                   treinador_id, email_contato, criado_por)
-             values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12) returning id`,
+             values ($1, $2, $3, $4, $5, $6, $7, $8, $9) returning id`,
             [
-              v.codigo,
-              v.nome,
-              v.genero,
-              v.data_nascimento,
+              wsId,
+              velaidInformado,
               classeId,
-              v.clube,
-              v.cidade,
-              v.uf,
-              v.ws_id,
+              v?.clube ?? null,
+              v?.cidade ?? null,
+              v?.uf ?? null,
               treinadorId,
-              v.email,
+              email,
               usuarioId,
             ],
           );
           const id = ins.rows[0]!.id;
-          // Sem o VelaID: o entidade_id já identifica o atleta, e a anonimização não pode deixar
-          // o código original na trilha de auditoria.
-          const detalhes = JSON.stringify({ classeId, versaoTermo: termo.versao });
+          // Sem WS ID nem VelaID: o entidade_id já identifica o atleta, e a anonimização não pode
+          // deixar o código original na trilha de auditoria.
+          const detalhes = JSON.stringify({
+            classeId,
+            versaoTermo: termo.versao,
+            comVelaid: velaidInformado !== null,
+          });
           await tx.query(
             `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
              values ($1, 'cadastrar_atleta', 'atletas', $2, $3::jsonb, $4), ($1, 'enviar_termo', 'atletas', $2, $3::jsonb, $4)`,
             [usuarioId, id, detalhes, app.agora()],
           );
 
-          // Conta do atleta (papel atleta), amarrada ao e-mail do VelaID. E-mail já em uso: não cria.
+          // Conta do atleta (papel atleta), amarrada ao e-mail informado. E-mail já em uso: não cria.
+          // O nome da conta é provisório (parte local do e-mail) até o atleta completar o cadastro.
           let contaUsuarioId: string | null = null;
-          const email = v.email?.trim().toLowerCase() || null;
-          if (criarConta && email) {
+          if (criarConta) {
             const emUso = await tx.query("select 1 from usuarios where lower(email) = $1", [email]);
             if (emUso.rows.length === 0) {
               const u = await tx.query<{ id: string }>(
                 "insert into usuarios (email, nome, papel, atleta_id) values ($1, $2, 'atleta', $3) returning id",
-                [email, v.nome, id],
+                [email, email.split("@")[0]!.slice(0, 120) || "Atleta", id],
               );
               contaUsuarioId = u.rows[0]!.id;
               await tx.query(
@@ -298,18 +329,24 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
               );
             }
           }
-          return { id, nome: v.nome, email, contaUsuarioId };
+          return { id, email, contaUsuarioId };
         })
         .catch((e: unknown) => {
-          // Cadastro simultâneo do mesmo código: a restrição única do banco decide.
-          if ((e as { code?: string }).code === "23505")
-            throw conflito(`O código ${codigo} já está no piloto.`);
+          // Cadastro simultâneo do mesmo WS ID ou VelaID: a restrição única do banco decide.
+          const f = e as { code?: string; constraint?: string };
+          if (f.code === "23505") {
+            throw conflito(
+              f.constraint?.includes("velaid")
+                ? `O código ${velaidInformado ?? "VelaID"} já está no piloto.`
+                : MENSAGEM_WS_ID_DUPLICADO,
+            );
+          }
           throw e;
         });
 
       const front = app.config.FRONT_URL.replace(/\/+$/, "");
       let conta: "convite_enviado" | "sem_email" | "indisponivel" = "sem_email";
-      if (criado.contaUsuarioId && criado.email) {
+      if (criado.contaUsuarioId) {
         conta = "indisponivel";
         if (app.adminAuth) {
           try {
@@ -345,28 +382,26 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       }
 
       // E-mail do termo: falha de envio não desfaz o cadastro (o gestor pode registrar o aceite depois).
-      if (criado.email) {
-        try {
-          await app.email.enviar({
-            para: criado.email,
-            assunto: "Scout Vela: leia e aceite o termo de consentimento",
-            texto: [
-              `Olá, ${criado.nome}.`,
-              "Você foi cadastrado no piloto do Scout Vela (CBVela). Para participar, leia e aceite o termo de consentimento " +
-                `(${termo.versao}) em ${front}`,
-              "O compartilhamento com o IBVAR é uma autorização separada, que você controla depois do aceite.",
-            ].join("\n\n"),
-          });
-        } catch (e) {
-          req.log.error(
-            {
-              evento: "email_termo_falhou",
-              atletaId: criado.id,
-              err: e instanceof Error ? e.message : "erro",
-            },
-            "falha ao enviar o termo",
-          );
-        }
+      try {
+        await app.email.enviar({
+          para: criado.email,
+          assunto: "Scout Vela: complete seu cadastro e aceite o termo de consentimento",
+          texto: [
+            "Olá,",
+            "Você foi cadastrado no piloto do Scout Vela (CBVela). No primeiro acesso, complete seu cadastro (nome, gênero e data de nascimento) e leia e aceite o termo de consentimento " +
+              `(${termo.versao}) em ${front}`,
+            "O compartilhamento com o IBVAR é uma autorização separada, que você controla depois do aceite.",
+          ].join("\n\n"),
+        });
+      } catch (e) {
+        req.log.error(
+          {
+            evento: "email_termo_falhou",
+            atletaId: criado.id,
+            err: e instanceof Error ? e.message : "erro",
+          },
+          "falha ao enviar o termo",
+        );
       }
 
       req.log.info(
@@ -375,7 +410,9 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       );
       return reply.code(201).send({
         id: criado.id,
-        nome: criado.nome,
+        wsId,
+        velaid: velaidInformado,
+        cadastroCompleto: false as const,
         termo: { status: "aguardando_aceite" as const, versao: termo.versao },
         conta,
       });
@@ -391,26 +428,37 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         tags: ["cadastro"],
         summary: "Todos os atletas do piloto, para gestão do cadastro",
         description:
-          "Inclui inativos e quem não aceitou o termo. Sem dado sensível nem e-mail. termoAceito segue a regra do ranking (TERMO_EXIGE_REACEITE). contaVinculada: já existe conta de atleta ligada a ele. busca procura no nome e no código VelaID.",
+          "Inclui inativos e quem não aceitou o termo. Sem dado sensível nem e-mail. termoAceito segue a regra do ranking (TERMO_EXIGE_REACEITE). contaVinculada: já existe conta de atleta ligada a ele. busca procura no nome, no ID World Sailing e no código VelaID. cadastroCompleto: o atleta já informou nome, gênero e data de nascimento; incompleto aparece com nome nulo. cadastroRecusado: o atleta informou menos de 18 anos no primeiro acesso (inativado; o gestor remove o cadastro pela anonimização).",
         security: seguranca,
         querystring: z.object({
           ativo: z.enum(["true", "false"]).optional(),
           termoAceito: z.enum(["true", "false"]).optional(),
           classeId: z.string().min(1).max(40).optional(),
           treinadorId: z.uuid().optional(),
-          busca: z.string().trim().max(80).optional().describe("Parte do nome ou do VelaID"),
+          cadastroCompleto: z.enum(["true", "false"]).optional(),
+          busca: z
+            .string()
+            .trim()
+            .max(80)
+            .optional()
+            .describe("Parte do nome, do ID World Sailing ou do VelaID"),
         }),
         response: {
           200: z.array(
             z.object({
               id: z.string(),
-              nome: z.string(),
-              velaid: z.string(),
+              nome: z.string().nullable().describe("Nulo enquanto o cadastro está incompleto"),
+              wsId: z.string(),
+              velaid: z.string().nullable(),
               classe: z.object({ id: z.string(), nome: z.string() }),
               treinador: z.object({ id: z.string(), nome: z.string() }).nullable(),
               numeroVela: z.string().nullable(),
               ativo: z.boolean(),
               termoAceito: z.boolean(),
+              cadastroCompleto: z.boolean(),
+              cadastroRecusado: z
+                .boolean()
+                .describe("Menor de 18 anos no primeiro acesso: inativado, aguarda anonimização"),
               contaVinculada: z.boolean(),
             }),
           ),
@@ -428,6 +476,7 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         agora: app.agora(),
         ativo: comoBool(q.ativo),
         termoAceito: comoBool(q.termoAceito),
+        cadastroCompleto: comoBool(q.cadastroCompleto),
         classeId: q.classeId,
         treinadorId: q.treinadorId,
         busca: q.busca,
@@ -449,8 +498,9 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
           200: z.array(
             z.object({
               id: z.string(),
-              nome: z.string(),
-              velaid: z.string(),
+              nome: z.string().nullable().describe("Nulo enquanto o cadastro está incompleto"),
+              wsId: z.string(),
+              velaid: z.string().nullable(),
               classe: z.object({ id: z.string(), nome: z.string() }),
               criadoEm: z.string().describe("Instante ISO"),
               termoAceitoVersao: z
@@ -468,14 +518,15 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       const agora = app.agora();
       const { rows } = await app.db.query<{
         id: string;
-        nome: string;
-        velaid: string;
+        nome: string | null;
+        ws_id: string;
+        velaid: string | null;
         classe_id: string;
         classe_nome: string;
         criado_em: Date;
         termo_aceito_versao: string | null;
       }>(
-        `select a.id, a.nome, a.velaid_codigo as velaid, c.id as classe_id, c.nome as classe_nome, a.criado_em,
+        `select a.id, a.nome, a.ws_id, a.velaid_codigo as velaid, c.id as classe_id, c.nome as classe_nome, a.criado_em,
                 (select ct.versao_termo from consentimento_atual ct
                   where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido) as termo_aceito_versao
            from atletas a join classes c on c.id = a.classe_id
@@ -486,6 +537,7 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
       return rows.map((l) => ({
         id: l.id,
         nome: l.nome,
+        wsId: l.ws_id,
         velaid: l.velaid,
         classe: { id: l.classe_id, nome: l.classe_nome },
         criadoEm: new Date(l.criado_em).toISOString(),

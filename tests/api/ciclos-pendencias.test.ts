@@ -82,8 +82,8 @@ describe("GET /ciclos/:id/pendencias", () => {
       await p.db.query<{ classe_id: string }>("select classe_id from atletas limit 1")
     ).rows[0]!.classe_id;
     await p.db.query(
-      `insert into atletas (velaid_codigo, nome, genero, data_nascimento, classe_id, treinador_id)
-       values ('MG-T98', 'Sem Termo', 'F', '2000-01-01', $1, $2)`,
+      `insert into atletas (velaid_codigo, ws_id, nome, genero, data_nascimento, classe_id, treinador_id, cadastro_completo_em)
+       values ('MG-T98', 'BRAMGT98', 'Sem Termo', 'F', '2000-01-01', $1, $2, now())`,
       [classe, ana.id],
     );
 

@@ -25,11 +25,7 @@ describe("POST /atletas com conta e e-mail do termo", () => {
     await semAdmin.encerrar();
   });
 
-  const cadastrar = async (
-    alvo: Piloto,
-    velaidCodigo: string,
-    extra: Record<string, unknown> = {},
-  ) => {
+  const cadastrar = async (alvo: Piloto, extra: Record<string, unknown> = {}) => {
     const treinadorId = (
       await alvo.db.query<{ id: string }>("select id from usuarios where email = $1", [
         EMAILS_DEMO.treinadora,
@@ -39,7 +35,14 @@ describe("POST /atletas com conta e e-mail do termo", () => {
       method: "POST",
       url: "/atletas",
       headers: await alvo.como(EMAILS_DEMO.gestor),
-      payload: { velaidCodigo, classeId: "ilca7", treinadorId, ...extra },
+      payload: {
+        wsId: "BRARB51",
+        email: "renata@exemplo.com",
+        classeId: "ilca7",
+        treinadorId,
+        confirmaMaioridade: true,
+        ...extra,
+      },
     });
     return { status: r.statusCode, corpo: r.json() };
   };
@@ -57,11 +60,13 @@ describe("POST /atletas com conta e e-mail do termo", () => {
     ).rows[0];
 
   it("cria a conta de atleta, convida e envia o e-mail do termo; resposta compatível + conta", async () => {
-    const { status, corpo } = await cadastrar(p, "MG-T15");
+    const { status, corpo } = await cadastrar(p);
     expect(status).toBe(201);
     expect(corpo).toEqual({
       id: expect.any(String),
-      nome: "Renata Bastos",
+      wsId: "BRARB51",
+      velaid: null,
+      cadastroCompleto: false,
       termo: { status: "aguardando_aceite", versao: "Piloto 18+ · v1" },
       conta: "convite_enviado",
     });
@@ -79,6 +84,7 @@ describe("POST /atletas com conta e e-mail do termo", () => {
     expect(m.para).toBe("renata@exemplo.com");
     expect(m.texto).toContain("http://localhost:8080");
     expect(m.texto).toContain("Piloto 18+ · v1");
+    expect(m.texto).toContain("complete seu cadastro");
 
     const aud = await p.db.query<{ acao: string; detalhes: unknown }>(
       "select acao, detalhes from auditoria where acao in ('criar_usuario', 'convidar_usuario') order by id",
@@ -89,7 +95,11 @@ describe("POST /atletas com conta e e-mail do termo", () => {
 
   it("criarConta=false: só cadastra, sem usuário nem convite, mas o e-mail do termo vai", async () => {
     const antes = emails.enviadas.length;
-    const { status, corpo } = await cadastrar(p, "BA-T16", { criarConta: false });
+    const { status, corpo } = await cadastrar(p, {
+      wsId: "BRAFG77",
+      email: "felipe@exemplo.com",
+      criarConta: false,
+    });
     expect(status).toBe(201);
     expect(corpo.conta).toBe("sem_email");
     expect(await usuarioDe(p, "felipe@exemplo.com")).toBeUndefined();
@@ -97,21 +107,22 @@ describe("POST /atletas com conta e e-mail do termo", () => {
     expect(emails.enviadas.at(-1)!.para).toBe("felipe@exemplo.com");
   });
 
-  it("VelaID sem e-mail: sem conta e sem e-mail", async () => {
-    await p.db.query(
-      "insert into velaid_registros (codigo, nome, genero, data_nascimento, fonte) values ('SP-T97', 'Sem Email', 'F', '2000-01-01', 'simulado')",
-    );
-    const antes = emails.enviadas.length;
-    expect((await cadastrar(p, "SP-T97")).corpo.conta).toBe("sem_email");
-    expect(emails.enviadas).toHaveLength(antes);
+  it("a conta nasce com nome provisório (parte local do e-mail)", async () => {
+    const { status, corpo } = await cadastrar(p, {
+      wsId: "BRAXY12",
+      email: "Maria.Souza@Exemplo.com",
+    });
+    expect(status).toBe(201);
+    const u = (await usuarioDe(p, "maria.souza@exemplo.com"))!;
+    expect(u).toMatchObject({ papel: "atleta", atleta_id: corpo.id });
+    const nome = (
+      await p.db.query<{ nome: string }>("select nome from usuarios where id = $1", [u.id])
+    ).rows[0]!.nome;
+    expect(nome).toBe("maria.souza");
   });
 
   it("e-mail já usado por outro usuário: cadastra o atleta sem criar conta", async () => {
-    await p.db.query(
-      "insert into velaid_registros (codigo, nome, genero, data_nascimento, email, fonte) values ('SP-T99', 'Duplicada', 'F', '2000-01-01', $1, 'simulado')",
-      [EMAILS_DEMO.ibvar],
-    );
-    const { status, corpo } = await cadastrar(p, "SP-T99");
+    const { status, corpo } = await cadastrar(p, { wsId: "BRADUP1", email: EMAILS_DEMO.ibvar });
     expect(status).toBe(201);
     expect(corpo.conta).toBe("sem_email");
     expect(
@@ -120,7 +131,7 @@ describe("POST /atletas com conta e e-mail do termo", () => {
   });
 
   it("sem adminAuth: usuário criado, conta indisponivel; o termo ainda é enviado", async () => {
-    const { status, corpo } = await cadastrar(semAdmin, "MG-T15");
+    const { status, corpo } = await cadastrar(semAdmin);
     expect(status).toBe(201);
     expect(corpo.conta).toBe("indisponivel");
     expect(await usuarioDe(semAdmin, "renata@exemplo.com")).toMatchObject({
@@ -132,11 +143,8 @@ describe("POST /atletas com conta e e-mail do termo", () => {
   });
 
   it("e-mail que já tem conta no Auth: indisponivel (login será vinculado pelo e-mail)", async () => {
-    admin.contasExistentes.add("felipe@exemplo.com");
-    await p.db.query(
-      "insert into velaid_registros (codigo, nome, genero, data_nascimento, email, fonte) values ('SP-T98', 'Conta Existente', 'M', '2000-01-01', 'felipe@exemplo.com', 'simulado')",
-    );
-    const { corpo } = await cadastrar(p, "SP-T98");
+    admin.contasExistentes.add("existente@exemplo.com");
+    const { corpo } = await cadastrar(p, { wsId: "BRAEX99", email: "existente@exemplo.com" });
     expect(corpo.conta).toBe("indisponivel");
   });
 
@@ -149,7 +157,7 @@ describe("POST /atletas com conta e e-mail do termo", () => {
       },
     });
     try {
-      const { status, corpo } = await cadastrar(falho, "MG-T15");
+      const { status, corpo } = await cadastrar(falho);
       expect(status).toBe(201);
       expect(corpo.termo.status).toBe("aguardando_aceite");
     } finally {

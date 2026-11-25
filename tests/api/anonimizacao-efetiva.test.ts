@@ -88,9 +88,12 @@ describe("anonimização efetiva (de fato)", () => {
       ])
     ).rows[0]!.id;
     const cad = await gestor("POST", "/atletas", {
-      velaidCodigo: VELAID,
+      wsId: WS_ID,
+      email: EMAIL,
+      velaid: VELAID,
       classeId: "ilca6",
       treinadorId,
+      confirmaMaioridade: true,
       criarConta: true,
     });
     expect(cad.status).toBe(201);
@@ -105,6 +108,16 @@ describe("anonimização efetiva (de fato)", () => {
     contaId = conta.id;
     authAtleta = conta.auth_user_id;
     const atleta = cabecalhoAuth(await tokenPara(authAtleta));
+    // O atleta completa o cadastro no primeiro acesso (nome, gênero e nascimento).
+    expect(
+      (
+        await chamar(atleta, "PUT", "/me/cadastro", {
+          nome: NOME,
+          genero: "F",
+          dataNascimento: "2000-03-15",
+        })
+      ).status,
+    ).toBe(200);
 
     expect((await gestor("PUT", `/atletas/${atletaId}`, { numeroVela: NUMERO_VELA })).status).toBe(
       200,
@@ -209,7 +222,10 @@ describe("anonimização efetiva (de fato)", () => {
     );
     expect(r.rows).toHaveLength(3);
     const novos = r.rows.slice(0, 2);
-    for (const l of novos) expect(l.detalhes).not.toHaveProperty("velaid");
+    for (const l of novos) {
+      expect(l.detalhes).not.toHaveProperty("velaid");
+      expect(l.detalhes).not.toHaveProperty("wsId");
+    }
   });
 
   it("antes de anonimizar a busca acha os dados (a busca não é vazia)", async () => {

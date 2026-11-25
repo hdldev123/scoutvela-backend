@@ -7,7 +7,8 @@ import type { ArmazenamentoEvidencias } from "../storage/index.js";
 /**
  * Anonimização do atleta por pedido de exclusão (LGPD, art. 18).
  *
- * Some: nome, contato, clube, cidade, UF, número de vela, ID World Sailing, código VelaID, a linha
+ * Some: nome, contato, clube, cidade, UF, número de vela, ID World Sailing (vira `ANON` + 8 hexadecimais,
+ * porque o campo é obrigatório e único), código VelaID (vira `ANON-xxxxxxxx`), a linha
  * do VelaID, os dados pessoais da conta de login, a conta no Supabase Auth, a foto de perfil, os
  * arquivos de evidência, os textos livres da série histórica (evidência das notas e das medidas,
  * justificativa de gate, plano individual, pedidos de revisão e do titular, nome do evento e link
@@ -70,6 +71,19 @@ async function novoCodigoAnonimo(tx: Db): Promise<string> {
   throw new Error("Não foi possível gerar um código anônimo único.");
 }
 
+/**
+ * ID World Sailing neutro e único: `ANON` + 8 hexadecimais (respeita o formato do banco, que exige
+ * 3 letras e 2 a 12 letras ou números). O campo é obrigatório e único, então nunca fica nulo.
+ */
+async function novoWsIdAnonimo(tx: Db): Promise<string> {
+  for (let i = 0; i < 10; i++) {
+    const wsId = `ANON${randomBytes(4).toString("hex").toUpperCase()}`;
+    const r = await tx.query("select 1 from atletas where ws_id = $1", [wsId]);
+    if (r.rows.length === 0) return wsId;
+  }
+  throw new Error("Não foi possível gerar um ID World Sailing anônimo único.");
+}
+
 export async function anonimizarAtleta(
   deps: DepsAnonimizacao,
   entrada: { atletaId: string; pedidoTitularId: string; gestorId: string },
@@ -123,7 +137,7 @@ async function anonimizarNoBanco(
   await tx.query(`select set_config('scoutvela.anonimizando', lower($1), true)`, [atletaId]);
 
   // Trava o atleta: duas anonimizações ao mesmo tempo não passam juntas.
-  const lock = await tx.query<{ anonimizado_em: Date | null; velaid_codigo: string }>(
+  const lock = await tx.query<{ anonimizado_em: Date | null; velaid_codigo: string | null }>(
     `select anonimizado_em, velaid_codigo from atletas where id = $1::uuid for update`,
     [atletaId],
   );
@@ -141,16 +155,19 @@ async function anonimizarNoBanco(
   if (respondeu.rows.length === 0) throw conflito("Este pedido já foi respondido.");
 
   const codigoAnonimo = await novoCodigoAnonimo(tx);
+  const wsIdAnonimo = await novoWsIdAnonimo(tx);
   await tx.query(
     `update atletas
-        set nome = $2, clube = null, cidade = null, uf = null, numero_vela = null, ws_id = null,
+        set nome = $2, clube = null, cidade = null, uf = null, numero_vela = null, ws_id = $6,
             email_contato = null, velaid_codigo = $3, ativo = false,
             data_nascimento = make_date(extract(year from data_nascimento)::int, 7, 1),
             anonimizado_em = $4, anonimizado_pedido_id = $5::bigint
       where id = $1::uuid`,
-    [atletaId, NOME_ANONIMIZADO, codigoAnonimo, em, pedidoTitularId],
+    [atletaId, NOME_ANONIMIZADO, codigoAnonimo, em, pedidoTitularId, wsIdAnonimo],
   );
-  await tx.query(`delete from velaid_registros where codigo = $1`, [linha.velaid_codigo]);
+  if (linha.velaid_codigo) {
+    await tx.query(`delete from velaid_registros where codigo = $1`, [linha.velaid_codigo]);
+  }
 
   // Contas de login do atleta. O id do Auth fica guardado até a conta ser apagada de fato.
   const contas = await tx.query<{ id: string; auth_user_id: string | null }>(

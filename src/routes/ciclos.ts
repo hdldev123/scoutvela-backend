@@ -200,7 +200,7 @@ export async function rotasCiclos(app: FastifyInstance): Promise<void> {
           // Nenhum atleta com o termo em dia: fechar congelaria um ciclo vazio. Só vale fechar
           // vazio se o piloto também não tem atletas ativos.
           const ativos = await tx.query<{ n: string }>(
-            `select count(*)::text as n from atletas where ativo`,
+            `select count(*)::text as n from atletas where ativo and cadastro_completo_em is not null`,
           );
           const n = Number(ativos.rows[0]?.n ?? 0);
           if (n > 0) {

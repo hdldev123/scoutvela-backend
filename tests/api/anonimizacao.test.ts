@@ -85,9 +85,10 @@ describe("anonimização do atleta (LGPD)", () => {
       await p.db.query<{
         nome: string;
         velaid_codigo: string;
+        ws_id: string;
         email_contato: string | null;
         clube: string | null;
-      }>("select nome, velaid_codigo, email_contato, clube from atletas where id = $1", [id])
+      }>("select nome, velaid_codigo, ws_id, email_contato, clube from atletas where id = $1", [id])
     ).rows[0]!;
     expect(antes.nome).toBe("Helena Vasques");
     const conta = (
@@ -138,11 +139,12 @@ describe("anonimização do atleta (LGPD)", () => {
       cidade: null,
       uf: null,
       numero_vela: null,
-      ws_id: null,
       email_contato: null,
       ativo: false,
     });
     expect(depois.velaid_codigo).toMatch(/^ANON-[0-9A-F]{8}$/);
+    expect(depois.ws_id).toMatch(/^ANON[0-9A-F]{8}$/);
+    expect(depois.ws_id).not.toBe(antes.ws_id);
     expect(depois.velaid_codigo).not.toBe(antes.velaid_codigo);
     expect(new Date(depois.anonimizado_em as Date).toISOString()).toBe("2026-11-06T15:00:00.000Z");
 

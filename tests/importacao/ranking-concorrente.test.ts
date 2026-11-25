@@ -12,8 +12,8 @@ describe("importarRanking: envios simultâneos", () => {
         values ('t_cls', 'Classe teste', 'Teste', 'ind', 60, 65, 70, 99);
       insert into usuarios (id, email, nome, papel)
         values ('11111111-1111-4111-8111-111111111111', 'g@t.dev', 'Gestor', 'gestor');
-      insert into atletas (velaid_codigo, nome, genero, data_nascimento, classe_id)
-        values ('SP-R01', 'Atleta R', 'F', '2000-01-01', 't_cls');
+      insert into atletas (velaid_codigo, ws_id, nome, genero, data_nascimento, classe_id, cadastro_completo_em)
+        values ('SP-R01', 'BRASPR01', 'Atleta R', 'F', '2000-01-01', 't_cls', now());
     `);
   });
   afterAll(() => db.fechar());

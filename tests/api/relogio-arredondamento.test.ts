@@ -97,9 +97,11 @@ describe("auditorias e carimbos usam app.agora()", () => {
     expect((await chamar(EMAILS_DEMO.atleta, "GET", "/meus-dados")).status).toBe(200);
     // cadastro, aceite registrado pelo gestor, edição de atleta e de usuário
     const novo = await chamar(EMAILS_DEMO.gestor, "POST", "/atletas", {
-      velaidCodigo: "MG-T15",
+      wsId: "BRARB51",
+      email: "renata@exemplo.com",
       classeId: "ilca7",
       treinadorId: ana,
+      confirmaMaioridade: true,
     });
     expect(novo.status).toBe(201);
     expect(

@@ -22,7 +22,10 @@ export interface ClasseAltura {
 /** Atleta com o que o cadastro, a classe e o treinador respondem. */
 export interface AtletaBase {
   id: string;
-  velaid: string;
+  /** ID World Sailing normalizado: a chave do atleta. */
+  wsId: string;
+  /** Código VelaID; nulo se o atleta não tem (opcional). */
+  velaid: string | null;
   nome: string;
   genero: Genero;
   /** AAAA-MM-DD. */
@@ -129,7 +132,8 @@ export function filtroVisibilidade(
 
 interface LinhaBase {
   id: string;
-  velaid_codigo: string;
+  ws_id: string;
+  velaid_codigo: string | null;
   nome: string;
   genero: Genero;
   data_nascimento: string;
@@ -165,7 +169,13 @@ export interface FiltrosListagem {
   atletaId?: string;
 }
 
-/** Atletas ativos que o usuário pode ver, em ordem alfabética. */
+/**
+ * Atleta com o cadastro completado (nome, gênero e nascimento informados). Quem ainda não completou
+ * fica fora do ranking, do score, das pendências, do fechamento de ciclo, dos lembretes e do investimento.
+ */
+export const cadastroCompletoSql = (alias: string) => `${alias}.cadastro_completo_em is not null`;
+
+/** Atletas ativos, com o cadastro completo, que o usuário pode ver, em ordem alfabética. */
 export async function listarAtletasVisiveis(
   db: Db,
   usuario: UsuarioDeAcesso,
@@ -173,7 +183,7 @@ export async function listarAtletasVisiveis(
 ): Promise<AtletaBase[]> {
   const vis = filtroVisibilidade(usuario, "a", 1);
   const params: unknown[] = [...vis.params];
-  const condicoes = ["a.ativo", `(${vis.sql})`];
+  const condicoes = ["a.ativo", cadastroCompletoSql("a"), `(${vis.sql})`];
   const param = (v: unknown) => {
     params.push(v);
     return `$${params.length}`;
@@ -186,7 +196,7 @@ export async function listarAtletasVisiveis(
   if (filtros.atletaId) condicoes.push(`a.id = ${param(filtros.atletaId)}::uuid`);
 
   const r = await db.query<LinhaBase>(
-    `select a.id, a.velaid_codigo, a.nome, a.genero, a.data_nascimento::text as data_nascimento,
+    `select a.id, a.ws_id, a.velaid_codigo, a.nome, a.genero, a.data_nascimento::text as data_nascimento,
             a.clube, a.cidade, a.uf, a.numero_vela, a.email_contato,
             a.treinador_id, t.nome as treinador_nome,
             ${termoAceito} as termo_aceito,
@@ -202,6 +212,7 @@ export async function listarAtletasVisiveis(
   );
   return r.rows.map((l) => ({
     id: l.id,
+    wsId: l.ws_id,
     velaid: l.velaid_codigo,
     nome: l.nome,
     genero: l.genero,
@@ -228,7 +239,7 @@ export async function listarAtletasVisiveis(
   }));
 }
 
-/** Um atleta ativo, se o usuário puder vê-lo (senão nulo, sem distinguir de inexistente). */
+/** Um atleta ativo e com cadastro completo, se o usuário puder vê-lo (senão nulo, sem distinguir de inexistente). */
 export async function buscarAtletaVisivel(
   db: Db,
   usuario: UsuarioDeAcesso,
@@ -244,7 +255,7 @@ export async function contarSemConsentimentoIbvar(db: Db, agora: Date): Promise<
   const r = await db.query<{ n: string }>(
     `select count(*)::text as n
        from atletas a
-      where a.ativo and ${termoSql.aceitoNoPiloto("a.id", "$1")}
+      where a.ativo and ${cadastroCompletoSql("a")} and ${termoSql.aceitoNoPiloto("a.id", "$1")}
         and not exists (select 1 from consentimento_atual ci
                          where ci.atleta_id = a.id and ci.tipo = 'compartilhar_ibvar' and ci.concedido)`,
     [agora],
@@ -255,13 +266,18 @@ export async function contarSemConsentimentoIbvar(db: Db, agora: Date): Promise<
 /** Linha da lista de gestão (GET /atletas): sem dado sensível nem e-mail. */
 export interface AtletaGestao {
   id: string;
-  nome: string;
-  velaid: string;
+  /** Nulo enquanto o cadastro está incompleto. */
+  nome: string | null;
+  wsId: string;
+  velaid: string | null;
   classe: { id: string; nome: string };
   treinador: { id: string; nome: string } | null;
   numeroVela: string | null;
   ativo: boolean;
   termoAceito: boolean;
+  cadastroCompleto: boolean;
+  /** Menor de 18 anos no primeiro acesso: inativado, aguarda a anonimização. */
+  cadastroRecusado: boolean;
   /** Já existe conta (usuário de papel atleta) ligada a este atleta. */
   contaVinculada: boolean;
 }
@@ -270,9 +286,10 @@ export interface FiltrosGestao {
   agora: Date;
   ativo?: boolean | undefined;
   termoAceito?: boolean | undefined;
+  cadastroCompleto?: boolean | undefined;
   classeId?: string | undefined;
   treinadorId?: string | undefined;
-  /** Parte do nome ou do código VelaID, sem diferenciar maiúsculas. */
+  /** Parte do nome, do ID World Sailing ou do código VelaID, sem diferenciar maiúsculas. */
   busca?: string | undefined;
 }
 
@@ -294,18 +311,26 @@ export async function listarAtletasGestao(db: Db, filtros: FiltrosGestao): Promi
   if (filtros.termoAceito !== undefined) {
     condicoes.push(filtros.termoAceito ? termoAceito : `not ${termoAceito}`);
   }
+  if (filtros.cadastroCompleto !== undefined) {
+    condicoes.push(
+      filtros.cadastroCompleto ? cadastroCompletoSql("a") : `not ${cadastroCompletoSql("a")}`,
+    );
+  }
   if (filtros.classeId) condicoes.push(`a.classe_id = ${param(filtros.classeId)}`);
   if (filtros.treinadorId) condicoes.push(`a.treinador_id = ${param(filtros.treinadorId)}::uuid`);
   const busca = filtros.busca?.trim();
   if (busca) {
     const p = param(`%${escaparLike(busca)}%`);
-    condicoes.push(`(a.nome ilike ${p} escape '\\' or a.velaid_codigo ilike ${p} escape '\\')`);
+    condicoes.push(
+      `(a.nome ilike ${p} escape '\\' or a.ws_id ilike ${p} escape '\\' or a.velaid_codigo ilike ${p} escape '\\')`,
+    );
   }
 
   const r = await db.query<{
     id: string;
-    nome: string;
-    velaid_codigo: string;
+    nome: string | null;
+    ws_id: string;
+    velaid_codigo: string | null;
     classe_id: string;
     classe_nome: string;
     treinador_id: string | null;
@@ -313,28 +338,35 @@ export async function listarAtletasGestao(db: Db, filtros: FiltrosGestao): Promi
     numero_vela: string | null;
     ativo: boolean;
     termo_aceito: boolean;
+    cadastro_completo: boolean;
+    cadastro_recusado: boolean;
     conta_vinculada: boolean;
   }>(
-    `select a.id, a.nome, a.velaid_codigo, c.id as classe_id, c.nome as classe_nome,
+    `select a.id, a.nome, a.ws_id, a.velaid_codigo, c.id as classe_id, c.nome as classe_nome,
             a.treinador_id, t.nome as treinador_nome, a.numero_vela, a.ativo,
             ${termoAceito} as termo_aceito,
+            ${cadastroCompletoSql("a")} as cadastro_completo,
+            (a.cadastro_recusado_em is not null) as cadastro_recusado,
             exists (select 1 from usuarios u where u.atleta_id = a.id) as conta_vinculada
        from atletas a
        join classes c on c.id = a.classe_id
        left join usuarios t on t.id = a.treinador_id
       ${condicoes.length ? `where ${condicoes.join(" and ")}` : ""}
-      order by a.nome, a.id`,
+      order by a.nome nulls last, a.ws_id, a.id`,
     params,
   );
   return r.rows.map((l) => ({
     id: l.id,
     nome: l.nome,
+    wsId: l.ws_id,
     velaid: l.velaid_codigo,
     classe: { id: l.classe_id, nome: l.classe_nome },
     treinador: l.treinador_id ? { id: l.treinador_id, nome: l.treinador_nome ?? "" } : null,
     numeroVela: l.numero_vela,
     ativo: l.ativo,
     termoAceito: l.termo_aceito,
+    cadastroCompleto: l.cadastro_completo,
+    cadastroRecusado: l.cadastro_recusado,
     contaVinculada: l.conta_vinculada,
   }));
 }

@@ -22,7 +22,8 @@ const esquemaItem = z.object({
   atleta: z.object({
     id: z.string(),
     nome: z.string(),
-    velaid: z.string(),
+    wsId: z.string().describe("ID World Sailing; para o IBVAR só de quem consentiu (como o item)"),
+    velaid: z.string().nullable().describe("Nulo se o atleta não tem VelaID"),
     numeroVela: z.string().nullable(),
     uf: z.string().nullable(),
     idade: z.number().int(),
@@ -71,7 +72,7 @@ export async function rotasRanking(app: FastifyInstance): Promise<void> {
         tags: ["ranking"],
         summary: "Ranking de atletas do piloto, conforme a matriz de acesso do papel",
         description:
-          "Gestor vê todos; treinador, os próprios; IBVAR, só atletas com consentimento (os demais entram apenas na contagem).",
+          "Gestor vê todos; treinador, os próprios; IBVAR, só atletas com consentimento (os demais entram apenas na contagem). Atleta com cadastro incompleto não entra.",
         security: [{ bearerAuth: [] }],
         querystring: esquemaQuery,
         response: { 200: esquemaRanking, 400: esquemaErro, 401: esquemaErro, 403: esquemaErro },
@@ -118,6 +119,7 @@ export async function rotasRanking(app: FastifyInstance): Promise<void> {
         atleta: {
           id: atleta.id,
           nome: atleta.nome,
+          wsId: atleta.wsId,
           velaid: atleta.velaid,
           numeroVela: atleta.numeroVela,
           uf: atleta.uf,

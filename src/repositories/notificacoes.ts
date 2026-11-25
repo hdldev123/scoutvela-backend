@@ -30,8 +30,10 @@ export async function contarNotificacoes(
       const r = await db.query<{ revisoes: string; cadastro: string }>(
         `select ((select count(*) from pedidos_revisao where status = 'aberto')
                + (select count(*) from pedidos_titular where status = 'aberto'))::text as revisoes,
-                (select count(*) from atletas a
-                  where a.ativo and not ${termoSql.aceitoVigente("a.id", "$1")})::text as cadastro`,
+                ((select count(*) from atletas a
+                   where a.ativo and not ${termoSql.aceitoVigente("a.id", "$1")})
+               + (select count(*) from atletas a
+                   where a.cadastro_recusado_em is not null and a.anonimizado_em is null))::text as cadastro`,
         [agora],
       );
       return { revisoes: contagem(r.rows[0]?.revisoes), cadastro: contagem(r.rows[0]?.cadastro) };
@@ -56,8 +58,9 @@ export async function contarNotificacoes(
     case "atleta": {
       if (!usuario.atletaId) return { painel: 0 };
       const [extras, ciclo] = await Promise.all([
-        db.query<{ termo: boolean; respostas: string }>(
+        db.query<{ termo: boolean; incompleto: boolean; respostas: string }>(
           `select not ${termoSql.aceitoVigente("$1::uuid", "$2")} as termo,
+                  (select cadastro_completo_em is null from atletas where id = $1::uuid) as incompleto,
                   ((select count(*) from pedidos_revisao r
                      where r.atleta_id = $1::uuid and r.status = 'respondido'
                        and r.respondido_em > coalesce(v.visto_em, '-infinity'::timestamptz))
@@ -76,7 +79,9 @@ export async function contarNotificacoes(
             ?.perguntasSemResposta ?? 0)
         : 0;
       const l = extras.rows[0];
-      return { painel: perguntas + (l?.termo ? 1 : 0) + contagem(l?.respostas) };
+      return {
+        painel: perguntas + (l?.termo ? 1 : 0) + (l?.incompleto ? 1 : 0) + contagem(l?.respostas),
+      };
     }
     default:
       // IBVAR e demais papéis: nada.
