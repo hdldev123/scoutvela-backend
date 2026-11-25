@@ -13190,10 +13190,10 @@ paths:
         consentimentos, notas com evidência e avaliador, respostas, medidas,
         resultados, decisões de gate, financeiro, pedidos de revisão (com o
         recurso, se houve) e pedidos do titular, telefone, validade do
-        passaporte e aptidões conferidas, foto de perfil (tipo e link de 5
-        minutos), lista de evidências anexadas (metadados, sem o arquivo) e
-        plano individual (todas as versões). Só o atleta logado, só os próprios
-        dados."
+        passaporte e aptidões conferidas, pesagens informadas, pedidos de ajuste
+        recebidos, foto de perfil (tipo e link de 5 minutos), lista de
+        evidências anexadas (metadados, sem o arquivo) e plano individual (todas
+        as versões). Só o atleta logado, só os próprios dados."
       security: &a8
         - bearerAuth: []
       responses:
@@ -13283,6 +13283,22 @@ paths:
                       additionalProperties: {}
                     description: Aptidão para a prática esportiva conferida pelo gestor (apto, quem
                       conferiu e quando; sem arquivo)
+                  pesagens:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: {}
+                    description: "Pesagens informadas pelo atleta: peso, situação (pendente,
+                      validada ou recusada), motivo da recusa, quem decidiu e
+                      quando (a foto da balança não é exportada e é apagada
+                      depois da decisão)"
+                  pedidosAjuste:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: {}
+                    description: "Pedidos de ajuste recebidos do treinador ou do gestor: mensagem,
+                      indicador, quem pediu e quando"
                   foto:
                     nullable: true
                     description: Foto de perfil da conta do atleta (o caminho interno não é
@@ -13330,6 +13346,8 @@ paths:
                   - pedidosRevisao
                   - pedidosTitular
                   - aptidoes
+                  - pesagens
+                  - pedidosAjuste
                   - foto
                   - evidencias
                   - plano

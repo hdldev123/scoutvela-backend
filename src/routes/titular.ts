@@ -65,6 +65,12 @@ const esquemaExportacao = z.object({
   aptidoes: registros.describe(
     "Aptidão para a prática esportiva conferida pelo gestor (apto, quem conferiu e quando; sem arquivo)",
   ),
+  pesagens: registros.describe(
+    "Pesagens informadas pelo atleta: peso, situação (pendente, validada ou recusada), motivo da recusa, quem decidiu e quando (a foto da balança não é exportada e é apagada depois da decisão)",
+  ),
+  pedidosAjuste: registros.describe(
+    "Pedidos de ajuste recebidos do treinador ou do gestor: mensagem, indicador, quem pediu e quando",
+  ),
   foto: z
     .object({
       tipoMime: z.string(),
@@ -196,7 +202,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         tags: ["titular"],
         summary: "Exporta em JSON tudo o que o sistema guarda sobre o atleta (LGPD)",
         description:
-          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados, decisões de gate, financeiro, pedidos de revisão (com o recurso, se houve) e pedidos do titular, telefone, validade do passaporte e aptidões conferidas, foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
+          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados, decisões de gate, financeiro, pedidos de revisão (com o recurso, se houve) e pedidos do titular, telefone, validade do passaporte e aptidões conferidas, pesagens informadas, pedidos de ajuste recebidos, foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
         security: seguranca,
         response: { 200: esquemaExportacao, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
       },
@@ -222,6 +228,8 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         evidencias,
         plano,
         aptidoes,
+        pesagens,
+        pedidosAjuste,
         caminhoFoto,
       ] = await Promise.all([
         q<Record<string, unknown>>(
@@ -310,6 +318,19 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
                from aptidoes p join usuarios u on u.id = p.conferido_por
               where p.atleta_id = $1::uuid order by p.conferido_em, p.id`,
         ),
+        q<Record<string, unknown>>(
+          `select p.peso_kg::float8 as "pesoKg", p.status, p.motivo, p.enviado_em as "enviadoEm",
+                    u.nome as "decididoPor", p.decidido_em as "decididoEm"
+               from pesagens_atleta p left join usuarios u on u.id = p.decidido_por
+              where p.atleta_id = $1::uuid order by p.enviado_em, p.id`,
+        ),
+        q<Record<string, unknown>>(
+          `select p.mensagem, i.nome as indicador, u.nome as "pedidoPor", p.criado_em as "criadoEm"
+               from pedidos_ajuste p
+               left join indicadores i on i.id = p.indicador_id
+               left join usuarios u on u.id = p.criado_por
+              where p.atleta_id = $1::uuid order by p.criado_em, p.id`,
+        ),
         caminhoDaFotoDoAtleta(app.db, id),
       ]);
       if (!cadastro[0]) throw naoEncontrado("Atleta não encontrado.");
@@ -337,6 +358,8 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         pedidosRevisao: revisoes,
         pedidosTitular: pedidos,
         aptidoes,
+        pesagens,
+        pedidosAjuste,
         foto: caminhoFoto
           ? {
               tipoMime: caminhoFoto.endsWith(".png") ? "image/png" : "image/jpeg",
