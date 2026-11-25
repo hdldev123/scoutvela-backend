@@ -159,7 +159,8 @@ async function anonimizarNoBanco(
   await tx.query(
     `update atletas
         set nome = $2, clube = null, cidade = null, uf = null, numero_vela = null, ws_id = $6,
-            email_contato = null, velaid_codigo = $3, ativo = false,
+            email_contato = null, telefone = null, passaporte_valido_ate = null,
+            velaid_codigo = $3, ativo = false,
             data_nascimento = make_date(extract(year from data_nascimento)::int, 7, 1),
             anonimizado_em = $4, anonimizado_pedido_id = $5::bigint
       where id = $1::uuid`,
@@ -225,7 +226,7 @@ async function anonimizarNoBanco(
 export function textoDaResposta(em: Date): string {
   return [
     `Dados pessoais anonimizados em ${dataBr(em)}.`,
-    "Removidos: nome, e-mail de contato, clube, cidade, UF, número de vela, ID World Sailing e código VelaID (trocado por um código anônimo); o registro no VelaID; os dados da conta de login (nome, e-mail e acesso) e a conta no serviço de login; a foto de perfil e os arquivos de evidência; os textos livres da série histórica (evidências das notas e das medidas, justificativas de gates, plano individual, pedidos de revisão e do titular, nome e link dos resultados de regata); e os dados pessoais da trilha de auditoria. O compartilhamento com o IBVAR e o aceite do termo foram revogados.",
+    "Removidos: nome, e-mail de contato, telefone, validade do passaporte, clube, cidade, UF, número de vela, ID World Sailing e código VelaID (trocado por um código anônimo); o registro no VelaID; os dados da conta de login (nome, e-mail e acesso) e a conta no serviço de login; a foto de perfil e os arquivos de evidência; as aptidões conferidas (dado de saúde); os textos livres da série histórica (evidências das notas e das medidas, justificativas de gates, plano individual, pedidos de revisão e do titular, nome e link dos resultados de regata); e os dados pessoais da trilha de auditoria. O compartilhamento com o IBVAR e o aceite do termo foram revogados.",
     "Alterado: a data de nascimento foi generalizada para 1º de julho do mesmo ano.",
     "Mantidos, sem identificação direta e ligados apenas a um identificador interno: notas, respostas do questionário, medidas corporais, resultados de regata (nível, data, posição, tamanho da frota e pontos), status e datas das decisões de gate, financeiro da campanha, pontuações dos ciclos e a trilha de auditoria (quem fez o quê e quando, sem dados pessoais).",
   ].join(" ");
@@ -254,6 +255,9 @@ async function removerTextosLivres(
   const m = MARCADOR_REMOVIDO;
   const q = (sql: string, params: unknown[] = []) => tx.query(sql, [atletaId, m, ...params]);
 
+  // Aptidão é dado de saúde: as linhas saem (a tabela é só de inserção; o gatilho aceita este DELETE
+  // só com a variável da anonimização igual ao atleta).
+  await tx.query(`delete from aptidoes where atleta_id = $1::uuid`, [atletaId]);
   await q(`update avaliacoes set evidencia = $2 where atleta_id = $1::uuid and evidencia <> $2`);
   await q(
     `update medidas_corporais set evidencia = $2 where atleta_id = $1::uuid and evidencia <> $2`,

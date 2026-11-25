@@ -62,6 +62,9 @@ const esquemaExportacao = z.object({
   ),
   pedidosRevisao: registros,
   pedidosTitular: registros,
+  aptidoes: registros.describe(
+    "Aptidão para a prática esportiva conferida pelo gestor (apto, quem conferiu e quando; sem arquivo)",
+  ),
   foto: z
     .object({
       tipoMime: z.string(),
@@ -193,7 +196,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         tags: ["titular"],
         summary: "Exporta em JSON tudo o que o sistema guarda sobre o atleta (LGPD)",
         description:
-          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados, decisões de gate, financeiro, pedidos de revisão e pedidos do titular, foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
+          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados, decisões de gate, financeiro, pedidos de revisão (com o recurso, se houve) e pedidos do titular, telefone, validade do passaporte e aptidões conferidas, foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
         security: seguranca,
         response: { 200: esquemaExportacao, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
       },
@@ -218,12 +221,14 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         pedidos,
         evidencias,
         plano,
+        aptidoes,
         caminhoFoto,
       ] = await Promise.all([
         q<Record<string, unknown>>(
           `select a.velaid_codigo as "velaid", a.nome, a.genero, a.data_nascimento::text as "dataNascimento",
                     c.nome as classe, c.evento as "classeEvento", a.clube, a.cidade, a.uf, a.numero_vela as "numeroVela",
-                    a.ws_id as "wsId", a.email_contato as "emailContato", t.nome as treinador, a.ativo,
+                    a.ws_id as "wsId", a.email_contato as "emailContato", a.telefone,
+                    to_char(a.passaporte_valido_ate, 'YYYY-MM') as "passaporteValidoAte", t.nome as treinador, a.ativo,
                     a.criado_em as "criadoEm"
                from atletas a join classes c on c.id = a.classe_id left join usuarios t on t.id = a.treinador_id
               where a.id = $1::uuid`,
@@ -300,6 +305,11 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
                from plano_individual p join usuarios u on u.id = p.registrado_por
               where p.atleta_id = $1::uuid order by p.registrado_em, p.id`,
         ),
+        q<Record<string, unknown>>(
+          `select p.apto, u.nome as "conferidoPor", p.conferido_em as "conferidoEm"
+               from aptidoes p join usuarios u on u.id = p.conferido_por
+              where p.atleta_id = $1::uuid order by p.conferido_em, p.id`,
+        ),
         caminhoDaFotoDoAtleta(app.db, id),
       ]);
       if (!cadastro[0]) throw naoEncontrado("Atleta não encontrado.");
@@ -326,6 +336,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         financeiro: financeiroComComponentes,
         pedidosRevisao: revisoes,
         pedidosTitular: pedidos,
+        aptidoes,
         foto: caminhoFoto
           ? {
               tipoMime: caminhoFoto.endsWith(".png") ? "image/png" : "image/jpeg",

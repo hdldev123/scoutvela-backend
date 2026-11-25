@@ -132,6 +132,9 @@ describe("perfil do usuário (/me/perfil e /me/foto)", () => {
         emailContato: "contato@exemplo.dev",
         termoAceitoEm: "2026-10-01T12:00:00.000Z",
         compartilharIbvar: true,
+        telefone: null,
+        passaporteValidoAte: null,
+        aptidao: null,
       });
       expect(r.corpo.treinador).toBeNull();
     });

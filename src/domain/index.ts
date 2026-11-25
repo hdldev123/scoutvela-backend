@@ -8,3 +8,4 @@ export * from "./plano.js";
 export * from "./pontos.js";
 export * from "./altura.js";
 export * from "./ws-id.js";
+export * from "./contato.js";

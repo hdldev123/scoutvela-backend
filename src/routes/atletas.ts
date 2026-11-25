@@ -14,9 +14,11 @@ import {
 import { esquemaErro, naoEncontrado, semAcesso } from "../erros.js";
 import { historicoDeNotas, historicoDePesagens } from "../repositories/historico.js";
 import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
+import { lerContatoSensivel } from "../repositories/contato-sensivel.js";
 import { ultimoLancamento } from "../repositories/investimento.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { buscarPlanoAtual } from "../repositories/plano.js";
+import { esquemaAptidao } from "./aptidao.js";
 import { esquemaPlanoRegistrado, esquemaTextosPlano } from "./plano.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 import { caminhoDaFotoDoAtleta, linkDaFoto } from "../servicos/foto-perfil.js";
@@ -90,7 +92,23 @@ const esquemaFicha = z.object({
       posicao: z.enum(["helm", "crew", "ind"]),
     }),
   }),
-  contato: z.object({ email: z.string().nullable(), treinador: pessoa.nullable() }).nullable(),
+  contato: z
+    .object({
+      email: z.string().nullable(),
+      treinador: pessoa.nullable(),
+      telefone: z.string().nullable().describe("E.164 (+5511999998888); nulo se não informado"),
+      passaporteValidoAte: z
+        .string()
+        .nullable()
+        .describe("AAAA-MM (último dia do mês); sem número nem cópia do passaporte"),
+      aptidao: esquemaAptidao
+        .nullable()
+        .describe(
+          "Última aptidão conferida pelo gestor (dado de saúde; cada leitura de gestor ou treinador é auditada); nulo se nunca conferida",
+        ),
+    })
+    .nullable()
+    .describe("Nulo para o IBVAR: contato, passaporte e aptidão não são dele (matriz de acesso)"),
   ciclo: z.object({ nome: z.string(), prazo: z.string() }).nullable(),
   dadosAtualizadosEm: z
     .string()
@@ -238,6 +256,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
       const { atleta, dados, calculo } = avaliado;
 
       const ibvar = usuario.papel === "ibvar";
+      const sensivel = await lerContatoSensivel(app.db, usuario, atleta.id, referencia);
       const fotoUrl = ibvar
         ? null
         : await linkDaFoto(
@@ -391,7 +410,9 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
             posicao: atleta.classe.posicao,
           },
         },
-        contato: ibvar ? null : { email: atleta.emailContato, treinador: atleta.treinador },
+        contato: sensivel
+          ? { email: atleta.emailContato, treinador: atleta.treinador, ...sensivel }
+          : null,
         ciclo,
         dadosAtualizadosEm: await ultimoLancamento(app.db, [atleta.id]),
         score: calculo.score,

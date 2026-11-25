@@ -19,6 +19,7 @@ import { registrarTratamentoDeErros } from "./erros.js";
 import type { AdminAuth } from "./integracoes/supabase-admin.js";
 import { rotasHealth } from "./routes/health.js";
 import { rotasAnonimizacao } from "./routes/anonimizacao.js";
+import { rotasAptidao } from "./routes/aptidao.js";
 import { rotasAtletas } from "./routes/atletas.js";
 import { rotasAuditoria } from "./routes/auditoria.js";
 import { rotasAvaliacoes } from "./routes/avaliacoes.js";
@@ -83,6 +84,7 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasPerfil,
   rotasRanking,
   rotasAtletas,
+  rotasAptidao,
   rotasAvaliacoes,
   rotasCadastro,
   rotasPainel,

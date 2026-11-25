@@ -199,6 +199,12 @@ describe("anonimização efetiva (de fato)", () => {
          from usuarios u where u.papel = 'gestor' limit 1`,
       [atletaId, `Resposta para ${NOME}.`, `Recurso de ${NOME}.`],
     );
+    // D15: telefone, validade do passaporte e aptidão conferida.
+    await p.db.query(
+      "update atletas set telefone = '+5521988887777', passaporte_valido_ate = '2029-03-31' where id = $1",
+      [atletaId],
+    );
+    expect((await gestor("POST", `/atletas/${atletaId}/aptidao`, { apto: true })).status).toBe(201);
     const pedido = await chamar(atleta, "POST", "/pedidos-titular", {
       tipo: "exclusao",
       descricao: `Eu, ${NOME}, quero que apaguem meus dados.`,
@@ -327,6 +333,10 @@ describe("anonimização efetiva (de fato)", () => {
         recurso_texto: MARCADOR,
       },
     ]);
+    expect(await q("select telefone, passaporte_valido_ate from atletas where id = $1")).toEqual([
+      { telefone: null, passaporte_valido_ate: null },
+    ]);
+    expect(await q("select id from aptidoes where atleta_id = $1")).toEqual([]);
     const titular = await q(
       "select tipo, descricao, status, resposta from pedidos_titular where atleta_id = $1 order by id",
     );

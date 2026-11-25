@@ -850,6 +850,37 @@ paths:
                         type: string
                       compartilharIbvar:
                         type: boolean
+                      telefone:
+                        nullable: true
+                        description: E.164 (+5511999998888); nulo se não informado
+                        type: string
+                      passaporteValidoAte:
+                        nullable: true
+                        description: AAAA-MM (último dia do mês); sem número nem cópia do passaporte
+                        type: string
+                      aptidao:
+                        nullable: true
+                        description: Última aptidão conferida pelo gestor; nulo se nunca conferida
+                        type: object
+                        properties:
+                          apto:
+                            type: boolean
+                          conferidoEm:
+                            type: string
+                            description: Instante ISO em que o gestor conferiu
+                          conferidoPor:
+                            type: object
+                            properties:
+                              nome:
+                                type: string
+                            required:
+                              - nome
+                            additionalProperties: false
+                        required:
+                          - apto
+                          - conferidoEm
+                          - conferidoPor
+                        additionalProperties: false
                     required:
                       - wsId
                       - velaid
@@ -864,6 +895,9 @@ paths:
                       - emailContato
                       - termoAceitoEm
                       - compartilharIbvar
+                      - telefone
+                      - passaporteValidoAte
+                      - aptidao
                     additionalProperties: false
                   treinador:
                     nullable: true
@@ -964,13 +998,20 @@ paths:
                   - mensagem
                 additionalProperties: false
     put:
-      summary: "Edita o perfil: nome (treinador e gestor) ou e-mail de contato (atleta)"
+      summary: "Edita o perfil: nome (treinador e gestor) ou e-mail, telefone e
+        validade do passaporte (atleta)"
       tags:
         - sessao
       description: "Nome, gênero e data de nascimento do atleta (informados em PUT
         /me/cadastro) e o ID World Sailing não são editáveis aqui: a correção é
-        pelo pedido do titular (tipo `correcao`); só o gestor troca o WS ID. A
-        auditoria guarda só os nomes dos campos."
+        pelo pedido do titular (tipo `correcao`); só o gestor troca o WS ID.
+        `telefone` (atleta): E.164; aceita espaços, parênteses, traços e pontos,
+        que são removidos; sem `+` só com DDD brasileiro (10 ou 11 dígitos), e
+        então vira `+55...`; outro formato é 400. `passaporteValidoAte`
+        (atleta): `AAAA-MM`, gravado como o último dia do mês; data passada é
+        aceita (serve para avisar que venceu); não guardamos número nem cópia do
+        passaporte. `telefone` e `passaporteValidoAte` aceitam `null` para
+        apagar. A auditoria guarda só os nomes dos campos."
       requestBody:
         required: true
         content:
@@ -988,6 +1029,16 @@ paths:
                   maxLength: 254
                   format: email
                   pattern: ^(?:[A-Za-z0-9_'+\-]+\.)*[A-Za-z0-9_'+\-]*[A-Za-z0-9_+-]@(?:[A-Za-z0-9][A-Za-z0-9\-]*\.)+[A-Za-z]{2,}$
+                telefone:
+                  description: E.164, ou só com DDD brasileiro (vira +55...); null apaga
+                  nullable: true
+                  type: string
+                  maxLength: 40
+                passaporteValidoAte:
+                  description: AAAA-MM; null apaga
+                  nullable: true
+                  type: string
+                  maxLength: 7
               additionalProperties: false
       security:
         - bearerAuth: []
@@ -1080,6 +1131,37 @@ paths:
                         type: string
                       compartilharIbvar:
                         type: boolean
+                      telefone:
+                        nullable: true
+                        description: E.164 (+5511999998888); nulo se não informado
+                        type: string
+                      passaporteValidoAte:
+                        nullable: true
+                        description: AAAA-MM (último dia do mês); sem número nem cópia do passaporte
+                        type: string
+                      aptidao:
+                        nullable: true
+                        description: Última aptidão conferida pelo gestor; nulo se nunca conferida
+                        type: object
+                        properties:
+                          apto:
+                            type: boolean
+                          conferidoEm:
+                            type: string
+                            description: Instante ISO em que o gestor conferiu
+                          conferidoPor:
+                            type: object
+                            properties:
+                              nome:
+                                type: string
+                            required:
+                              - nome
+                            additionalProperties: false
+                        required:
+                          - apto
+                          - conferidoEm
+                          - conferidoPor
+                        additionalProperties: false
                     required:
                       - wsId
                       - velaid
@@ -1094,6 +1176,9 @@ paths:
                       - emailContato
                       - termoAceitoEm
                       - compartilharIbvar
+                      - telefone
+                      - passaporteValidoAte
+                      - aptidao
                     additionalProperties: false
                   treinador:
                     nullable: true
@@ -2041,6 +2126,8 @@ paths:
                     additionalProperties: false
                   contato:
                     nullable: true
+                    description: "Nulo para o IBVAR: contato, passaporte e aptidão não são dele
+                      (matriz de acesso)"
                     type: object
                     properties:
                       email:
@@ -2058,9 +2145,45 @@ paths:
                           - id
                           - nome
                         additionalProperties: false
+                      telefone:
+                        nullable: true
+                        description: E.164 (+5511999998888); nulo se não informado
+                        type: string
+                      passaporteValidoAte:
+                        nullable: true
+                        description: AAAA-MM (último dia do mês); sem número nem cópia do passaporte
+                        type: string
+                      aptidao:
+                        nullable: true
+                        description: Última aptidão conferida pelo gestor (dado de saúde; cada leitura
+                          de gestor ou treinador é auditada); nulo se nunca
+                          conferida
+                        type: object
+                        properties:
+                          apto:
+                            type: boolean
+                          conferidoEm:
+                            type: string
+                            description: Instante ISO em que o gestor conferiu
+                          conferidoPor:
+                            type: object
+                            properties:
+                              nome:
+                                type: string
+                            required:
+                              - nome
+                            additionalProperties: false
+                        required:
+                          - apto
+                          - conferidoEm
+                          - conferidoPor
+                        additionalProperties: false
                     required:
                       - email
                       - treinador
+                      - telefone
+                      - passaporteValidoAte
+                      - aptidao
                     additionalProperties: false
                   ciclo:
                     nullable: true
@@ -3220,6 +3343,258 @@ paths:
                   - mensagem
                 additionalProperties: false
         "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/aptidao:
+    post:
+      summary: Registra a aptidão para a prática esportiva conferida pelo gestor
+      tags:
+        - atletas
+      description: "Só o gestor, depois de conferir o atestado FORA do sistema: grava
+        apenas `apto`, quem conferiu e quando (sem texto livre e sem arquivo).
+        Cada registro é novo (só inserção); vale o mais recente. Dado de saúde:
+        a auditoria guarda só os ids."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                apto:
+                  type: boolean
+              required:
+                - apto
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security:
+        - bearerAuth: []
+      responses:
+        "201":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  apto:
+                    type: boolean
+                  conferidoEm:
+                    type: string
+                    description: Instante ISO em que o gestor conferiu
+                  conferidoPor:
+                    type: object
+                    properties:
+                      nome:
+                        type: string
+                    required:
+                      - nome
+                    additionalProperties: false
+                required:
+                  - apto
+                  - conferidoEm
+                  - conferidoPor
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
           description: Default Response
           content:
             application/json:
@@ -11267,10 +11642,12 @@ paths:
         - titular
       description: "Devolve como anexo (meus-dados-scout-vela.json): cadastro,
         consentimentos, notas com evidência e avaliador, respostas, medidas,
-        resultados, decisões de gate, financeiro, pedidos de revisão e pedidos
-        do titular, foto de perfil (tipo e link de 5 minutos), lista de
-        evidências anexadas (metadados, sem o arquivo) e plano individual (todas
-        as versões). Só o atleta logado, só os próprios dados."
+        resultados, decisões de gate, financeiro, pedidos de revisão (com o
+        recurso, se houve) e pedidos do titular, telefone, validade do
+        passaporte e aptidões conferidas, foto de perfil (tipo e link de 5
+        minutos), lista de evidências anexadas (metadados, sem o arquivo) e
+        plano individual (todas as versões). Só o atleta logado, só os próprios
+        dados."
       security: &a6
         - bearerAuth: []
       responses:
@@ -11353,6 +11730,13 @@ paths:
                     items:
                       type: object
                       additionalProperties: {}
+                  aptidoes:
+                    type: array
+                    items:
+                      type: object
+                      additionalProperties: {}
+                    description: Aptidão para a prática esportiva conferida pelo gestor (apto, quem
+                      conferiu e quando; sem arquivo)
                   foto:
                     nullable: true
                     description: Foto de perfil da conta do atleta (o caminho interno não é
@@ -11399,6 +11783,7 @@ paths:
                   - financeiro
                   - pedidosRevisao
                   - pedidosTitular
+                  - aptidoes
                   - foto
                   - evidencias
                   - plano
