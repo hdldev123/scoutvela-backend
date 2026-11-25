@@ -15,6 +15,9 @@ export const TIPOS_AVISO = [
   "atleta_enviou_pesagem",
   "pesagem_validada",
   "pesagem_recusada",
+  "atleta_lancou_resultado",
+  "resultado_validado",
+  "resultado_recusado",
 ] as const;
 export type TipoAviso = (typeof TIPOS_AVISO)[number];
 
@@ -24,7 +27,7 @@ export const DIAS_RETENCAO_AVISOS = 180;
 /**
  * Só ids e nomes de campo: nunca nota, peso, texto livre do atleta nem nome de arquivo.
  * Ex.: `{ indicadorId }`, `{ anexoId, categoria }`, `{ pedidoAjusteId }`, `{ sugestaoId, status }`,
- * `{ quantidade }` (autoavaliação), `{ pesagemId }` (pesagem).
+ * `{ quantidade }` (autoavaliação), `{ pesagemId }` (pesagem), `{ resultadoId }` (resultado).
  */
 export type ReferenciaAviso = Record<string, string | number | string[] | null>;
 

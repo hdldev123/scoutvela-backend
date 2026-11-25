@@ -26,6 +26,7 @@ import { rotasAvisos } from "./routes/avisos.js";
 import { rotasAvaliacoes } from "./routes/avaliacoes.js";
 import { rotasAutoavaliacoes } from "./routes/autoavaliacoes.js";
 import { rotasPesagens } from "./routes/pesagens.js";
+import { rotasResultados } from "./routes/resultados.js";
 import { rotasCadastro } from "./routes/cadastro.js";
 import { rotasCampanha } from "./routes/campanha.js";
 import { rotasCiclos } from "./routes/ciclos.js";
@@ -92,6 +93,7 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasAvaliacoes,
   rotasAutoavaliacoes,
   rotasPesagens,
+  rotasResultados,
   rotasCadastro,
   rotasPainel,
   rotasInvestimento,

@@ -125,7 +125,7 @@ export async function carregarCongelado(
 
 /**
  * Instante do último lançamento que muda score ou gates (avaliações que pontuam, medidas corporais,
- * resultados de regata, decisões de gate e financeiro) dos atletas informados. Nulo se não houver.
+ * resultados de regata, decisões de gate e financeiro) dos atletas informados. Do resultado informado pelo atleta conta só a validação (pendente não muda o score). Nulo se não houver.
  * Sugestão do atleta ainda sem nota (`resposta_sugerida` e `autoavaliacao`) não muda o score e fica de fora.
  * Os ids devem vir já filtrados pela matriz de acesso; para o painel, é sempre o agregado do piloto.
  */
@@ -136,7 +136,11 @@ export async function ultimoLancamento(db: Db, atletaIds: string[]): Promise<str
        select max(lancado_em) as t from avaliacoes
         where atleta_id = any($1::uuid[]) and ${sqlNotaDoAvaliador()}
        union all select max(registrado_em) from medidas_corporais where atleta_id = any($1::uuid[])
-       union all select max(registrado_em) from resultados_regata where atleta_id = any($1::uuid[])
+       union all select max(registrado_em) from resultados_regata
+        where atleta_id = any($1::uuid[]) and fonte <> 'atleta'
+       union all select max(v.validado_em) from validacao_resultado_atual v
+         join resultados_regata r on r.id = v.resultado_id
+        where r.atleta_id = any($1::uuid[])
        union all select max(decidido_em) from gates_decisoes where atleta_id = any($1::uuid[])
        union all select max(informado_em) from financeiro_campanha where atleta_id = any($1::uuid[])
      ) x`,

@@ -233,6 +233,13 @@ describe("financeiro da campanha e resultados internacionais", () => {
       const r = await chamar(quem, "POST", `/atletas/${alvo}/resultados`, corpo());
       expect(r.status).toBe(201);
       expect(r.corpo).toEqual({
+        id: expect.any(String),
+        edicao: 2026,
+        status: "validado",
+        motivo: null,
+        anexo: null,
+        validadoPor: null,
+        validadoEm: null,
         data: "2026-10-01",
         nivel: "mundial",
         evento: "Mundial ILCA 7 2026",

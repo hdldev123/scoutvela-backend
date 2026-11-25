@@ -5,7 +5,12 @@ import { exigirPapel } from "../auth/plugin.js";
 import { dataIso } from "../domain/datas.js";
 import { conflito, esquemaErro, naoEncontrado, requisicaoInvalida } from "../erros.js";
 import { recusarAtletaAnonimizado, travarAtletaEditavel } from "../repositories/anonimizado.js";
-import { buscarAtletaVisivel, carregarDadosAtletas } from "../repositories/atletas.js";
+import {
+  buscarAtletaVisivel,
+  carregarDadosAtletas,
+  lerResultado,
+} from "../repositories/atletas.js";
+import { esquemaResultadoDetalhe } from "./esquemas-resultado.js";
 
 const esquemaFinanceiro = z.object({
   perfilSuporte: z.enum(["A", "B", "C", "D"]),
@@ -14,18 +19,6 @@ const esquemaFinanceiro = z.object({
   componentes: z.array(
     z.object({ id: z.string(), nome: z.string(), autonomia: z.string(), apoioCbvela: z.string() }),
   ),
-});
-
-const esquemaResultado = z.object({
-  data: z.string(),
-  nivel: z.string(),
-  evento: z.string(),
-  posicao: z.number().int(),
-  tamanhoFrota: z.number().int(),
-  internacional: z.boolean(),
-  pontosCbvela: z.number().nullable(),
-  fonte: z.enum(["ranking_cbvela", "manual"]),
-  linkOficial: z.string().nullable(),
 });
 
 const esquemaCorpoResultado = z
@@ -161,7 +154,7 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
         params,
         body: esquemaCorpoResultado,
         response: {
-          201: esquemaResultado,
+          201: esquemaResultadoDetalhe,
           400: esquemaErro,
           401: esquemaErro,
           403: esquemaErro,
@@ -180,7 +173,7 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
       const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
 
-      const resultado = await app.db.transacao(async (tx) => {
+      const resultadoId = await app.db.transacao(async (tx) => {
         await travarAtletaEditavel(tx, base.id);
         const repetido = await tx.query(
           `select 1 from resultados_regata where atleta_id = $1 and data = $2 and lower(evento) = lower($3)`,
@@ -190,13 +183,14 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
           throw conflito("Este resultado já foi lançado para o atleta (mesmo evento e data).");
         const r = await tx.query<{ id: string }>(
           `insert into resultados_regata
-             (atleta_id, nivel, evento, data, posicao, tamanho_frota, internacional, pontos_cbvela, fonte, link_oficial, registrado_por)
-           values ($1, $2, $3, $4, $5, $6, true, null, 'manual', $7, $8) returning id`,
+             (atleta_id, nivel, evento, data, edicao, posicao, tamanho_frota, internacional, pontos_cbvela, fonte, link_oficial, registrado_por)
+           values ($1, $2, $3, $4, $5, $6, $7, true, null, 'manual', $8, $9) returning id::text as id`,
           [
             base.id,
             body.nivel,
             body.evento,
             body.data,
+            Number(body.data.slice(0, 4)),
             body.posicao,
             body.tamanhoFrota,
             body.linkOficial,
@@ -216,19 +210,9 @@ export async function rotasCampanha(app: FastifyInstance): Promise<void> {
             agora,
           ],
         );
-        return {
-          data: body.data,
-          nivel: body.nivel,
-          evento: body.evento,
-          posicao: body.posicao,
-          tamanhoFrota: body.tamanhoFrota,
-          internacional: true,
-          pontosCbvela: null,
-          fonte: "manual" as const,
-          linkOficial: body.linkOficial,
-        };
+        return r.rows[0]!.id;
       });
-      return reply.code(201).send(resultado);
+      return reply.code(201).send(await lerResultado(app.db, resultadoId));
     },
   );
 }

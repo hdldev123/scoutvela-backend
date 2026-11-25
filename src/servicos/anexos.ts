@@ -24,7 +24,7 @@ export interface DepsRemocaoAnexo {
 }
 
 /**
- * Remove um anexo AINDA NÃO ligado a nenhuma avaliação (nota ou autoavaliação) nem a uma pesagem.
+ * Remove um anexo AINDA NÃO ligado a nenhuma avaliação (nota ou autoavaliação), pesagem nem resultado.
  *
  * Saída escolhida para a regra de só-inserção de `evidencias_anexos` (opção "a"): o registro fica e
  * é marcado como removido (`removido_em` + `nome_arquivo = 'removido'`), a mesma exceção controlada
@@ -55,10 +55,12 @@ export async function removerAnexoNaoVinculado(
     if (anexo.removido_em) return "ja_removido";
 
     await travarAtletaEditavel(tx, anexo.atleta_id);
-    // Ligado a uma nota (do treinador ou autoavaliação) ou a uma pesagem do atleta: não sai por aqui.
+    // Ligado a uma nota (do treinador ou autoavaliação), a uma pesagem ou a um resultado do atleta
+    // (a súmula): não sai por aqui.
     const ligado = await tx.query(
       `select 1 from avaliacoes where anexo_id = $1::uuid
-       union all select 1 from pesagens_atleta where anexo_id = $1::uuid limit 1`,
+       union all select 1 from pesagens_atleta where anexo_id = $1::uuid
+       union all select 1 from resultados_regata where anexo_id = $1::uuid limit 1`,
       [anexoId],
     );
     if (ligado.rows.length > 0) return "vinculado";

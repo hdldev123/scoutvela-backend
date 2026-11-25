@@ -5,6 +5,7 @@ import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { conflito, esquemaErro, naoEncontrado, requisicaoInvalida } from "../erros.js";
 import { travarAtletaEditavel } from "../repositories/anonimizado.js";
+import { SQL_EDICAO_RESULTADO, SQL_STATUS_RESULTADO } from "../repositories/atletas.js";
 import { caminhoDaFotoDoAtleta, linkDaFoto } from "../servicos/foto-perfil.js";
 
 /**
@@ -202,7 +203,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         tags: ["titular"],
         summary: "Exporta em JSON tudo o que o sistema guarda sobre o atleta (LGPD)",
         description:
-          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados, decisões de gate, financeiro, pedidos de revisão (com o recurso, se houve) e pedidos do titular, telefone, validade do passaporte e aptidões conferidas, pesagens informadas, pedidos de ajuste recebidos, foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
+          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados (com a edição e a situação da validação), decisões de gate, financeiro, pedidos de revisão (com o recurso, se houve) e pedidos do titular, telefone, validade do passaporte e aptidões conferidas, pesagens informadas, pedidos de ajuste recebidos, foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
         security: seguranca,
         response: { 200: esquemaExportacao, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
       },
@@ -265,9 +266,14 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
               where m.atleta_id = $1::uuid order by m.medido_em, m.id`,
         ),
         q<Record<string, unknown>>(
-          `select data::text as data, nivel, evento, posicao, tamanho_frota as "tamanhoFrota", internacional,
-                    pontos_cbvela::float8 as "pontosCbvela", fonte, link_oficial as "linkOficial"
-               from resultados_regata where atleta_id = $1::uuid order by data, id`,
+          `select r.data::text as data, r.nivel, r.evento, ${SQL_EDICAO_RESULTADO} as edicao, r.posicao,
+                    r.tamanho_frota as "tamanhoFrota", r.internacional, r.pontos_cbvela::float8 as "pontosCbvela",
+                    r.fonte, r.link_oficial as "linkOficial", ${SQL_STATUS_RESULTADO} as status,
+                    v.motivo, uv.nome as "validadoPor", v.validado_em as "validadoEm"
+               from resultados_regata r
+               left join validacao_resultado_atual v on v.resultado_id = r.id
+               left join usuarios uv on uv.id = v.validado_por
+              where r.atleta_id = $1::uuid order by r.data, r.id`,
         ),
         q<Record<string, unknown>>(
           `select g.gate, g.status, g.justificativa, u.nome as "decididoPor", g.decidido_em as "decididoEm"
