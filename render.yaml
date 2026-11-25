@@ -140,3 +140,26 @@ services:
         sync: false
       - key: SUPABASE_SERVICE_ROLE_KEY
         sync: false
+
+  # Retenção do chat (D16): apaga as conversas 90 dias depois da inativação ou anonimização do atleta, da desativação do treinador ou da troca de treinador; todo dia às 03:45 de Brasília.
+  - type: cron
+    name: scout-vela-limpar-conversas
+    runtime: node
+    plan: starter
+    region: oregon
+    schedule: "45 6 * * *"
+    buildCommand: npm ci && npm run build
+    startCommand: npm run job:limpar-conversas:prod
+    envVars:
+      - key: APP_ENV
+        value: producao
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_CA_CERT
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_JWT_SECRET
+        sync: false
+      - key: SUPABASE_SERVICE_ROLE_KEY
+        sync: false

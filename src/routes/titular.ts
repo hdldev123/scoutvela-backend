@@ -75,6 +75,9 @@ const esquemaExportacao = z.object({
   pedidosAjuste: registros.describe(
     "Pedidos de ajuste recebidos do treinador ou do gestor: mensagem, indicador, quem pediu e quando",
   ),
+  mensagens: registros.describe(
+    "Mensagens das conversas do atleta (com o treinador, atuais e antigas, e com a gestão): conversa, tipo, texto, autor (nome e papel) e data",
+  ),
   foto: z
     .object({
       tipoMime: z.string(),
@@ -206,7 +209,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         tags: ["titular"],
         summary: "Exporta em JSON tudo o que o sistema guarda sobre o atleta (LGPD)",
         description:
-          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados (com a edição e a situação da validação), decisões de gate, financeiro, pedidos de revisão (com o recurso, se houve) e pedidos do titular, telefone, validade do passaporte e aptidões conferidas, pesagens informadas, pedidos de ajuste recebidos, foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
+          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados (com a edição e a situação da validação), decisões de gate, financeiro, pedidos de revisão (com o recurso, se houve) e pedidos do titular, telefone, validade do passaporte e aptidões conferidas, pesagens informadas, pedidos de ajuste recebidos, mensagens das conversas (D16), foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
         security: seguranca,
         response: { 200: esquemaExportacao, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
       },
@@ -235,6 +238,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         pesagens,
         conquistas,
         pedidosAjuste,
+        mensagens,
         caminhoFoto,
       ] = await Promise.all([
         q<Record<string, unknown>>(
@@ -347,6 +351,14 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
                left join usuarios u on u.id = p.criado_por
               where p.atleta_id = $1::uuid order by p.criado_em, p.id`,
         ),
+        q<Record<string, unknown>>(
+          `select c.id::text as "conversaId", c.tipo, m.texto, u.nome as autor, u.papel as "autorPapel",
+                    m.enviada_em as "enviadaEm"
+               from mensagens m
+               join conversas c on c.id = m.conversa_id
+               join usuarios u on u.id = m.autor_id
+              where c.atleta_id = $1::uuid order by m.enviada_em, m.id`,
+        ),
         caminhoDaFotoDoAtleta(app.db, id),
       ]);
       if (!cadastro[0]) throw naoEncontrado("Atleta não encontrado.");
@@ -377,6 +389,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         pesagens,
         conquistas,
         pedidosAjuste,
+        mensagens,
         foto: caminhoFoto
           ? {
               tipoMime: caminhoFoto.endsWith(".png") ? "image/png" : "image/jpeg",

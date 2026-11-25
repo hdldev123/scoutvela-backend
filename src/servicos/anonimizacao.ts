@@ -2,6 +2,7 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { Db } from "../db/db.js";
 import { conflito, naoEncontrado, requisicaoInvalida } from "../erros.js";
 import type { AdminAuth } from "../integracoes/supabase-admin.js";
+import { apagarConversasDoAtleta } from "../repositories/conversas.js";
 import type { ArmazenamentoEvidencias } from "../storage/index.js";
 
 /**
@@ -262,6 +263,8 @@ async function removerTextosLivres(
   // `pedidos_ajuste` é só de inserção; o gatilho aceita este DELETE pela mesma variável da aptidão.
   await tx.query(`delete from pedidos_ajuste where atleta_id = $1::uuid`, [atletaId]);
   await tx.query(`delete from avisos where atleta_id = $1::uuid`, [atletaId]);
+  // Conversas do atleta (D16): mensagens, leituras, acessos de supervisão e avisos, na hora.
+  await apagarConversasDoAtleta(tx, atletaId);
   // Pesagens informadas pelo atleta (peso é dado sensível): as linhas saem; a tabela só aceita este
   // DELETE com a variável da anonimização igual ao atleta. A medida validada fica em `medidas_corporais`.
   await tx.query(`delete from pesagens_atleta where atleta_id = $1::uuid`, [atletaId]);
