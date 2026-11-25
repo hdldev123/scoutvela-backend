@@ -419,7 +419,7 @@ export async function rotasEvidencias(app: FastifyInstance): Promise<void> {
       if (resultado === "ja_removido") throw evidenciaRemovida();
       if (resultado === "vinculado") {
         throw conflito(
-          "Este anexo já está ligado a uma avaliação, pesagem ou resultado e não pode ser removido.",
+          "Este anexo já está ligado a uma avaliação, pesagem, resultado ou conquista e não pode ser removido.",
         );
       }
       return reply.code(204).send(null);

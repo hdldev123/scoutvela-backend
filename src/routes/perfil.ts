@@ -23,7 +23,14 @@ const TAMANHO_MAXIMO_FOTO = 2 * 1024 * 1024;
 const BASE64_MAXIMO_FOTO = 2_800_000;
 const LIMITE_ENVIOS_FOTO = 10;
 
-const CAMPOS_DO_ATLETA = ["emailContato", "telefone", "passaporteValidoAte"];
+const CAMPOS_DO_ATLETA = ["emailContato", "telefone", "passaporteValidoAte", "bio"];
+
+/** Controle que não seja tabulação, quebra de linha nem retorno de carro (o Postgres nem aceita o nulo). */
+const temCaractereDeControle = (texto: string): boolean =>
+  [...texto].some((c) => {
+    const n = c.charCodeAt(0);
+    return n === 127 || (n < 32 && n !== 9 && n !== 10 && n !== 13);
+  });
 
 const pessoa = z.object({ id: z.string(), nome: z.string() });
 
@@ -60,6 +67,10 @@ const esquemaPerfil = z.object({
       aptidao: esquemaAptidao
         .nullable()
         .describe("Última aptidão conferida pelo gestor; nulo se nunca conferida"),
+      bio: z
+        .string()
+        .nullable()
+        .describe("Mini bio (texto simples, até 500 caracteres); nula se não escreveu"),
     })
     .nullable(),
   treinador: z.object({ quantidadeAtletas: z.number().int() }).nullable(),
@@ -83,6 +94,7 @@ interface LinhaAtletaPerfil {
   treinador_nome: string | null;
   termo_aceito_em: Date | null;
   compartilhar_ibvar: boolean;
+  bio: string | null;
 }
 
 async function dadosDoAtleta(db: Db, u: UsuarioAutenticado, atletaId: string, em: Date) {
@@ -90,7 +102,7 @@ async function dadosDoAtleta(db: Db, u: UsuarioAutenticado, atletaId: string, em
     `select a.ws_id, (a.cadastro_completo_em is not null) as cadastro_completo,
             a.velaid_codigo, a.classe_id, c.nome as classe_nome, a.numero_vela,
             to_char(a.data_nascimento, 'YYYY-MM-DD') as data_nascimento,
-            a.clube, a.cidade, a.uf, a.email_contato,
+            a.clube, a.cidade, a.uf, a.email_contato, a.bio,
             t.id::text as treinador_id, t.nome as treinador_nome,
             (select ct.registrado_em from consentimento_atual ct
               where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido) as termo_aceito_em,
@@ -122,6 +134,7 @@ async function dadosDoAtleta(db: Db, u: UsuarioAutenticado, atletaId: string, em
     telefone: sensivel?.telefone ?? null,
     passaporteValidoAte: sensivel?.passaporteValidoAte ?? null,
     aptidao: sensivel?.aptidao ?? null,
+    bio: l.bio,
   };
 }
 
@@ -208,7 +221,7 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
         summary:
           "Edita o perfil: nome (treinador e gestor) ou e-mail, telefone e validade do passaporte (atleta)",
         description:
-          "Nome, gênero e data de nascimento do atleta (informados em PUT /me/cadastro) e o ID World Sailing não são editáveis aqui: a correção é pelo pedido do titular (tipo `correcao`); só o gestor troca o WS ID. `telefone` (atleta): E.164; aceita espaços, parênteses, traços e pontos, que são removidos; sem `+` só com DDD brasileiro (10 ou 11 dígitos), e então vira `+55...`; outro formato é 400. `passaporteValidoAte` (atleta): `AAAA-MM`, gravado como o último dia do mês; data passada é aceita (serve para avisar que venceu); não guardamos número nem cópia do passaporte. `telefone` e `passaporteValidoAte` aceitam `null` para apagar. A auditoria guarda só os nomes dos campos.",
+          "Nome, gênero e data de nascimento do atleta (informados em PUT /me/cadastro) e o ID World Sailing não são editáveis aqui: a correção é pelo pedido do titular (tipo `correcao`); só o gestor troca o WS ID. `telefone` (atleta): E.164; aceita espaços, parênteses, traços e pontos, que são removidos; sem `+` só com DDD brasileiro (10 ou 11 dígitos), e então vira `+55...`; outro formato é 400. `passaporteValidoAte` (atleta): `AAAA-MM`, gravado como o último dia do mês; data passada é aceita (serve para avisar que venceu); não guardamos número nem cópia do passaporte. `telefone` e `passaporteValidoAte` aceitam `null` para apagar. `bio` (atleta): texto simples de até 500 caracteres (espaços nas pontas saem; vazio ou `null` apaga). A auditoria guarda só os nomes dos campos (nunca o texto da bio).",
         security: [{ bearerAuth: [] }],
         body: z
           .object({
@@ -235,6 +248,18 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
               .nullable()
               .optional()
               .describe("AAAA-MM; null apaga"),
+            bio: z
+              .string()
+              .trim()
+              .max(500, "A bio pode ter no máximo 500 caracteres.")
+              .refine((t) => !temCaractereDeControle(t), {
+                message: "A bio aceita só texto simples.",
+              })
+              .nullable()
+              .optional()
+              .describe(
+                "Mini bio do atleta (texto simples, até 500 caracteres; vazio ou null apaga). Texto livre visto pelo gestor, pelo treinador e, com o aceite do termo que inclui foto e bio, pelo IBVAR: não cite saúde, família nem contato",
+              ),
           })
           .strict(),
         response: { 200: esquemaPerfil, 400: esquemaErro, ...respostasComuns },
@@ -243,11 +268,14 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
     async (req) => {
       const u = req.usuario;
       const { nome, emailContato, telefone, passaporteValidoAte } = req.body;
+      // Bio vazia apaga, como null.
+      const bio = req.body.bio === undefined ? undefined : req.body.bio?.trim() || null;
       const campos = [
         ...(nome !== undefined ? ["nome"] : []),
         ...(emailContato !== undefined ? ["emailContato"] : []),
         ...(telefone !== undefined ? ["telefone"] : []),
         ...(passaporteValidoAte !== undefined ? ["passaporteValidoAte"] : []),
+        ...(bio !== undefined ? ["bio"] : []),
       ];
       if (campos.length === 0) throw requisicaoInvalida("Informe ao menos um campo.");
       const permitidos = u.papel === "atleta" ? CAMPOS_DO_ATLETA : ["nome"];
@@ -287,6 +315,7 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
           };
           if (emailContato !== undefined) set("email_contato", emailContato);
           if (telefone !== undefined) set("telefone", telefoneE164);
+          if (bio !== undefined) set("bio", bio);
           if (passaporteValidoAte !== undefined)
             set(
               "passaporte_valido_ate",

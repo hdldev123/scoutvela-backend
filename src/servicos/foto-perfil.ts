@@ -59,19 +59,37 @@ export async function linksDasFotosDosAtletas(
       order by atleta_id, criado_em desc`,
     [atletaIds],
   );
+  return linksDosCaminhos(
+    armazenamento,
+    new Map(r.rows.map((l) => [l.atleta_id, l.foto_caminho])),
+    log,
+  );
+}
+
+/**
+ * Links assinados de caminhos de foto já decididos (quem pode ver a foto foi resolvido na consulta
+ * que trouxe os caminhos). Falha do Storage vira nulo.
+ */
+export async function linksDosCaminhos(
+  armazenamento: ArmazenamentoEvidencias,
+  caminhoPorAtleta: Map<string, string>,
+  log: Log,
+): Promise<Map<string, string | null>> {
   const resultado = new Map<string, string | null>();
-  if (r.rows.length === 0) return resultado;
+  if (caminhoPorAtleta.size === 0) return resultado;
   let links = new Map<string, { url: string }>();
   try {
     links = await armazenamento.linksTemporarios(
-      r.rows.map((l) => ({
-        caminho: l.foto_caminho,
-        tipoMime: l.foto_caminho.endsWith(".png") ? "image/png" : "image/jpeg",
+      [...caminhoPorAtleta.values()].map((caminho) => ({
+        caminho,
+        tipoMime: caminho.endsWith(".png") ? "image/png" : "image/jpeg",
       })),
     );
   } catch (e) {
     log.warn({ evento: "foto_link_falhou", erro: nomeDoErro(e) }, "falha ao gerar link da foto");
   }
-  for (const l of r.rows) resultado.set(l.atleta_id, links.get(l.foto_caminho)?.url ?? null);
+  for (const [atletaId, caminho] of caminhoPorAtleta) {
+    resultado.set(atletaId, links.get(caminho)?.url ?? null);
+  }
   return resultado;
 }

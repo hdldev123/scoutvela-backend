@@ -135,6 +135,7 @@ describe("perfil do usuário (/me/perfil e /me/foto)", () => {
         telefone: null,
         passaporteValidoAte: null,
         aptidao: null,
+        bio: null,
       });
       expect(r.corpo.treinador).toBeNull();
     });

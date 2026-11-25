@@ -10,8 +10,9 @@ import {
   listarAtletasVisiveis,
 } from "../repositories/atletas.js";
 import { carregarParametros } from "../repositories/parametros.js";
+import { fotoEBioParaIbvar } from "../repositories/perfil-publico.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
-import { linksDasFotosDosAtletas } from "../servicos/foto-perfil.js";
+import { linksDasFotosDosAtletas, linksDosCaminhos } from "../servicos/foto-perfil.js";
 
 const esquemaCiclo = z
   .object({ nome: z.string(), prazo: z.string().describe("AAAA-MM-DD") })
@@ -32,7 +33,9 @@ const esquemaItem = z.object({
     fotoUrl: z
       .string()
       .nullable()
-      .describe("Link assinado curto da foto da conta do atleta; sempre nulo para o IBVAR"),
+      .describe(
+        "Link assinado curto da foto da conta do atleta. Para o IBVAR, só de quem consentiu com ele e aceitou uma versão do termo que inclui foto e bio (D14); nulo nos demais casos",
+      ),
   }),
   score: z.number(),
   faixa: z.object({ id: z.string(), nome: z.string(), nomeCurto: z.string() }),
@@ -104,15 +107,17 @@ export async function rotasRanking(app: FastifyInstance): Promise<void> {
         return d !== 0 ? d : a.atleta.nome.localeCompare(b.atleta.nome, "pt-BR");
       });
 
-      const fotos =
-        req.usuario.papel === "ibvar"
-          ? new Map<string, string | null>()
-          : await linksDasFotosDosAtletas(
-              app.db,
-              app.armazenamento,
-              filtrados.map((x) => x.atleta.id),
-              req.log,
-            );
+      const idsFiltrados = filtrados.map((x) => x.atleta.id);
+      let fotos: Map<string, string | null>;
+      if (req.usuario.papel === "ibvar") {
+        // A regra de foto e bio do IBVAR fica na consulta (consentimento + termo que inclui foto e bio).
+        const liberadas = await fotoEBioParaIbvar(app.db, idsFiltrados, referencia);
+        const caminhos = new Map<string, string>();
+        for (const [id, v] of liberadas) if (v.fotoCaminho) caminhos.set(id, v.fotoCaminho);
+        fotos = await linksDosCaminhos(app.armazenamento, caminhos, req.log);
+      } else {
+        fotos = await linksDasFotosDosAtletas(app.db, app.armazenamento, idsFiltrados, req.log);
+      }
       const nomeCurto = new Map(parametros.pilares.map((p) => [p.id, p.nomeCurto]));
       const itens = filtrados.map(({ atleta, calculo }, i) => ({
         posicao: i + 1,

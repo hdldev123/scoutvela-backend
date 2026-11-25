@@ -216,6 +216,47 @@ describe("anonimização efetiva (de fato)", () => {
     });
     expect(anexo.status).toBe(201);
 
+    // D14: bio e conquistas (título e motivo citam o nome): saem na anonimização.
+    expect(
+      (await chamar(atleta, "PUT", "/me/perfil", { bio: `Sou ${NOME}, velejadora de Niterói.` }))
+        .status,
+    ).toBe(200);
+    const provaConquista = async () =>
+      (
+        await chamar(atleta, "POST", `/atletas/${atletaId}/evidencias`, {
+          nomeArquivo: "titulo.pdf",
+          tipoMime: "application/pdf",
+          conteudoBase64: pdf().toString("base64"),
+        })
+      ).corpo.id as string;
+    const conquistaValidada = await chamar(atleta, "POST", "/me/conquistas", {
+      titulo: `Campeã estadual ${NOME}`,
+      ano: 2025,
+      anexoId: await provaConquista(),
+    });
+    expect(conquistaValidada.status).toBe(201);
+    expect(
+      (
+        await gestor("PUT", `/conquistas/${conquistaValidada.corpo.id}/validacao`, {
+          decisao: "validar",
+        })
+      ).status,
+    ).toBe(200);
+    const conquistaRecusada = await chamar(atleta, "POST", "/me/conquistas", {
+      titulo: "Medalha de bronze",
+      ano: 2024,
+      anexoId: await provaConquista(),
+    });
+    expect(conquistaRecusada.status).toBe(201);
+    expect(
+      (
+        await gestor("PUT", `/conquistas/${conquistaRecusada.corpo.id}/validacao`, {
+          decisao: "recusar",
+          motivo: `Documento de ${NOME} ilegível`,
+        })
+      ).status,
+    ).toBe(200);
+
     const foto = await chamar(atleta, "POST", "/me/foto", {
       tipoMime: "image/jpeg",
       conteudoBase64: jpegValido().toString("base64"),
@@ -311,6 +352,22 @@ describe("anonimização efetiva (de fato)", () => {
       CLUBE,
     ]);
     expect(sobras).toEqual([]);
+  });
+
+  it("D14: bio e conquistas saem; os avisos delas também", async () => {
+    const bio = await p.db.query("select 1 from atletas where id = $1 and bio is not null", [
+      atletaId,
+    ]);
+    expect(bio.rows).toHaveLength(0);
+    const conquistas = await p.db.query("select 1 from conquistas_atleta where atleta_id = $1", [
+      atletaId,
+    ]);
+    expect(conquistas.rows).toHaveLength(0);
+    const avisos = await p.db.query(
+      "select 1 from avisos where atleta_id = $1 and tipo like '%conquista%'",
+      [atletaId],
+    );
+    expect(avisos.rows).toHaveLength(0);
   });
 
   it("o que ficou: série histórica sem texto, data de nascimento generalizada, regata sem link", async () => {

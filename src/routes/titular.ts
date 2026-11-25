@@ -69,6 +69,9 @@ const esquemaExportacao = z.object({
   pesagens: registros.describe(
     "Pesagens informadas pelo atleta: peso, situação (pendente, validada ou recusada), motivo da recusa, quem decidiu e quando (a foto da balança não é exportada e é apagada depois da decisão)",
   ),
+  conquistas: registros.describe(
+    "Conquistas informadas pelo atleta: título, ano, situação (pendente, validada ou recusada), motivo da recusa, quem decidiu e quando (o anexo está em evidencias). Os pódios dos resultados validados estão em resultados",
+  ),
   pedidosAjuste: registros.describe(
     "Pedidos de ajuste recebidos do treinador ou do gestor: mensagem, indicador, quem pediu e quando",
   ),
@@ -230,13 +233,14 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         plano,
         aptidoes,
         pesagens,
+        conquistas,
         pedidosAjuste,
         caminhoFoto,
       ] = await Promise.all([
         q<Record<string, unknown>>(
           `select a.velaid_codigo as "velaid", a.nome, a.genero, a.data_nascimento::text as "dataNascimento",
                     c.nome as classe, c.evento as "classeEvento", a.clube, a.cidade, a.uf, a.numero_vela as "numeroVela",
-                    a.ws_id as "wsId", a.email_contato as "emailContato", a.telefone,
+                    a.ws_id as "wsId", a.email_contato as "emailContato", a.telefone, a.bio,
                     to_char(a.passaporte_valido_ate, 'YYYY-MM') as "passaporteValidoAte", t.nome as treinador, a.ativo,
                     a.criado_em as "criadoEm"
                from atletas a join classes c on c.id = a.classe_id left join usuarios t on t.id = a.treinador_id
@@ -331,6 +335,12 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
               where p.atleta_id = $1::uuid order by p.enviado_em, p.id`,
         ),
         q<Record<string, unknown>>(
+          `select c.titulo, c.ano, c.status, c.motivo, c.criado_em as "criadoEm",
+                    u.nome as "decididoPor", c.decidido_em as "decididoEm"
+               from conquistas_atleta c left join usuarios u on u.id = c.decidido_por
+              where c.atleta_id = $1::uuid order by c.criado_em, c.id`,
+        ),
+        q<Record<string, unknown>>(
           `select p.mensagem, i.nome as indicador, u.nome as "pedidoPor", p.criado_em as "criadoEm"
                from pedidos_ajuste p
                left join indicadores i on i.id = p.indicador_id
@@ -365,6 +375,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         pedidosTitular: pedidos,
         aptidoes,
         pesagens,
+        conquistas,
         pedidosAjuste,
         foto: caminhoFoto
           ? {

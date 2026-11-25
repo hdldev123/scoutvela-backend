@@ -25,9 +25,16 @@ import { lerContatoSensivel } from "../repositories/contato-sensivel.js";
 import { carregarTurmaPorCiclo, lerRegra } from "../repositories/evolucao.js";
 import { ultimoLancamento } from "../repositories/investimento.js";
 import { carregarParametros } from "../repositories/parametros.js";
+import { bioDoAtleta, fotoEBioParaIbvar } from "../repositories/perfil-publico.js";
+import {
+  conquistasAutomaticas,
+  conquistasManuaisValidadas,
+  ordenarConquistas,
+} from "../repositories/conquistas.js";
 import { buscarPlanoAtual } from "../repositories/plano.js";
 import { esquemaAptidao } from "./aptidao.js";
 import { esquemaResultadoDetalhe } from "./esquemas-resultado.js";
+import { esquemaConquistaFicha } from "./conquistas.js";
 import { esquemaFonteFaixa } from "./parametros.js";
 import { esquemaPlanoRegistrado, esquemaTextosPlano } from "./plano.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
@@ -116,7 +123,15 @@ const esquemaFicha = z.object({
     fotoUrl: z
       .string()
       .nullable()
-      .describe("Link assinado curto da foto da conta do atleta; sempre nulo para o IBVAR"),
+      .describe(
+        "Link assinado curto da foto da conta do atleta. Para o IBVAR, só se o atleta consentiu com ele e aceitou uma versão do termo que inclui foto e bio (D14); nulo nos demais casos",
+      ),
+    bio: z
+      .string()
+      .nullable()
+      .describe(
+        "Mini bio escrita pelo atleta (texto simples, até 500 caracteres); nula se não escreveu. Mesma regra da foto para o IBVAR",
+      ),
     termoAceito: z.boolean(),
     classe: z.object({
       id: z.string(),
@@ -142,6 +157,11 @@ const esquemaFicha = z.object({
     })
     .nullable()
     .describe("Nulo para o IBVAR: contato, passaporte e aptidão não são dele (matriz de acesso)"),
+  conquistas: z
+    .array(esquemaConquistaFicha)
+    .describe(
+      "Só as validadas, do ano mais novo ao mais antigo: pódios (1º a 3º) dos resultados validados e as conquistas manuais validadas pelo treinador ou pelo gestor. O IBVAR recebe os pódios de quem consentiu (são resultados que ele já vê) e as manuais só se o aceite do atleta inclui foto e bio",
+    ),
   ciclo: z.object({ nome: z.string(), prazo: z.string() }).nullable(),
   dadosAtualizadosEm: z
     .string()
@@ -327,13 +347,21 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         ibvar ? (await lerRegra(app.db, "MIN_GRUPO_AGREGADO")).minimo : null,
       );
       const sensivel = await lerContatoSensivel(app.db, usuario, atleta.id, referencia);
-      const fotoUrl = ibvar
-        ? null
-        : await linkDaFoto(
-            app.armazenamento,
-            await caminhoDaFotoDoAtleta(app.db, atleta.id),
-            req.log,
-          );
+      // Foto e bio do IBVAR: a consulta só devolve se ele consentiu E o aceite do termo inclui foto e bio.
+      const paraIbvar = ibvar
+        ? (await fotoEBioParaIbvar(app.db, [atleta.id], referencia)).get(atleta.id)
+        : undefined;
+      const fotoUrl = await linkDaFoto(
+        app.armazenamento,
+        ibvar ? (paraIbvar?.fotoCaminho ?? null) : await caminhoDaFotoDoAtleta(app.db, atleta.id),
+        req.log,
+      );
+      const bio = ibvar ? (paraIbvar?.bio ?? null) : await bioDoAtleta(app.db, atleta.id);
+      // Pódios validados (já vêm só validados para o IBVAR) e, se o papel pode, as manuais validadas.
+      const conquistas = ordenarConquistas([
+        ...conquistasAutomaticas(dados.resultados),
+        ...(!ibvar || paraIbvar ? await conquistasManuaisValidadas(app.db, atleta.id) : []),
+      ]);
       const notaPorIndicador = new Map(dados.notas.map((n) => [n.indicadorId, n]));
       const pilaresCalc = new Map(calculo.pilares.map((p) => [p.pilarId, p]));
       const nivelDoIndicador = new Map<string, NivelDeNota>(
@@ -508,6 +536,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
           cidade: atleta.cidade,
           uf: atleta.uf,
           fotoUrl,
+          bio,
           termoAceito: atleta.termoAceito,
           classe: {
             id: atleta.classe.id,
@@ -519,6 +548,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         contato: sensivel
           ? { email: atleta.emailContato, treinador: atleta.treinador, ...sensivel }
           : null,
+        conquistas,
         ciclo,
         dadosAtualizadosEm: await ultimoLancamento(app.db, [atleta.id]),
         score: calculo.score,

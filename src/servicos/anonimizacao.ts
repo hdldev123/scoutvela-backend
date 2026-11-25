@@ -159,7 +159,7 @@ async function anonimizarNoBanco(
   await tx.query(
     `update atletas
         set nome = $2, clube = null, cidade = null, uf = null, numero_vela = null, ws_id = $6,
-            email_contato = null, telefone = null, passaporte_valido_ate = null,
+            email_contato = null, telefone = null, passaporte_valido_ate = null, bio = null,
             velaid_codigo = $3, ativo = false,
             data_nascimento = make_date(extract(year from data_nascimento)::int, 7, 1),
             anonimizado_em = $4, anonimizado_pedido_id = $5::bigint
@@ -265,6 +265,9 @@ async function removerTextosLivres(
   // Pesagens informadas pelo atleta (peso é dado sensível): as linhas saem; a tabela só aceita este
   // DELETE com a variável da anonimização igual ao atleta. A medida validada fica em `medidas_corporais`.
   await tx.query(`delete from pesagens_atleta where atleta_id = $1::uuid`, [atletaId]);
+  // Conquistas informadas pelo atleta (título e motivo são texto livre): as linhas saem, pela mesma
+  // exceção do DELETE. Os pódios dos resultados seguem como os resultados (evento anonimizado).
+  await tx.query(`delete from conquistas_atleta where atleta_id = $1::uuid`, [atletaId]);
   // Evidência e justificativa do treinador na mesma atualização (o gatilho confere a linha inteira).
   await q(
     `update avaliacoes
