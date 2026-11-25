@@ -1,5 +1,6 @@
 import type { Db } from "../db/db.js";
 import type { CicloCongeladoEntrada, LinhaCongelada } from "../domain/evolucao.js";
+import type { CicloDaTurma } from "../domain/turma.js";
 import { ESQUEMAS_REGRAS, type CodigoRegra } from "./regras-esquemas.js";
 
 type ValorDe<C extends CodigoRegra> = ReturnType<(typeof ESQUEMAS_REGRAS)[C]["parse"]>;
@@ -92,5 +93,35 @@ export async function carregarCiclosCongelados(
           ? (pilaresDe.get(`${l.ciclo_id}|${l.atleta_id}`) ?? new Map())
           : null,
       })),
+  }));
+}
+
+/**
+ * Por ciclo fechado (mais antigo primeiro): média do score de todos os atletas do piloto, quantos são e o
+ * score do atleta informado. Só agregado mais o score do próprio atleta; o acesso à ficha já foi checado.
+ */
+export async function carregarTurmaPorCiclo(db: Db, atletaId: string): Promise<CicloDaTurma[]> {
+  const r = await db.query<{
+    ciclo_id: string;
+    ciclo: string;
+    media: string;
+    atletas: string;
+    score_atleta: string | null;
+  }>(
+    `select c.id as ciclo_id, c.nome as ciclo, avg(s.score)::text as media, count(*)::text as atletas,
+            max(s.score) filter (where s.atleta_id = $1::uuid)::text as score_atleta
+       from scores_ciclo s
+       join ciclos_avaliacao c on c.id = s.ciclo_id
+      where c.status = 'fechado'
+      group by c.id, c.nome, c.inicio
+      order by c.inicio, c.id`,
+    [atletaId],
+  );
+  return r.rows.map((l) => ({
+    cicloId: l.ciclo_id,
+    ciclo: l.ciclo,
+    media: Number(l.media),
+    atletas: Number(l.atletas),
+    scoreDoAtleta: l.score_atleta === null ? null : Number(l.score_atleta),
   }));
 }

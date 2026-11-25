@@ -86,6 +86,7 @@ export const ESQUEMAS_REGRAS = {
   }),
   META_EVOLUCAO: z.strictObject({ percentual: z.number().min(0).max(1000) }),
   MIN_GRUPO_AGREGADO: z.strictObject({ minimo: z.number().int().min(1).max(1000) }),
+  TENDENCIA: z.strictObject({ limiar: z.number().positive().max(100) }),
 } as const;
 
 export type CodigoRegra = keyof typeof ESQUEMAS_REGRAS;

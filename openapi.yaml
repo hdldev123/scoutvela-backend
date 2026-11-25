@@ -2245,6 +2245,70 @@ paths:
                         - ciclo
                         - score
                       additionalProperties: false
+                  mediaTurmaPorCiclo:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        cicloId:
+                          type: string
+                          format: uuid
+                          pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+                        ciclo:
+                          type: string
+                        media:
+                          nullable: true
+                          description: Média do score de todo o piloto no ciclo; nula para o IBVAR se o
+                            grupo for pequeno
+                          type: number
+                        atletas:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                      required:
+                        - cicloId
+                        - ciclo
+                        - media
+                        - atletas
+                      additionalProperties: false
+                    description: Um item por ciclo fechado, do mais antigo ao mais recente, alinhado
+                      com historicoScore
+                  comparacaoTurma:
+                    nullable: true
+                    description: Último ciclo fechado em que o atleta tem score; na_media quando a
+                      diferença absoluta é menor que TENDENCIA.limiar. Nulo sem
+                      ciclo fechado com score, ou se a média foi suprimida para
+                      o IBVAR
+                    type: object
+                    properties:
+                      scoreAtual:
+                        type: number
+                      mediaTurma:
+                        type: number
+                      diferenca:
+                        type: number
+                        description: scoreAtual menos mediaTurma
+                      posicao:
+                        type: string
+                        enum:
+                          - acima
+                          - na_media
+                          - abaixo
+                    required:
+                      - scoreAtual
+                      - mediaTurma
+                      - diferenca
+                      - posicao
+                    additionalProperties: false
+                  tendencia:
+                    nullable: true
+                    description: Dois últimos ciclos fechados do atleta contra TENDENCIA.limiar;
+                      nula com menos de dois
+                    type: string
+                    enum:
+                      - subindo
+                      - estavel
+                      - caindo
                   pilares:
                     type: array
                     items:
@@ -2796,6 +2860,9 @@ paths:
                   - total
                   - pontosCbvela
                   - historicoScore
+                  - mediaTurmaPorCiclo
+                  - comparacaoTurma
+                  - tendencia
                   - pilares
                   - gates
                   - classFit
@@ -12579,18 +12646,20 @@ paths:
                 regras:
                   description: "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4,
                     RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_RESULTADOS,
-                    META_EVOLUCAO, MIN_GRUPO_AGREGADO. META_EVOLUCAO (D12): {
-                    percentual (0 a 1000) }, meta de alta da média do score da
-                    turma sobre o ciclo fechado anterior. MIN_GRUPO_AGREGADO
-                    (D12): { minimo (inteiro, 1 a 1000) }, menor grupo que o
-                    IBVAR vê em agregado. O valor segue o formato lido em GET
-                    /parametros. PERF_RESULTADOS (regra provisória P12): {
-                    edicoes_max (1 a 20), sem_resultado (nota 0 a 5 do nível sem
-                    resultado validado, padrão 0), niveis: { mundial,
-                    continental, nacional } }, cada nível uma lista de faixas {
-                    ate, nota } em ordem: ate crescente (inteiro, 1 a 500), só a
-                    última com ate nulo (qualquer colocação), nota inteira de 0
-                    a 5 que não aumenta"
+                    META_EVOLUCAO, MIN_GRUPO_AGREGADO, TENDENCIA. TENDENCIA
+                    (D13): { limiar (maior que 0, até 100) }, pontos de score da
+                    tendência do atleta e da faixa de na média da turma.
+                    META_EVOLUCAO (D12): { percentual (0 a 1000) }, meta de alta
+                    da média do score da turma sobre o ciclo fechado anterior.
+                    MIN_GRUPO_AGREGADO (D12): { minimo (inteiro, 1 a 1000) },
+                    menor grupo que o IBVAR vê em agregado. O valor segue o
+                    formato lido em GET /parametros. PERF_RESULTADOS (regra
+                    provisória P12): { edicoes_max (1 a 20), sem_resultado (nota
+                    0 a 5 do nível sem resultado validado, padrão 0), niveis: {
+                    mundial, continental, nacional } }, cada nível uma lista de
+                    faixas { ate, nota } em ordem: ate crescente (inteiro, 1 a
+                    500), só a última com ate nulo (qualquer colocação), nota
+                    inteira de 0 a 5 que não aumenta"
                   type: object
                   additionalProperties: {}
                 indicadores:

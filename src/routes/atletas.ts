@@ -13,6 +13,7 @@ import {
   notaDaColocacao,
   notaPeso,
   nivelDeNota,
+  resumoDaTurma,
   sugerirPlano,
 } from "../domain/index.js";
 import type { NivelDeNota } from "../domain/index.js";
@@ -21,6 +22,7 @@ import { historicoDeNotas, historicoDePesagens } from "../repositories/historico
 import { ehSugestao } from "../repositories/origens.js";
 import { buscarAtletaVisivel, carregarDadosAtletas, cicloAberto } from "../repositories/atletas.js";
 import { lerContatoSensivel } from "../repositories/contato-sensivel.js";
+import { carregarTurmaPorCiclo, lerRegra } from "../repositories/evolucao.js";
 import { ultimoLancamento } from "../repositories/investimento.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { buscarPlanoAtual } from "../repositories/plano.js";
@@ -153,6 +155,40 @@ const esquemaFicha = z.object({
   total: z.number().int(),
   pontosCbvela: z.number(),
   historicoScore: z.array(z.object({ ciclo: z.string(), score: z.number() })),
+  mediaTurmaPorCiclo: z
+    .array(
+      z.object({
+        cicloId: z.uuid(),
+        ciclo: z.string(),
+        media: z
+          .number()
+          .nullable()
+          .describe(
+            "Média do score de todo o piloto no ciclo; nula para o IBVAR se o grupo for pequeno",
+          ),
+        atletas: z.number().int(),
+      }),
+    )
+    .describe(
+      "Um item por ciclo fechado, do mais antigo ao mais recente, alinhado com historicoScore",
+    ),
+  comparacaoTurma: z
+    .object({
+      scoreAtual: z.number(),
+      mediaTurma: z.number(),
+      diferenca: z.number().describe("scoreAtual menos mediaTurma"),
+      posicao: z.enum(["acima", "na_media", "abaixo"]),
+    })
+    .nullable()
+    .describe(
+      "Último ciclo fechado em que o atleta tem score; na_media quando a diferença absoluta é menor que TENDENCIA.limiar. Nulo sem ciclo fechado com score, ou se a média foi suprimida para o IBVAR",
+    ),
+  tendencia: z
+    .enum(["subindo", "estavel", "caindo"])
+    .nullable()
+    .describe(
+      "Dois últimos ciclos fechados do atleta contra TENDENCIA.limiar; nula com menos de dois",
+    ),
   pilares: z.array(
     z.object({
       id: z.string(),
@@ -279,6 +315,11 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
       const { atleta, dados, calculo } = avaliado;
 
       const ibvar = usuario.papel === "ibvar";
+      const resumo = resumoDaTurma(
+        await carregarTurmaPorCiclo(app.db, atleta.id),
+        (await lerRegra(app.db, "TENDENCIA")).limiar,
+        ibvar ? (await lerRegra(app.db, "MIN_GRUPO_AGREGADO")).minimo : null,
+      );
       const sensivel = await lerContatoSensivel(app.db, usuario, atleta.id, referencia);
       const fotoUrl = ibvar
         ? null
@@ -484,6 +525,7 @@ export async function rotasAtletas(app: FastifyInstance): Promise<void> {
         total: calculo.total,
         pontosCbvela: calculo.pontosCbvela,
         historicoScore: dados.historicoScore,
+        ...resumo,
         pilares,
         gates: {
           statusFinal: calculo.statusFinal,
