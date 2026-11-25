@@ -91,11 +91,17 @@ const auth = await criarAuthLocal({
   origens: ORIGENS,
   serviceRoleKey,
 });
+// Só no modo local (APP_ENV fixo em desenvolvimento): a suíte E2E roda em paralelo a partir do mesmo
+// IP e estoura o limite global de 300 requisições por minuto. LIMITE_REQUISICOES_LOCAL sobe esse teto.
+const limiteLocal = Number(process.env.LIMITE_REQUISICOES_LOCAL);
 const app = await criarApp({
   db,
   config,
   adminAuth: criarAdminAuth({ supabaseUrl: URL_AUTH, serviceRoleKey }),
   verificarToken: criarVerificadorSupabase({ supabaseUrl: URL_AUTH, jwtSecret }),
+  ...(Number.isInteger(limiteLocal) && limiteLocal > 0
+    ? { limiteRequisicoes: { max: limiteLocal, janelaMs: 60_000 } }
+    : {}),
 });
 
 let encerrando = false;

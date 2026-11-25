@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { cabecalhoAuth, tokenPara } from "../apoio/app.js";
 import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
 import type { Piloto } from "../apoio/piloto.js";
 
 const AGORA = () => new Date("2026-11-06T12:00:00-03:00");
 const TERMO = "Piloto 18+ · v1";
 
-describe("cadastro pelo VelaID, termo e importações", () => {
+describe("cadastro pelo WS ID, termo e importações", () => {
   let p: Piloto;
   beforeAll(async () => {
     p = await criarPiloto(AGORA);
@@ -87,66 +88,109 @@ describe("cadastro pelo VelaID, termo e importações", () => {
 
   describe("fluxo completo", () => {
     let novoId: string;
+    let treinador: string;
 
-    it("POST /atletas cadastra, audita o envio do termo e não entra no ranking", async () => {
-      const ana = await treinadorId(EMAILS_DEMO.treinadora);
-      const { status, corpo } = await gestor("POST", "/atletas", {
-        velaidCodigo: "mg-t15",
-        classeId: "ilca7",
-        treinadorId: ana,
+    const corpoCadastro = (extra: Record<string, unknown> = {}) => ({
+      wsId: "BRARB51",
+      email: "renata@exemplo.com",
+      classeId: "ilca7",
+      treinadorId: treinador,
+      confirmaMaioridade: true,
+      ...extra,
+    });
+
+    /** Cabeçalho do atleta recém-cadastrado (liga um login à conta criada no cadastro). */
+    const comoAtleta = async (email: string) => {
+      const authUserId = crypto.randomUUID();
+      await p.db.query("update usuarios set auth_user_id = $1 where email = $2", [
+        authUserId,
+        email,
+      ]);
+      return cabecalhoAuth(await tokenPara(authUserId));
+    };
+    const completar = async (cab: { authorization: string }, payload: unknown) => {
+      const r = await p.app.inject({
+        method: "PUT",
+        url: "/me/cadastro",
+        headers: cab,
+        payload: payload as object,
       });
+      return { status: r.statusCode, corpo: r.json() };
+    };
+
+    beforeAll(async () => {
+      treinador = await treinadorId(EMAILS_DEMO.treinadora);
+    });
+
+    it("POST /atletas cadastra só com WS ID, audita o envio do termo e não entra no ranking", async () => {
+      const { status, corpo } = await gestor(
+        "POST",
+        "/atletas",
+        corpoCadastro({ wsId: " bra rb51 ", velaid: "mg-t15" }),
+      );
       expect(status).toBe(201);
-      expect(corpo.nome).toBe("Renata Bastos");
+      expect(corpo.wsId).toBe("BRARB51");
+      expect(corpo.velaid).toBe("MG-T15");
+      expect(corpo.cadastroCompleto).toBe(false);
       expect(corpo.termo).toEqual({ status: "aguardando_aceite", versao: TERMO });
       novoId = corpo.id;
 
       const a = (
         await p.db.query<{
+          nome: string | null;
+          genero: string | null;
+          data_nascimento: string | null;
           email_contato: string;
           treinador_id: string;
           criado_por: string;
           uf: string;
           ws_id: string;
-        }>("select email_contato, treinador_id, criado_por, uf, ws_id from atletas where id = $1", [
-          novoId,
-        ])
+          velaid_codigo: string;
+          cadastro_completo_em: Date | null;
+        }>(
+          `select nome, genero, data_nascimento, email_contato, treinador_id, criado_por, uf, ws_id,
+                  velaid_codigo, cadastro_completo_em from atletas where id = $1`,
+          [novoId],
+        )
       ).rows[0]!;
-      expect(a.email_contato).toBe("renata@exemplo.com");
-      expect(a.treinador_id).toBe(ana);
-      expect(a.uf).toBe("MG");
-      expect(a.ws_id).toBe("BRARB51");
+      expect(a).toMatchObject({
+        nome: null,
+        genero: null,
+        data_nascimento: null,
+        cadastro_completo_em: null,
+        email_contato: "renata@exemplo.com",
+        treinador_id: treinador,
+        uf: "MG",
+        ws_id: "BRARB51",
+        velaid_codigo: "MG-T15",
+      });
 
       const aud = await p.db.query<{ acao: string; detalhes: Record<string, unknown> }>(
         "select acao, detalhes from auditoria where entidade_id = $1 order by id",
         [novoId],
       );
       expect(aud.rows.map((x) => x.acao)).toEqual(["cadastrar_atleta", "enviar_termo"]);
-      expect(JSON.stringify(aud.rows)).not.toContain("exemplo.com");
+      expect(JSON.stringify(aud.rows)).not.toMatch(/exemplo\.com|BRARB51|MG-T15/);
 
       const ranking = await gestor("GET", "/ranking");
       expect(ranking.corpo.itens).toHaveLength(14);
-      expect(
-        ranking.corpo.itens.some(
-          (i: { atleta: { velaid: string } }) => i.atleta.velaid === "MG-T15",
-        ),
-      ).toBe(false);
     });
 
-    it("GET /atletas/pendentes lista só quem espera aceite (rota estática convive com /atletas/:id)", async () => {
+    it("GET /atletas/pendentes lista quem espera aceite, com WS ID e nome nulo (rota estática convive com /atletas/:id)", async () => {
       const { status, corpo } = await gestor("GET", "/atletas/pendentes");
       expect(status).toBe(200);
       expect(corpo).toHaveLength(1);
       expect(corpo[0]).toMatchObject({
         id: novoId,
-        nome: "Renata Bastos",
+        nome: null,
+        wsId: "BRARB51",
         velaid: "MG-T15",
         classe: { id: "ilca7", nome: "ILCA 7" },
       });
       expect(typeof corpo[0].criadoEm).toBe("string");
 
-      const ficha = await gestor("GET", `/atletas/${novoId}`);
-      expect(ficha.status).toBe(200);
-      expect(ficha.corpo.atleta.termoAceito).toBe(false);
+      // Atleta incompleto não tem ficha (nem score): 404 para todos.
+      expect((await gestor("GET", `/atletas/${novoId}`)).status).toBe(404);
       expect((await gestor("GET", "/atletas/nao-e-uuid")).status).toBe(400);
     });
 
@@ -156,7 +200,7 @@ describe("cadastro pelo VelaID, termo e importações", () => {
       expect(corpo.elegivel).toBe(false);
     });
 
-    it("POST /atletas/:id/termo registra o aceite, entra no ranking com 0% e não concede IBVAR", async () => {
+    it("POST /atletas/:id/termo registra o aceite, mas o atleta incompleto segue fora do ranking", async () => {
       const { status, corpo } = await gestor("POST", `/atletas/${novoId}/termo`, { versao: TERMO });
       expect(status).toBe(200);
       expect(corpo).toEqual({ ok: true });
@@ -183,16 +227,82 @@ describe("cadastro pelo VelaID, termo e importações", () => {
       ).toBe(1);
 
       expect((await gestor("GET", "/atletas/pendentes")).corpo).toEqual([]);
+      expect((await gestor("GET", "/ranking")).corpo.itens).toHaveLength(14);
+    });
 
+    it("o atleta vê a sugestão do VelaID em GET /me e completa o cadastro (uma vez)", async () => {
+      const cab = await comoAtleta("renata@exemplo.com");
+      const me = await p.app.inject({ method: "GET", url: "/me", headers: cab });
+      expect(me.json().cadastroPendente).toEqual({
+        wsId: "BRARB51",
+        velaid: "MG-T15",
+        sugestao: { nome: "Renata Bastos", genero: "F", dataNascimento: "2005-08-19" },
+      });
+      expect(me.json().atleta).toEqual({ id: novoId, nome: null });
+
+      const ok = await completar(cab, {
+        nome: "  Renata Bastos Lima ",
+        genero: "F",
+        dataNascimento: "2005-08-19",
+      });
+      expect(ok.status).toBe(200);
+      expect(ok.corpo).toEqual({
+        nome: "Renata Bastos Lima",
+        genero: "F",
+        dataNascimento: "2005-08-19",
+        cadastroCompleto: true,
+      });
+      const a = (
+        await p.db.query<{ nome: string; cadastro_completo_em: Date }>(
+          "select nome, cadastro_completo_em from atletas where id = $1",
+          [novoId],
+        )
+      ).rows[0]!;
+      expect(a.nome).toBe("Renata Bastos Lima");
+      expect(a.cadastro_completo_em).toEqual(AGORA());
+      expect(
+        (
+          await p.db.query<{ nome: string }>(
+            "select nome from usuarios where email = 'renata@exemplo.com'",
+          )
+        ).rows[0]!.nome,
+      ).toBe("Renata Bastos Lima");
+      const aud = await p.db.query<{ detalhes: unknown }>(
+        "select detalhes from auditoria where acao = 'completar_cadastro' and entidade_id = $1",
+        [novoId],
+      );
+      expect(aud.rows).toEqual([{ detalhes: { campos: ["nome", "genero", "dataNascimento"] } }]);
+
+      const meDepois = await p.app.inject({ method: "GET", url: "/me", headers: cab });
+      expect(meDepois.json().cadastroPendente).toBeNull();
+      expect(meDepois.json().atleta).toEqual({ id: novoId, nome: "Renata Bastos Lima" });
+
+      // Segunda vez: 409 e nada muda.
+      const de_novo = await completar(cab, {
+        nome: "Outro Nome",
+        genero: "M",
+        dataNascimento: "2000-01-01",
+      });
+      expect(de_novo.status).toBe(409);
+      expect(
+        (await p.db.query<{ nome: string }>("select nome from atletas where id = $1", [novoId]))
+          .rows[0]!.nome,
+      ).toBe("Renata Bastos Lima");
+    });
+
+    it("completo e com o termo aceito, entra no ranking com 0% e não concede IBVAR", async () => {
       const ranking = await gestor("GET", "/ranking");
       expect(ranking.corpo.itens).toHaveLength(15);
       const item = ranking.corpo.itens.find(
         (i: { atleta: { velaid: string } }) => i.atleta.velaid === "MG-T15",
       );
+      expect(item.atleta).toMatchObject({ wsId: "BRARB51", nome: "Renata Bastos Lima" });
       expect(item.score).toBe(0);
       expect(item.completo).toBe(false);
 
       const ficha = await gestor("GET", `/atletas/${novoId}`);
+      expect(ficha.status).toBe(200);
+      expect(ficha.corpo.atleta).toMatchObject({ wsId: "BRARB51", velaid: "MG-T15" });
       const g = Object.fromEntries(
         ficha.corpo.gates.itens.map((x: { gate: number; motivo: string }) => [x.gate, x.motivo]),
       );
@@ -217,86 +327,116 @@ describe("cadastro pelo VelaID, termo e importações", () => {
         400,
       );
     });
+
+    it("sem VelaID: cadastra (velaid nulo) e o atleta fica sem sugestão", async () => {
+      const { status, corpo } = await gestor(
+        "POST",
+        "/atletas",
+        corpoCadastro({ wsId: "gbrhm15", email: "sem.velaid@exemplo.com" }),
+      );
+      expect(status).toBe(201);
+      expect(corpo).toMatchObject({ wsId: "GBRHM15", velaid: null });
+      const cab = await comoAtleta("sem.velaid@exemplo.com");
+      const me = await p.app.inject({ method: "GET", url: "/me", headers: cab });
+      expect(me.json().cadastroPendente).toEqual({ wsId: "GBRHM15", velaid: null, sugestao: null });
+      const lista = await gestor("GET", "/atletas?cadastroCompleto=false");
+      expect(lista.corpo).toHaveLength(1);
+      expect(lista.corpo[0]).toMatchObject({
+        id: corpo.id,
+        nome: null,
+        wsId: "GBRHM15",
+        velaid: null,
+        cadastroCompleto: false,
+        cadastroRecusado: false,
+      });
+    });
   });
 
   describe("validações de POST /atletas", () => {
-    it("menor de 18 -> 400, sem gravar", async () => {
-      const marcos = await treinadorId("marcos.pires@scoutvela.dev");
+    let marcos: string;
+    beforeAll(async () => {
+      marcos = await treinadorId("marcos.pires@scoutvela.dev");
+    });
+    const base = (extra: Record<string, unknown> = {}) => ({
+      wsId: "BRAFG77",
+      email: "felipe@exemplo.com",
+      classeId: "ilca7",
+      treinadorId: marcos,
+      confirmaMaioridade: true,
+      ...extra,
+    });
+
+    it("sem confirmaMaioridade, ou com false -> 400, sem gravar", async () => {
       const antes = await contar("atletas");
-      const { status, corpo } = await gestor("POST", "/atletas", {
-        velaidCodigo: "PE-T17",
-        classeId: "ilca7",
-        treinadorId: marcos,
-      });
+      const sem = base();
+      delete (sem as Record<string, unknown>).confirmaMaioridade;
+      for (const payload of [sem, base({ confirmaMaioridade: false })]) {
+        const { status, corpo } = await gestor("POST", "/atletas", payload);
+        expect(status).toBe(400);
+        expect(JSON.stringify(corpo)).toContain("18 anos");
+      }
+      expect(await contar("atletas")).toBe(antes);
+    });
+
+    it("WS ID com formato inválido -> 400", async () => {
+      for (const wsId of ["", "BR", "123ABCD", "BRA-123", "BRA1", "BRAABCDEFGHIJKLM", "BRA ÃO12"]) {
+        const { status } = await gestor("POST", "/atletas", base({ wsId }));
+        expect(status, wsId).toBe(400);
+      }
+      expect(await contar("atletas where ws_id = 'BRAFG77'")).toBe(0);
+    });
+
+    it("WS ID duplicado (também com outra grafia) -> 409", async () => {
+      const { status, corpo } = await gestor("POST", "/atletas", base({ wsId: "bra sc t01" }));
+      expect(status).toBe(409);
+      expect(corpo.mensagem).toBe("Já existe um atleta com este ID World Sailing.");
+    });
+
+    it("VelaID já usado -> 409; malformado -> 400", async () => {
+      const dup = await gestor("POST", "/atletas", base({ velaid: "SC-T01" }));
+      expect(dup.status).toBe(409);
+      expect(dup.corpo.mensagem).toBe("O código SC-T01 já está no piloto.");
+      expect((await gestor("POST", "/atletas", base({ velaid: "x" }))).status).toBe(400);
+    });
+
+    it("VelaID de menor de 18 anos -> 400, sem gravar", async () => {
+      const antes = await contar("atletas");
+      const { status, corpo } = await gestor("POST", "/atletas", base({ velaid: "PE-T17" }));
       expect(status).toBe(400);
       expect(corpo.mensagem).toContain("tem 17 anos");
       expect(await contar("atletas")).toBe(antes);
     });
 
-    it("já cadastrado -> 409", async () => {
-      const marcos = await treinadorId("marcos.pires@scoutvela.dev");
-      const { status, corpo } = await gestor("POST", "/atletas", {
-        velaidCodigo: "SC-T01",
-        classeId: "ilca7",
-        treinadorId: marcos,
-      });
-      expect(status).toBe(409);
-      expect(corpo.mensagem).toBe("O código SC-T01 já está no piloto.");
-    });
-
-    it("código inexistente -> 404; malformado -> 400", async () => {
-      const marcos = await treinadorId("marcos.pires@scoutvela.dev");
-      expect(
-        (
-          await gestor("POST", "/atletas", {
-            velaidCodigo: "ZZ-X99",
-            classeId: "ilca7",
-            treinadorId: marcos,
-          })
-        ).status,
-      ).toBe(404);
-      expect(
-        (
-          await gestor("POST", "/atletas", {
-            velaidCodigo: "x",
-            classeId: "ilca7",
-            treinadorId: marcos,
-          })
-        ).status,
-      ).toBe(400);
+    it("e-mail ausente ou inválido -> 400", async () => {
+      expect((await gestor("POST", "/atletas", base({ email: "nao-e-email" }))).status).toBe(400);
+      const sem = base();
+      delete (sem as Record<string, unknown>).email;
+      expect((await gestor("POST", "/atletas", sem)).status).toBe(400);
     });
 
     it("classe inexistente ou inativa -> 400", async () => {
-      const marcos = await treinadorId("marcos.pires@scoutvela.dev");
-      const base = { velaidCodigo: "BA-T16", treinadorId: marcos };
-      expect((await gestor("POST", "/atletas", { ...base, classeId: "nao-existe" })).status).toBe(
-        400,
-      );
+      expect((await gestor("POST", "/atletas", base({ classeId: "nao-existe" }))).status).toBe(400);
       await p.db.query("update classes set ativa = false where id = 'ilca7'");
-      const inativa = await gestor("POST", "/atletas", { ...base, classeId: "ilca7" });
+      const inativa = await gestor("POST", "/atletas", base());
       await p.db.query("update classes set ativa = true where id = 'ilca7'");
       expect(inativa.status).toBe(400);
       expect(inativa.corpo.mensagem).toBe("Classe inválida ou inativa.");
     });
 
     it("treinador inexistente, de outro papel ou inativo -> 400", async () => {
-      const base = { velaidCodigo: "BA-T16", classeId: "ilca7" };
       expect(
-        (await gestor("POST", "/atletas", { ...base, treinadorId: crypto.randomUUID() })).status,
+        (await gestor("POST", "/atletas", base({ treinadorId: crypto.randomUUID() }))).status,
       ).toBe(400);
       const gestorId = await treinadorId(EMAILS_DEMO.gestor);
-      expect((await gestor("POST", "/atletas", { ...base, treinadorId: gestorId })).status).toBe(
-        400,
-      );
-      const marcos = await treinadorId("marcos.pires@scoutvela.dev");
+      expect((await gestor("POST", "/atletas", base({ treinadorId: gestorId }))).status).toBe(400);
       await p.db.query("update usuarios set ativo = false where id = $1", [marcos]);
-      const inativo = await gestor("POST", "/atletas", { ...base, treinadorId: marcos });
+      const inativo = await gestor("POST", "/atletas", base());
       await p.db.query("update usuarios set ativo = true where id = $1", [marcos]);
       expect(inativo.status).toBe(400);
-      expect((await gestor("POST", "/atletas", { ...base, treinadorId: "nao-uuid" })).status).toBe(
+      expect((await gestor("POST", "/atletas", base({ treinadorId: "nao-uuid" }))).status).toBe(
         400,
       );
-      expect(await contar("atletas where velaid_codigo = 'BA-T16'")).toBe(0);
+      expect(await contar("atletas where ws_id = 'BRAFG77'")).toBe(0);
     });
   });
 
@@ -310,7 +450,13 @@ describe("cadastro pelo VelaID, termo e importações", () => {
           "cadastro",
           "POST",
           "/atletas",
-          { velaidCodigo: "MG-T15", classeId: "ilca7", treinadorId: crypto.randomUUID() },
+          {
+            wsId: "BRARB51",
+            email: "renata@exemplo.com",
+            classeId: "ilca7",
+            treinadorId: crypto.randomUUID(),
+            confirmaMaioridade: true,
+          },
         ],
         ["pendentes", "GET", "/atletas/pendentes", undefined],
         ["termo", "POST", `/atletas/${id}/termo`, { versao: TERMO }],

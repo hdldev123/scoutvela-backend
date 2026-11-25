@@ -29,13 +29,15 @@ describe("GET /atletas/:id/indicadores/:indicadorId/historico", () => {
       p.idDe("SP-T07"),
       p.idDe("RJ-T05"),
     ]);
-    // Novo lançamento de perf_nacional e nova pesagem, pela treinadora, no ciclo aberto.
+    // Novo lançamento de perf_consistencia e nova pesagem, pela treinadora, no ciclo aberto.
     const r = await p.app.inject({
       method: "POST",
       url: `/atletas/${livia}/avaliacoes`,
       headers: await p.como(EMAILS_DEMO.treinadora),
       payload: {
-        notas: [{ indicadorId: "perf_nacional", valor: 4, evidencia: "Brasileiro 2026: 2º lugar" }],
+        notas: [
+          { indicadorId: "perf_consistencia", valor: 4, evidencia: "Brasileiro 2026: 2º lugar" },
+        ],
         medida: { pesoKg: 75 },
       },
     });
@@ -59,16 +61,18 @@ describe("GET /atletas/:id/indicadores/:indicadorId/historico", () => {
   };
 
   it("sem token 401; uuid inválido 400; atleta ou indicador inexistente 404", async () => {
-    expect((await historico(null, livia, "perf_nacional")).status).toBe(401);
-    expect((await historico(EMAILS_DEMO.gestor, "nao-e-uuid", "perf_nacional")).status).toBe(400);
-    expect((await historico(EMAILS_DEMO.gestor, crypto.randomUUID(), "perf_nacional")).status).toBe(
-      404,
+    expect((await historico(null, livia, "perf_consistencia")).status).toBe(401);
+    expect((await historico(EMAILS_DEMO.gestor, "nao-e-uuid", "perf_consistencia")).status).toBe(
+      400,
     );
+    expect(
+      (await historico(EMAILS_DEMO.gestor, crypto.randomUUID(), "perf_consistencia")).status,
+    ).toBe(404);
     expect((await historico(EMAILS_DEMO.gestor, livia, "nao_existe")).status).toBe(404);
   });
 
   it("gestor: do mais novo para o mais antigo, com avaliador, ciclo e evidência", async () => {
-    const { status, corpo } = await historico(EMAILS_DEMO.gestor, livia, "perf_nacional");
+    const { status, corpo } = await historico(EMAILS_DEMO.gestor, livia, "perf_consistencia");
     expect(status).toBe(200);
     expect(corpo.length).toBeGreaterThanOrEqual(2);
     expect(corpo[0]).toMatchObject({
@@ -83,6 +87,25 @@ describe("GET /atletas/:id/indicadores/:indicadorId/historico", () => {
     });
     const datas = corpo.map((l) => Date.parse(l.lancadoEm));
     expect(datas).toEqual([...datas].sort((a, b) => b - a));
+  });
+
+  it("perf_nacional (calculado): um item por resultado validado, com a nota que a colocação daria", async () => {
+    const { status, corpo } = await historico(EMAILS_DEMO.gestor, livia, "perf_nacional");
+    expect(status).toBe(200);
+    // Seed: Brasileiro de ILCA 6 em 2026, 4º lugar: fora do pódio, nota 0 (sem peso nem ciclo).
+    expect(corpo).toHaveLength(1);
+    expect(corpo[0]).toMatchObject({
+      valor: 0,
+      pesoKg: null,
+      origem: "calculado",
+      pendente: false,
+      cicloNome: null,
+      evidencia: "4º em Brasileiro de ILCA 6 (2026)",
+    });
+    // IBVAR (Lívia consentiu): vê a nota, sem evidência, avaliador nem anexo.
+    const ib = await historico(EMAILS_DEMO.ibvar, livia, "perf_mundial");
+    expect(ib.status).toBe(200);
+    expect(ib.corpo[0]).toMatchObject({ valor: 3, evidencia: null, avaliador: null, anexo: null });
   });
 
   it("inclui a sugestão pendente do atleta, marcada como tal", async () => {
@@ -112,20 +135,20 @@ describe("GET /atletas/:id/indicadores/:indicadorId/historico", () => {
   });
 
   it("treinador só vê os próprios atletas", async () => {
-    expect((await historico(EMAILS_DEMO.treinadora, livia, "perf_nacional")).status).toBe(200);
-    expect((await historico(EMAILS_DEMO.treinadora, rafael, "perf_nacional")).status).toBe(404);
+    expect((await historico(EMAILS_DEMO.treinadora, livia, "perf_consistencia")).status).toBe(200);
+    expect((await historico(EMAILS_DEMO.treinadora, rafael, "perf_consistencia")).status).toBe(404);
   });
 
   it("atleta só vê o seu", async () => {
-    expect((await historico(EMAILS_DEMO.atleta, helena, "perf_nacional")).status).toBe(200);
-    expect((await historico(EMAILS_DEMO.atleta, livia, "perf_nacional")).status).toBe(404);
+    expect((await historico(EMAILS_DEMO.atleta, helena, "perf_consistencia")).status).toBe(200);
+    expect((await historico(EMAILS_DEMO.atleta, livia, "perf_consistencia")).status).toBe(404);
   });
 
   it("IBVAR: pilar sensível 403; nos demais, sem evidência, avaliador, anexo nem sugestão", async () => {
     for (const ind of ["cf_peso_kg", "cf_composicao", "men_resiliencia", "amb_autonomia"]) {
       expect((await historico(EMAILS_DEMO.ibvar, livia, ind)).status, ind).toBe(403);
     }
-    const perf = await historico(EMAILS_DEMO.ibvar, livia, "perf_nacional");
+    const perf = await historico(EMAILS_DEMO.ibvar, livia, "perf_consistencia");
     expect(perf.status).toBe(200);
     expect(perf.corpo.length).toBeGreaterThan(0);
     for (const l of perf.corpo) {
@@ -134,6 +157,6 @@ describe("GET /atletas/:id/indicadores/:indicadorId/historico", () => {
     const car = await historico(EMAILS_DEMO.ibvar, livia, "car_disponibilidade");
     expect(car.corpo.some((l) => l.pendente)).toBe(false);
     // Sem consentimento de compartilhamento: o IBVAR nem enxerga o atleta.
-    expect((await historico(EMAILS_DEMO.ibvar, helena, "perf_nacional")).status).toBe(404);
+    expect((await historico(EMAILS_DEMO.ibvar, helena, "perf_consistencia")).status).toBe(404);
   });
 });

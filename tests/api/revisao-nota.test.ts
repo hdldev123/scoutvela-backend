@@ -116,7 +116,7 @@ describe("revisão ligada ao lançamento (PUT /revisoes/:id com avaliacaoId)", (
       "select detalhes from auditoria where acao = 'responder_revisao' and entidade_id = $1",
       [id],
     );
-    expect(aud.rows[0]!.detalhes).toEqual({ avaliacaoId: nova });
+    expect(aud.rows[0]!.detalhes).toEqual({ avaliacaoId: nova, papel: "gestor", instancia: 1 });
   });
 
   it("avaliacaoId numérico; notaAnterior vem do último lançamento antes do vinculado (seed)", async () => {

@@ -18,12 +18,19 @@ const ACESSO: Partial<Record<Papel, AcessoDoPapel>> = {
       "usuarios",
       "parametros",
       "auditoria",
+      "sugestoes",
+      "mensagens",
     ],
     telaInicial: "ranking",
   },
-  // No front, "ranking" do treinador aparece como "Meus atletas". Revisões: só leitura dos próprios atletas.
-  treinador: { telas: ["ranking", "avaliar", "revisoes"], telaInicial: "ranking" },
-  atleta: { telas: ["painel", "ficha"], telaInicial: "painel" },
+  // No front, "ranking" do treinador aparece como "Meus atletas". Revisões: responde os pedidos dos próprios atletas (1ª instância).
+  // Mensagens (D16): chat do treinador com os atletas e com a gestão.
+  // Sugestões (D7): o treinador propõe mudanças (ex.: faixa do Class Fit) e o gestor aprova ou recusa.
+  treinador: {
+    telas: ["ranking", "avaliar", "revisoes", "sugestoes", "mensagens"],
+    telaInicial: "ranking",
+  },
+  atleta: { telas: ["painel", "ficha", "mensagens"], telaInicial: "painel" },
   ibvar: { telas: ["investimento", "ranking"], telaInicial: "investimento" },
 };
 

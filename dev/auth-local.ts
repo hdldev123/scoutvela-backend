@@ -179,7 +179,7 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
       email: u.email,
       email_confirmed_at: criado,
       app_metadata: { provider: "email", providers: ["email"] },
-      user_metadata: {},
+      user_metadata: { email: u.email, email_verified: true },
       created_at: criado,
       updated_at: criado,
       factors: (fatores.get(u.auth_user_id) ?? []).map((f) => ({
@@ -216,6 +216,8 @@ export async function criarAuthLocal(opcoes: OpcoesAuthLocal): Promise<FastifyIn
     const expiraEm = emitidoEm + VALIDADE_SEGUNDOS;
     const accessToken = await new SignJWT({
       email: u.email,
+      // Como no Supabase: o e-mail das contas do emulador já está confirmado.
+      user_metadata: { email: u.email, email_verified: true },
       role: "authenticated",
       session_id: sessionId,
       aal,

@@ -1,4 +1,5 @@
 import type { Db } from "../db/db.js";
+import { sqlNotaDoAvaliador } from "./origens.js";
 
 /** Dados do pedido de revisão que definem quais lançamentos podem ser ligados a ele. */
 export interface PedidoParaVinculo {
@@ -12,10 +13,10 @@ export interface PedidoParaVinculo {
  * Regra única de "lançamento elegível para o pedido". Usada na validação do PUT e na listagem
  * (GET /revisoes/:id/lancamentos), para as duas nunca divergirem. Espera os aliases
  * `a` (avaliacoes) e `i` (indicadores) e os parâmetros $1 a $4 de `paramsElegibilidade`.
- * Sugestão gerada pela resposta do atleta (`resposta_sugerida`) não é nota de avaliador: não conta.
+ * Sugestão do atleta (`resposta_sugerida` e `autoavaliacao`) não é nota de avaliador: não conta.
  */
 export const SQL_LANCAMENTO_ELEGIVEL = `a.atleta_id = $1::uuid
-  and a.origem <> 'resposta_sugerida'
+  and ${sqlNotaDoAvaliador("a")}
   and a.lancado_em > $4::timestamptz
   and case when $3::text is not null then a.indicador_id = $3::text
            when $2::text is not null then i.pilar_id = $2::text
@@ -87,4 +88,32 @@ export async function listarLancamentosElegiveis(
     origem: l.origem,
     avaliador: l.avaliador_id ? { id: l.avaliador_id, nome: l.avaliador_nome ?? "" } : null,
   }));
+}
+
+export interface PedidoDoAvaliador extends PedidoParaVinculo {
+  status: "aberto" | "respondido";
+  instancia: 1 | 2;
+}
+
+/**
+ * Pedido de revisão que o usuário pode responder ou consultar (gestor: qualquer um; treinador: só de
+ * atleta dele, filtro no SQL). Fora do acesso e inexistente dão o mesmo resultado (nulo, 404 na rota).
+ * Com `travar`, bloqueia a linha do pedido até o fim da transação.
+ */
+export async function buscarPedidoDoAvaliador(
+  db: Db,
+  usuario: { id: string; papel: string },
+  id: string,
+  travar = false,
+): Promise<PedidoDoAvaliador | null> {
+  const r = await db.query<PedidoDoAvaliador>(
+    `select p.atleta_id, p.pilar_id, p.indicador_id, p.criado_em, p.status, p.instancia
+       from pedidos_revisao p
+       join atletas a on a.id = p.atleta_id
+      where p.id = $1::bigint
+        and ($2::text = 'gestor' or a.treinador_id = $3::uuid)
+      ${travar ? "for update of p" : ""}`,
+    [id, usuario.papel, usuario.id],
+  );
+  return r.rows[0] ?? null;
 }

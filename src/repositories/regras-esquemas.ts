@@ -9,6 +9,34 @@ const posicao = z.number().int().min(1).max(500);
 const statusGate = z.enum(["apto", "condicional", "alerta"]);
 const perfilG4 = z.strictObject({ status: statusGate, motivo: z.string().trim().min(3).max(200) });
 
+/**
+ * Faixas de colocação de um nível (PERF_RESULTADOS): "ate" crescente, a última com "ate" nulo (vale
+ * qualquer colocação, para toda colocação ter nota) e colocação melhor nunca com nota menor.
+ */
+function faixasColocacao(nivel: string) {
+  return z
+    .array(
+      z.strictObject({
+        ate: z.number().int().min(1).max(500).nullable(),
+        nota: z.number().int().min(0).max(5),
+      }),
+    )
+    .min(1)
+    .max(20)
+    .refine(
+      (f) => f.every((x, i) => (i === f.length - 1 ? x.ate === null : x.ate !== null)),
+      `Em PERF_RESULTADOS (${nivel}), só a última faixa tem "ate" nulo.`,
+    )
+    .refine(
+      (f) => f.every((x, i) => i === 0 || (x.ate ?? Infinity) > (f[i - 1]!.ate ?? Infinity)),
+      `Em PERF_RESULTADOS (${nivel}), o "ate" das faixas precisa ser crescente.`,
+    )
+    .refine(
+      (f) => f.every((x, i) => i === 0 || x.nota <= f[i - 1]!.nota),
+      `Em PERF_RESULTADOS (${nivel}), colocação pior não pode dar nota maior.`,
+    );
+}
+
 export const ESQUEMAS_REGRAS = {
   P3: z.strictObject({
     limites: z
@@ -47,31 +75,18 @@ export const ESQUEMAS_REGRAS = {
   G4: z.strictObject({ A: perfilG4, B: perfilG4, C: perfilG4, D: perfilG4 }),
   RANKING_CBVELA: z.strictObject({ janela_semanas: z.number().int().min(1).max(104) }),
   TERMO_EXIGE_REACEITE: z.strictObject({ ativa: z.boolean() }),
-  PERF_PONTOS: z
-    .strictObject({
-      ativa: z.boolean(),
-      indicador: z.string().min(1).max(60).optional(),
-      faixas: z
-        .array(
-          z.strictObject({
-            ate: z.number().min(0).max(100_000),
-            nota: z.number().int().min(0).max(5),
-          }),
-        )
-        .max(20)
-        .refine(
-          (f) => f.every((x, i) => i === 0 || x.ate > (f[i - 1] as { ate: number }).ate),
-          'Em PERF_PONTOS, o "ate" das faixas precisa ser crescente.',
-        )
-        .refine(
-          (f) => f.every((x, i) => i === 0 || x.nota >= (f[i - 1] as { nota: number }).nota),
-          "Em PERF_PONTOS, mais pontos não podem dar nota menor.",
-        ),
-    })
-    .refine(
-      (v) => !v.ativa || v.faixas.length > 0,
-      "Para ativar PERF_PONTOS, informe ao menos uma faixa.",
-    ),
+  PERF_RESULTADOS: z.strictObject({
+    edicoes_max: z.number().int().min(1).max(20),
+    sem_resultado: z.number().int().min(0).max(5),
+    niveis: z.strictObject({
+      mundial: faixasColocacao("mundial"),
+      continental: faixasColocacao("continental"),
+      nacional: faixasColocacao("nacional"),
+    }),
+  }),
+  META_EVOLUCAO: z.strictObject({ percentual: z.number().min(0).max(1000) }),
+  MIN_GRUPO_AGREGADO: z.strictObject({ minimo: z.number().int().min(1).max(1000) }),
+  TENDENCIA: z.strictObject({ limiar: z.number().positive().max(100) }),
 } as const;
 
 export type CodigoRegra = keyof typeof ESQUEMAS_REGRAS;

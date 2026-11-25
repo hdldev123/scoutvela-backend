@@ -76,6 +76,7 @@ describe("termo: aceite antecipado da próxima versão", () => {
         titulo: "Termo v2",
         texto: TEXTO,
         vigenteDesde: new Date("2026-11-10T00:00:00-03:00").toISOString(),
+        incluiFotoBio: false,
       });
     }
     expect((await chamar(EMAILS_DEMO.treinadora, "GET", "/termo/proxima")).status).toBe(403);

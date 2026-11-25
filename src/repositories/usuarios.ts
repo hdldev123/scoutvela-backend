@@ -44,8 +44,8 @@ export async function buscarUsuarioPorAuthId(
 export async function buscarNomeDoAtleta(
   db: Db,
   atletaId: string,
-): Promise<{ id: string; nome: string } | null> {
-  const r = await db.query<{ id: string; nome: string }>(
+): Promise<{ id: string; nome: string | null } | null> {
+  const r = await db.query<{ id: string; nome: string | null }>(
     `select id, nome from atletas where id = $1`,
     [atletaId],
   );

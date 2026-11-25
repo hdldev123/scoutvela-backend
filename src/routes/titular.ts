@@ -5,6 +5,7 @@ import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
 import { conflito, esquemaErro, naoEncontrado, requisicaoInvalida } from "../erros.js";
 import { travarAtletaEditavel } from "../repositories/anonimizado.js";
+import { SQL_EDICAO_RESULTADO, SQL_STATUS_RESULTADO } from "../repositories/atletas.js";
 import { caminhoDaFotoDoAtleta, linkDaFoto } from "../servicos/foto-perfil.js";
 
 /**
@@ -62,6 +63,21 @@ const esquemaExportacao = z.object({
   ),
   pedidosRevisao: registros,
   pedidosTitular: registros,
+  aptidoes: registros.describe(
+    "Aptidão para a prática esportiva conferida pelo gestor (apto, quem conferiu e quando; sem arquivo)",
+  ),
+  pesagens: registros.describe(
+    "Pesagens informadas pelo atleta: peso, situação (pendente, validada ou recusada), motivo da recusa, quem decidiu e quando (a foto da balança não é exportada e é apagada depois da decisão)",
+  ),
+  conquistas: registros.describe(
+    "Conquistas informadas pelo atleta: título, ano, situação (pendente, validada ou recusada), motivo da recusa, quem decidiu e quando (o anexo está em evidencias). Os pódios dos resultados validados estão em resultados",
+  ),
+  pedidosAjuste: registros.describe(
+    "Pedidos de ajuste recebidos do treinador ou do gestor: mensagem, indicador, quem pediu e quando",
+  ),
+  mensagens: registros.describe(
+    "Mensagens das conversas do atleta (com o treinador, atuais e antigas, e com a gestão): conversa, tipo, texto, autor (nome e papel) e data",
+  ),
   foto: z
     .object({
       tipoMime: z.string(),
@@ -109,7 +125,7 @@ interface LinhaPedido {
   anonimizado_em: Date | null;
 }
 
-const SQL_PEDIDO = `select p.id::text as id, p.atleta_id, a.nome as atleta_nome, p.tipo, p.descricao,
+const SQL_PEDIDO = `select p.id::text as id, p.atleta_id, coalesce(a.nome, a.ws_id) as atleta_nome, p.tipo, p.descricao,
          p.status, p.criado_em, p.resposta, p.respondido_em,
          case when a.anonimizado_pedido_id = p.id then a.anonimizado_em end as anonimizado_em
     from pedidos_titular p join atletas a on a.id = p.atleta_id`;
@@ -193,7 +209,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         tags: ["titular"],
         summary: "Exporta em JSON tudo o que o sistema guarda sobre o atleta (LGPD)",
         description:
-          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados, decisões de gate, financeiro, pedidos de revisão e pedidos do titular, foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
+          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados (com a edição e a situação da validação), decisões de gate, financeiro, pedidos de revisão (com o recurso, se houve) e pedidos do titular, telefone, validade do passaporte e aptidões conferidas, pesagens informadas, pedidos de ajuste recebidos, mensagens das conversas (D16), foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
         security: seguranca,
         response: { 200: esquemaExportacao, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
       },
@@ -218,12 +234,18 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         pedidos,
         evidencias,
         plano,
+        aptidoes,
+        pesagens,
+        conquistas,
+        pedidosAjuste,
+        mensagens,
         caminhoFoto,
       ] = await Promise.all([
         q<Record<string, unknown>>(
           `select a.velaid_codigo as "velaid", a.nome, a.genero, a.data_nascimento::text as "dataNascimento",
                     c.nome as classe, c.evento as "classeEvento", a.clube, a.cidade, a.uf, a.numero_vela as "numeroVela",
-                    a.ws_id as "wsId", a.email_contato as "emailContato", t.nome as treinador, a.ativo,
+                    a.ws_id as "wsId", a.email_contato as "emailContato", a.telefone, a.bio,
+                    to_char(a.passaporte_valido_ate, 'YYYY-MM') as "passaporteValidoAte", t.nome as treinador, a.ativo,
                     a.criado_em as "criadoEm"
                from atletas a join classes c on c.id = a.classe_id left join usuarios t on t.id = a.treinador_id
               where a.id = $1::uuid`,
@@ -233,7 +255,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
                from consentimentos where atleta_id = $1::uuid order by registrado_em, id`,
         ),
         q<Record<string, unknown>>(
-          `select i.nome as indicador, n.valor, n.evidencia, n.origem, u.nome as avaliador,
+          `select i.nome as indicador, n.valor, n.evidencia, n.link, n.origem, n.justificativa, u.nome as avaliador,
                     ci.nome as ciclo, n.lancado_em as "lancadoEm"
                from avaliacoes n join indicadores i on i.id = n.indicador_id
                left join usuarios u on u.id = n.avaliador_id
@@ -252,9 +274,14 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
               where m.atleta_id = $1::uuid order by m.medido_em, m.id`,
         ),
         q<Record<string, unknown>>(
-          `select data::text as data, nivel, evento, posicao, tamanho_frota as "tamanhoFrota", internacional,
-                    pontos_cbvela::float8 as "pontosCbvela", fonte, link_oficial as "linkOficial"
-               from resultados_regata where atleta_id = $1::uuid order by data, id`,
+          `select r.data::text as data, r.nivel, r.evento, ${SQL_EDICAO_RESULTADO} as edicao, r.posicao,
+                    r.tamanho_frota as "tamanhoFrota", r.internacional, r.pontos_cbvela::float8 as "pontosCbvela",
+                    r.fonte, r.link_oficial as "linkOficial", ${SQL_STATUS_RESULTADO} as status,
+                    v.motivo, uv.nome as "validadoPor", v.validado_em as "validadoEm"
+               from resultados_regata r
+               left join validacao_resultado_atual v on v.resultado_id = r.id
+               left join usuarios uv on uv.id = v.validado_por
+              where r.atleta_id = $1::uuid order by r.data, r.id`,
         ),
         q<Record<string, unknown>>(
           `select g.gate, g.status, g.justificativa, u.nome as "decididoPor", g.decidido_em as "decididoEm"
@@ -276,7 +303,9 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         ),
         q<Record<string, unknown>>(
           `select r.pilar_id as "pilarId", r.indicador_id as "indicadorId", r.motivo, r.status, r.resposta,
-                    r.criado_em as "criadoEm", r.respondido_em as "respondidoEm"
+                    r.criado_em as "criadoEm", r.respondido_em as "respondidoEm", r.instancia,
+                    r.resposta_1 as "respostaPrimeiraInstancia", r.respondido_em_1 as "respondidoEmPrimeiraInstancia",
+                    r.recurso_texto as "recurso", r.recurso_em as "recursoEm"
                from pedidos_revisao r where r.atleta_id = $1::uuid order by r.criado_em, r.id`,
         ),
         q<Record<string, unknown>>(
@@ -284,7 +313,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
                from pedidos_titular where atleta_id = $1::uuid order by criado_em, id`,
         ),
         q<Record<string, unknown>>(
-          `select e.id, e.nome_arquivo as "nomeArquivo", e.tipo_mime as "tipoMime", e.tamanho_bytes as "tamanhoBytes",
+          `select e.id, e.nome_arquivo as "nomeArquivo", e.categoria, e.tipo_mime as "tipoMime", e.tamanho_bytes as "tamanhoBytes",
                     e.enviado_em as "enviadoEm", i.nome as indicador, u.nome as "enviadoPor",
                     (e.removido_em is not null) as removida, e.removido_em as "removidoEm"
                from evidencias_anexos e
@@ -297,6 +326,38 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
                     u.nome as "registradoPor", p.registrado_em as "registradoEm"
                from plano_individual p join usuarios u on u.id = p.registrado_por
               where p.atleta_id = $1::uuid order by p.registrado_em, p.id`,
+        ),
+        q<Record<string, unknown>>(
+          `select p.apto, u.nome as "conferidoPor", p.conferido_em as "conferidoEm"
+               from aptidoes p join usuarios u on u.id = p.conferido_por
+              where p.atleta_id = $1::uuid order by p.conferido_em, p.id`,
+        ),
+        q<Record<string, unknown>>(
+          `select p.peso_kg::float8 as "pesoKg", p.status, p.motivo, p.enviado_em as "enviadoEm",
+                    u.nome as "decididoPor", p.decidido_em as "decididoEm"
+               from pesagens_atleta p left join usuarios u on u.id = p.decidido_por
+              where p.atleta_id = $1::uuid order by p.enviado_em, p.id`,
+        ),
+        q<Record<string, unknown>>(
+          `select c.titulo, c.ano, c.status, c.motivo, c.criado_em as "criadoEm",
+                    u.nome as "decididoPor", c.decidido_em as "decididoEm"
+               from conquistas_atleta c left join usuarios u on u.id = c.decidido_por
+              where c.atleta_id = $1::uuid order by c.criado_em, c.id`,
+        ),
+        q<Record<string, unknown>>(
+          `select p.mensagem, i.nome as indicador, u.nome as "pedidoPor", p.criado_em as "criadoEm"
+               from pedidos_ajuste p
+               left join indicadores i on i.id = p.indicador_id
+               left join usuarios u on u.id = p.criado_por
+              where p.atleta_id = $1::uuid order by p.criado_em, p.id`,
+        ),
+        q<Record<string, unknown>>(
+          `select c.id::text as "conversaId", c.tipo, m.texto, u.nome as autor, u.papel as "autorPapel",
+                    m.enviada_em as "enviadaEm"
+               from mensagens m
+               join conversas c on c.id = m.conversa_id
+               join usuarios u on u.id = m.autor_id
+              where c.atleta_id = $1::uuid order by m.enviada_em, m.id`,
         ),
         caminhoDaFotoDoAtleta(app.db, id),
       ]);
@@ -324,6 +385,11 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         financeiro: financeiroComComponentes,
         pedidosRevisao: revisoes,
         pedidosTitular: pedidos,
+        aptidoes,
+        pesagens,
+        conquistas,
+        pedidosAjuste,
+        mensagens,
         foto: caminhoFoto
           ? {
               tipoMime: caminhoFoto.endsWith(".png") ? "image/png" : "image/jpeg",

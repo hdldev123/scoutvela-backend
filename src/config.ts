@@ -58,6 +58,12 @@ const esquemaConfig = z
     STORAGE_PROVEDOR: z.enum(["local", "supabase"]).default("local"),
     STORAGE_BUCKET: z.string().min(1).default("evidencias"),
     STORAGE_DIR_LOCAL: z.string().min(1).default(".dados-locais/evidencias"),
+    /** Cota de anexos por atleta (soma dos arquivos não removidos). Padrão: 200 MB. */
+    COTA_ANEXOS_BYTES: z.coerce
+      .number()
+      .int()
+      .positive()
+      .default(200 * 1024 * 1024),
   })
   .superRefine((c, ctx) => {
     if (c.APP_ENV === "desenvolvimento") return;

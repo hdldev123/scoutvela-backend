@@ -5,7 +5,16 @@ import { z } from "zod";
 import type { UsuarioAutenticado } from "../auth/plugin.js";
 import { exigirPapel, limitePorIp } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
-import { esquemaErro, requisicaoInvalida, servicoIndisponivel } from "../erros.js";
+import { mesPassaporteValido, normalizarTelefone, ultimoDiaDoMes } from "../domain/index.js";
+import {
+  esquemaErro,
+  requisicaoInvalida,
+  requisicaoInvalidaCampos,
+  servicoIndisponivel,
+} from "../erros.js";
+import { avisarTreinadorDoAtleta } from "../repositories/avisos.js";
+import { lerContatoSensivel } from "../repositories/contato-sensivel.js";
+import { esquemaAptidao } from "./aptidao.js";
 import { TIPOS_ARQUIVO, decodificarArquivo, limparMetadados } from "../servicos/arquivo-base64.js";
 import { removerOuPendenciar } from "../servicos/arquivos-pendentes.js";
 import { linkDaFoto } from "../servicos/foto-perfil.js";
@@ -13,6 +22,15 @@ import { linkDaFoto } from "../servicos/foto-perfil.js";
 const TAMANHO_MAXIMO_FOTO = 2 * 1024 * 1024;
 const BASE64_MAXIMO_FOTO = 2_800_000;
 const LIMITE_ENVIOS_FOTO = 10;
+
+const CAMPOS_DO_ATLETA = ["emailContato", "telefone", "passaporteValidoAte", "bio"];
+
+/** Controle que não seja tabulação, quebra de linha nem retorno de carro (o Postgres nem aceita o nulo). */
+const temCaractereDeControle = (texto: string): boolean =>
+  [...texto].some((c) => {
+    const n = c.charCodeAt(0);
+    return n === 127 || (n < 32 && n !== 9 && n !== 10 && n !== 13);
+  });
 
 const pessoa = z.object({ id: z.string(), nome: z.string() });
 
@@ -24,10 +42,16 @@ const esquemaPerfil = z.object({
   mfaAtivo: z.boolean().describe("A sessão atual passou pelo segundo fator (aal2)"),
   atleta: z
     .object({
-      velaid: z.string(),
+      wsId: z.string().describe("ID World Sailing (a chave do atleta)"),
+      velaid: z.string().nullable().describe("Nulo se o atleta não tem VelaID"),
+      cadastroCompleto: z
+        .boolean()
+        .describe(
+          "Falso até o atleta informar nome, gênero e data de nascimento (PUT /me/cadastro)",
+        ),
       classe: z.object({ id: z.string(), nome: z.string() }),
       numeroVela: z.string().nullable(),
-      dataNascimento: z.string().describe("AAAA-MM-DD"),
+      dataNascimento: z.string().nullable().describe("AAAA-MM-DD; nula com o cadastro incompleto"),
       clube: z.string().nullable(),
       cidade: z.string().nullable(),
       uf: z.string().nullable(),
@@ -35,6 +59,18 @@ const esquemaPerfil = z.object({
       emailContato: z.string().nullable(),
       termoAceitoEm: z.string().nullable().describe("Instante ISO do aceite do termo do piloto"),
       compartilharIbvar: z.boolean(),
+      telefone: z.string().nullable().describe("E.164 (+5511999998888); nulo se não informado"),
+      passaporteValidoAte: z
+        .string()
+        .nullable()
+        .describe("AAAA-MM (último dia do mês); sem número nem cópia do passaporte"),
+      aptidao: esquemaAptidao
+        .nullable()
+        .describe("Última aptidão conferida pelo gestor; nulo se nunca conferida"),
+      bio: z
+        .string()
+        .nullable()
+        .describe("Mini bio (texto simples, até 500 caracteres); nula se não escreveu"),
     })
     .nullable(),
   treinador: z.object({ quantidadeAtletas: z.number().int() }).nullable(),
@@ -43,11 +79,13 @@ const esquemaPerfil = z.object({
 const esquemaFoto = z.object({ fotoUrl: z.string().nullable() });
 
 interface LinhaAtletaPerfil {
-  velaid_codigo: string;
+  ws_id: string;
+  cadastro_completo: boolean;
+  velaid_codigo: string | null;
   classe_id: string;
   classe_nome: string;
   numero_vela: string | null;
-  data_nascimento: string;
+  data_nascimento: string | null;
   clube: string | null;
   cidade: string | null;
   uf: string | null;
@@ -56,13 +94,15 @@ interface LinhaAtletaPerfil {
   treinador_nome: string | null;
   termo_aceito_em: Date | null;
   compartilhar_ibvar: boolean;
+  bio: string | null;
 }
 
-async function dadosDoAtleta(db: Db, atletaId: string) {
+async function dadosDoAtleta(db: Db, u: UsuarioAutenticado, atletaId: string, em: Date) {
   const r = await db.query<LinhaAtletaPerfil>(
-    `select a.velaid_codigo, a.classe_id, c.nome as classe_nome, a.numero_vela,
+    `select a.ws_id, (a.cadastro_completo_em is not null) as cadastro_completo,
+            a.velaid_codigo, a.classe_id, c.nome as classe_nome, a.numero_vela,
             to_char(a.data_nascimento, 'YYYY-MM-DD') as data_nascimento,
-            a.clube, a.cidade, a.uf, a.email_contato,
+            a.clube, a.cidade, a.uf, a.email_contato, a.bio,
             t.id::text as treinador_id, t.nome as treinador_nome,
             (select ct.registrado_em from consentimento_atual ct
               where ct.atleta_id = a.id and ct.tipo = 'termo_piloto' and ct.concedido) as termo_aceito_em,
@@ -76,8 +116,11 @@ async function dadosDoAtleta(db: Db, atletaId: string) {
   );
   const l = r.rows[0];
   if (!l) return null;
+  const sensivel = await lerContatoSensivel(db, u, atletaId, em);
   return {
+    wsId: l.ws_id,
     velaid: l.velaid_codigo,
+    cadastroCompleto: l.cadastro_completo,
     classe: { id: l.classe_id, nome: l.classe_nome },
     numeroVela: l.numero_vela,
     dataNascimento: l.data_nascimento,
@@ -88,6 +131,10 @@ async function dadosDoAtleta(db: Db, atletaId: string) {
     emailContato: l.email_contato,
     termoAceitoEm: l.termo_aceito_em ? new Date(l.termo_aceito_em).toISOString() : null,
     compartilharIbvar: l.compartilhar_ibvar,
+    telefone: sensivel?.telefone ?? null,
+    passaporteValidoAte: sensivel?.passaporteValidoAte ?? null,
+    aptidao: sensivel?.aptidao ?? null,
+    bio: l.bio,
   };
 }
 
@@ -115,7 +162,10 @@ async function montarPerfil(
     papel: u.papel as "gestor" | "treinador" | "atleta",
     fotoUrl: await linkDaFoto(app.armazenamento, linha.foto_caminho, log),
     mfaAtivo: u.aal === "aal2",
-    atleta: u.papel === "atleta" && u.atletaId ? await dadosDoAtleta(app.db, u.atletaId) : null,
+    atleta:
+      u.papel === "atleta" && u.atletaId
+        ? await dadosDoAtleta(app.db, u, u.atletaId, app.agora())
+        : null,
     treinador,
   };
 }
@@ -168,9 +218,10 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
       preHandler: acesso(),
       schema: {
         tags: ["sessao"],
-        summary: "Edita o perfil: nome (treinador e gestor) ou e-mail de contato (atleta)",
+        summary:
+          "Edita o perfil: nome (treinador e gestor) ou e-mail, telefone e validade do passaporte (atleta)",
         description:
-          "Os dados vindos do VelaID não são editáveis aqui: a correção é pelo pedido do titular (tipo `correcao`). A auditoria guarda só os nomes dos campos.",
+          "Nome, gênero e data de nascimento do atleta (informados em PUT /me/cadastro) e o ID World Sailing não são editáveis aqui: a correção é pelo pedido do titular (tipo `correcao`); só o gestor troca o WS ID. `telefone` (atleta): E.164; aceita espaços, parênteses, traços e pontos, que são removidos; sem `+` só com DDD brasileiro (10 ou 11 dígitos), e então vira `+55...`; outro formato é 400. `passaporteValidoAte` (atleta): `AAAA-MM`, gravado como o último dia do mês; data passada é aceita (serve para avisar que venceu); não guardamos número nem cópia do passaporte. `telefone` e `passaporteValidoAte` aceitam `null` para apagar. `bio` (atleta): texto simples de até 500 caracteres (espaços nas pontas saem; vazio ou `null` apaga). A auditoria guarda só os nomes dos campos (nunca o texto da bio).",
         security: [{ bearerAuth: [] }],
         body: z
           .object({
@@ -185,6 +236,30 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
               .max(254, "O e-mail pode ter no máximo 254 caracteres.")
               .nullable()
               .optional(),
+            telefone: z
+              .string()
+              .max(40, "O telefone pode ter no máximo 40 caracteres.")
+              .nullable()
+              .optional()
+              .describe("E.164, ou só com DDD brasileiro (vira +55...); null apaga"),
+            passaporteValidoAte: z
+              .string()
+              .max(7, "Informe o mês no formato AAAA-MM.")
+              .nullable()
+              .optional()
+              .describe("AAAA-MM; null apaga"),
+            bio: z
+              .string()
+              .trim()
+              .max(500, "A bio pode ter no máximo 500 caracteres.")
+              .refine((t) => !temCaractereDeControle(t), {
+                message: "A bio aceita só texto simples.",
+              })
+              .nullable()
+              .optional()
+              .describe(
+                "Mini bio do atleta (texto simples, até 500 caracteres; vazio ou null apaga). Texto livre visto pelo gestor, pelo treinador e, com o aceite do termo que inclui foto e bio, pelo IBVAR: não cite saúde, família nem contato",
+              ),
           })
           .strict(),
         response: { 200: esquemaPerfil, 400: esquemaErro, ...respostasComuns },
@@ -192,27 +267,71 @@ export async function rotasPerfil(app: FastifyInstance): Promise<void> {
     },
     async (req) => {
       const u = req.usuario;
-      const { nome, emailContato } = req.body;
+      const { nome, emailContato, telefone, passaporteValidoAte } = req.body;
+      // Bio vazia apaga, como null.
+      const bio = req.body.bio === undefined ? undefined : req.body.bio?.trim() || null;
       const campos = [
         ...(nome !== undefined ? ["nome"] : []),
         ...(emailContato !== undefined ? ["emailContato"] : []),
+        ...(telefone !== undefined ? ["telefone"] : []),
+        ...(passaporteValidoAte !== undefined ? ["passaporteValidoAte"] : []),
+        ...(bio !== undefined ? ["bio"] : []),
       ];
       if (campos.length === 0) throw requisicaoInvalida("Informe ao menos um campo.");
-      const permitido = u.papel === "atleta" ? "emailContato" : "nome";
-      if (campos.some((c) => c !== permitido)) {
+      const permitidos = u.papel === "atleta" ? CAMPOS_DO_ATLETA : ["nome"];
+      if (campos.some((c) => !permitidos.includes(c))) {
         throw requisicaoInvalida("Seu papel não pode editar este campo.");
       }
+
+      const invalidos: { campo: string; mensagem: string }[] = [];
+      let telefoneE164: string | null = null;
+      if (typeof telefone === "string") {
+        telefoneE164 = normalizarTelefone(telefone);
+        if (telefoneE164 === null)
+          invalidos.push({
+            campo: "telefone",
+            mensagem:
+              "Informe o telefone com DDD (ex.: (11) 99999-8888) ou com o código do país (ex.: +351 912 345 678).",
+          });
+      }
+      if (typeof passaporteValidoAte === "string" && !mesPassaporteValido(passaporteValidoAte)) {
+        invalidos.push({
+          campo: "passaporteValidoAte",
+          mensagem: "Informe o mês no formato AAAA-MM, com mês de 01 a 12 (ex.: 2029-03).",
+        });
+      }
+      if (invalidos.length > 0) throw requisicaoInvalidaCampos(invalidos);
 
       await app.db.transacao(async (tx) => {
         if (nome !== undefined) {
           await tx.query(`update usuarios set nome = $2 where id = $1::uuid`, [u.id, nome]);
         } else {
-          await tx.query(`update atletas set email_contato = $2 where id = $1::uuid`, [
-            u.atletaId,
-            emailContato,
-          ]);
+          // Só os campos enviados mudam; null apaga.
+          const sets: string[] = [];
+          const params: unknown[] = [u.atletaId];
+          const set = (coluna: string, valor: unknown) => {
+            params.push(valor);
+            sets.push(`${coluna} = $${params.length}`);
+          };
+          if (emailContato !== undefined) set("email_contato", emailContato);
+          if (telefone !== undefined) set("telefone", telefoneE164);
+          if (bio !== undefined) set("bio", bio);
+          if (passaporteValidoAte !== undefined)
+            set(
+              "passaporte_valido_ate",
+              passaporteValidoAte === null ? null : ultimoDiaDoMes(passaporteValidoAte),
+            );
+          await tx.query(`update atletas set ${sets.join(", ")} where id = $1::uuid`, params);
         }
         await auditar(tx, u.id, "editar_perfil", { campos }, app.agora());
+        if (u.papel === "atleta" && u.atletaId) {
+          await avisarTreinadorDoAtleta(tx, u.atletaId, {
+            tipo: "atleta_atualizou_perfil",
+            referencia: { campos },
+            autorId: u.id,
+            em: app.agora(),
+          });
+        }
       });
       return montarPerfil(app, u, req.log);
     },

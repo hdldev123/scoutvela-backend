@@ -31,8 +31,8 @@ describe("GET /atletas (lista de gestão)", () => {
     ).rows[0]!.classe_id;
     semTermoId = (
       await p.db.query<{ id: string }>(
-        `insert into atletas (velaid_codigo, nome, genero, data_nascimento, classe_id)
-         values ('MG-T99', 'Zeca Sem Termo', 'M', '2000-05-05', $1) returning id`,
+        `insert into atletas (velaid_codigo, ws_id, nome, genero, data_nascimento, classe_id, cadastro_completo_em)
+         values ('MG-T99', 'BRAMGT99', 'Zeca Sem Termo', 'M', '2000-05-05', $1, now()) returning id`,
         [classe],
       )
     ).rows[0]!.id;
@@ -73,16 +73,28 @@ describe("GET /atletas (lista de gestão)", () => {
     expect(Object.keys(corpo[0]!).sort()).toEqual(
       [
         "ativo",
+        "cadastroCompleto",
+        "cadastroRecusado",
         "classe",
         "contaVinculada",
         "id",
+        "idade",
         "nome",
         "numeroVela",
         "termoAceito",
         "treinador",
         "velaid",
+        "wsId",
       ].sort(),
     );
+  });
+
+  it("idade calculada no servidor, sem a data de nascimento na resposta (D2)", async () => {
+    const { corpo, texto } = await listar(EMAILS_DEMO.gestor);
+    // Nascido em 05/05/2000; referência 06/11/2026.
+    expect((corpo.find((a) => a.id === semTermoId) as unknown as { idade: number }).idade).toBe(26);
+    expect(texto).not.toMatch(/2000-05-05/);
+    expect(texto).not.toMatch(/dataNascimento/);
   });
 
   it("conta vinculada e treinador vêm do cadastro", async () => {

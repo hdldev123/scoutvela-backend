@@ -125,6 +125,29 @@ describe("direitos do titular (LGPD)", () => {
     ]);
   });
 
+  it("exporta as pesagens informadas e os pedidos de ajuste recebidos (D9, D8)", async () => {
+    const idAtleta = await p.idDe("SP-T07");
+    const antes = await chamar(EMAILS_DEMO.atleta, "GET", "/meus-dados");
+    expect(antes.corpo.pesagens).toEqual([]);
+    expect(antes.corpo.pedidosAjuste).toEqual([]);
+
+    const pedido = await chamar(EMAILS_DEMO.gestor, "POST", `/atletas/${idAtleta}/pedidos-ajuste`, {
+      mensagem: "Revise a estratégia que você informou.",
+      indicadorId: "tat_estrategia",
+    });
+    expect(pedido.status).toBe(201);
+
+    const depois = await chamar(EMAILS_DEMO.atleta, "GET", "/meus-dados");
+    expect(depois.corpo.pedidosAjuste).toEqual([
+      expect.objectContaining({
+        mensagem: "Revise a estratégia que você informou.",
+        indicador: "Estratégia",
+        pedidoPor: expect.any(String),
+        criadoEm: expect.any(String),
+      }),
+    ]);
+  });
+
   it("só o atleta exporta", async () => {
     for (const email of [EMAILS_DEMO.gestor, EMAILS_DEMO.treinadora, EMAILS_DEMO.ibvar]) {
       expect((await chamar(email, "GET", "/meus-dados")).status).toBe(403);

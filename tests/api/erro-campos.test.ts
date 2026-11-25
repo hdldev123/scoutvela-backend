@@ -18,7 +18,7 @@ describe("400 com campos", () => {
       url: `/atletas/${id}/avaliacoes`,
       headers: await p.como(EMAILS_DEMO.gestor),
       payload: {
-        notas: [{ indicadorId: "perf_mundial", valor: 3, evidencia: "x" }],
+        notas: [{ indicadorId: "perf_consistencia", valor: 3, evidencia: "x" }],
         medida: { pesoKg: 20, evidencia: "ok" },
       },
     });

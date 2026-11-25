@@ -1,9 +1,10 @@
 import type { Db } from "../db/db.js";
-import { INDICADOR_PONTOS_PADRAO } from "../domain/pontos.js";
+import { NIVEIS_DE_NOTA, type FaixaColocacao } from "../domain/resultados.js";
 import { CODIGOS_REGRAS, ESQUEMAS_REGRAS, type CodigoRegra } from "./regras-esquemas.js";
 import type {
   Classe,
   FaixaScore,
+  Indicador,
   Parametros,
   Pilar,
   Regras,
@@ -73,26 +74,32 @@ export function regrasDoBanco(linhas: { codigo: string; valor: ValorRegra }[]): 
     },
     g4: { A: perfil("A"), B: perfil("B"), C: perfil("C"), D: perfil("D") },
     rankingCbvela: { janelaSemanas: numero(rk.janela_semanas, "RANKING_CBVELA", "janela_semanas") },
-    perfPontos: perfPontosDoBanco(porCodigo.get("PERF_PONTOS")),
+    perfResultados: perfResultadosDoBanco(pegar("PERF_RESULTADOS")),
   };
 }
 
-/** PERF_PONTOS (migration 0012). Ausente ou desligada: sem nota sugerida. */
-function perfPontosDoBanco(valor: ValorRegra | undefined): Regras["perfPontos"] {
-  if (!valor) return { ativa: false, indicador: INDICADOR_PONTOS_PADRAO, faixas: [] };
-  const faixas = Array.isArray(valor.faixas) ? (valor.faixas as Record<string, unknown>[]) : [];
+/** PERF_RESULTADOS (migration 0030): faixas de colocação por nível. Obrigatória: a nota depende dela. */
+function perfResultadosDoBanco(valor: ValorRegra): Regras["perfResultados"] {
+  const niveis = (valor.niveis ?? {}) as Record<string, unknown>;
+  const faixasDe = (nivel: string): FaixaColocacao[] => {
+    const lista = niveis[nivel];
+    if (!Array.isArray(lista) || lista.length === 0) {
+      throw new Error(`Regra PERF_RESULTADOS sem faixas para o nível "${nivel}"`);
+    }
+    return (lista as Record<string, unknown>[]).map((f) => ({
+      ate: f.ate === null || f.ate === undefined ? null : numero(f.ate, "PERF_RESULTADOS", "ate"),
+      nota: numero(f.nota, "PERF_RESULTADOS", "nota"),
+    }));
+  };
+  const [mundial, continental, nacional] = NIVEIS_DE_NOTA.map(faixasDe) as [
+    FaixaColocacao[],
+    FaixaColocacao[],
+    FaixaColocacao[],
+  ];
   return {
-    ativa: valor.ativa === true,
-    indicador:
-      typeof valor.indicador === "string" && valor.indicador
-        ? valor.indicador
-        : INDICADOR_PONTOS_PADRAO,
-    faixas: faixas
-      .map((f) => ({
-        ate: numero(f.ate, "PERF_PONTOS", "faixas.ate"),
-        nota: numero(f.nota, "PERF_PONTOS", "faixas.nota"),
-      }))
-      .sort((a, b) => a.ate - b.ate),
+    edicoesMax: numero(valor.edicoes_max, "PERF_RESULTADOS", "edicoes_max"),
+    semResultado: numero(valor.sem_resultado, "PERF_RESULTADOS", "sem_resultado"),
+    niveis: { mundial, continental, nacional },
   };
 }
 
@@ -115,7 +122,13 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
       nome: string;
       tipo: TipoIndicador;
       calculado: boolean;
-    }>("select id, pilar_id, nome, tipo, calculado from indicadores order by pilar_id, ordem")
+      evidencia: Indicador["evidencia"];
+      exige_anexo: boolean;
+      autoavaliacao: boolean;
+      orientacao: string | null;
+    }>(
+      "select id, pilar_id, nome, tipo, calculado, evidencia, exige_anexo, autoavaliacao, orientacao from indicadores order by pilar_id, ordem",
+    )
   ).rows;
   const faixasRows = (
     await db.query<{ id: string; nome: string; nome_curto: string; score_min: string }>(
@@ -154,6 +167,10 @@ export async function carregarParametros(db: Db): Promise<Parametros> {
         nome: i.nome,
         tipo: i.tipo,
         calculado: i.calculado,
+        evidencia: i.evidencia,
+        exigeAnexo: i.exige_anexo,
+        autoavaliacao: i.autoavaliacao,
+        orientacao: i.orientacao,
       })),
   }));
   const faixas: FaixaScore[] = faixasRows.map((f) => ({
@@ -182,22 +199,52 @@ export interface FaixaAlturaClasse {
   alturaMaxCm: number | null;
 }
 
+/** De onde vem a faixa de peso da classe (informativa; não entra no cálculo). */
+export interface FonteFaixa {
+  documento: string | null;
+  versao: string | null;
+  /** AAAA-MM-DD. */
+  data: string | null;
+}
+
+/** Fonte da faixa a partir das três colunas; nula se nenhuma foi preenchida. */
+export function fonteDaFaixa(l: {
+  faixa_fonte_documento: string | null;
+  faixa_fonte_versao: string | null;
+  faixa_fonte_data: string | null;
+}): FonteFaixa | null {
+  if (!l.faixa_fonte_documento && !l.faixa_fonte_versao && !l.faixa_fonte_data) return null;
+  return {
+    documento: l.faixa_fonte_documento,
+    versao: l.faixa_fonte_versao,
+    data: l.faixa_fonte_data,
+  };
+}
+
 export interface ParametrosCompletos {
   pilares: Pilar[];
   faixas: FaixaScore[];
-  classes: (Classe & { ativa: boolean } & FaixaAlturaClasse)[];
+  classes: (Classe & { ativa: boolean } & FaixaAlturaClasse & { fonte: FonteFaixa | null })[];
   rubricas: { pilarId: string | null; nota: number; descricao: string }[];
   regras: { codigo: string; descricao: string; valor: unknown; atualizadoEm: string }[];
   componentesCusto: { id: string; nome: string }[];
+}
+
+/** Rubricas da escala de 0 a 5: a geral (`pilarId` nulo) e as dos pilares com escala própria, em ordem. */
+export async function carregarRubricas(
+  db: Db,
+): Promise<{ pilarId: string | null; nota: number; descricao: string }[]> {
+  const r = await db.query<{ pilar_id: string | null; nota: number; descricao: string }>(
+    "select pilar_id, nota, descricao from rubricas order by pilar_id nulls first, nota",
+  );
+  return r.rows.map((x) => ({ pilarId: x.pilar_id, nota: x.nota, descricao: x.descricao }));
 }
 
 /** Leitura completa para a tela de parâmetros e para a escala de avaliação (inclui rubricas, regras brutas e componentes). */
 export async function carregarParametrosCompletos(db: Db): Promise<ParametrosCompletos> {
   const base = await carregarParametros(db);
   const [rubricas, regras, componentes, ativas] = await Promise.all([
-    db.query<{ pilar_id: string | null; nota: number; descricao: string }>(
-      "select pilar_id, nota, descricao from rubricas order by pilar_id nulls first, nota",
-    ),
+    carregarRubricas(db),
     db.query<{ codigo: string; descricao: string; valor: unknown; atualizado_em: Date }>(
       "select codigo, descricao, valor, atualizado_em from regras order by codigo",
     ),
@@ -208,7 +255,14 @@ export async function carregarParametrosCompletos(db: Db): Promise<ParametrosCom
       altura_min_cm: string | null;
       altura_media_cm: string | null;
       altura_max_cm: string | null;
-    }>("select id, ativa, altura_min_cm, altura_media_cm, altura_max_cm from classes"),
+      faixa_fonte_documento: string | null;
+      faixa_fonte_versao: string | null;
+      faixa_fonte_data: string | null;
+    }>(
+      `select id, ativa, altura_min_cm, altura_media_cm, altura_max_cm,
+              faixa_fonte_documento, faixa_fonte_versao, faixa_fonte_data::text as faixa_fonte_data
+         from classes`,
+    ),
   ]);
   const extraPorId = new Map(ativas.rows.map((c) => [c.id, c]));
   const num = (v: string | null | undefined) => (v == null ? null : Number(v));
@@ -223,13 +277,10 @@ export async function carregarParametrosCompletos(db: Db): Promise<ParametrosCom
         alturaMinCm: num(x?.altura_min_cm),
         alturaMediaCm: num(x?.altura_media_cm),
         alturaMaxCm: num(x?.altura_max_cm),
+        fonte: x ? fonteDaFaixa(x) : null,
       };
     }),
-    rubricas: rubricas.rows.map((r) => ({
-      pilarId: r.pilar_id,
-      nota: r.nota,
-      descricao: r.descricao,
-    })),
+    rubricas,
     regras: regras.rows.map((r) => ({
       codigo: r.codigo,
       descricao: r.descricao,
@@ -247,6 +298,16 @@ export interface AtualizacaoParametros {
   /** Ids de pilar cujas rubricas próprias são removidas. A escala geral (pilar nulo) não sai. */
   rubricasRemover?: (string | null)[] | undefined;
   regras?: Record<string, unknown> | undefined;
+  /** Regra de evidência por indicador. */
+  indicadores?:
+    | {
+        id: string;
+        evidencia?: Indicador["evidencia"] | undefined;
+        autoavaliacao?: boolean | undefined;
+        /** Texto de ajuda; nulo remove. */
+        orientacao?: string | null | undefined;
+      }[]
+    | undefined;
   classes?:
     | {
         id: string;
@@ -258,11 +319,14 @@ export interface AtualizacaoParametros {
         alturaMediaCm?: number | null | undefined;
         alturaMaxCm?: number | null | undefined;
         ativa?: boolean | undefined;
+        /** Fonte da faixa de peso; nulo limpa. */
+        fonte?:
+          { documento: string; versao?: string | null; data?: string | null } | null | undefined;
       }[]
     | undefined;
 }
 
-const umaCasa = <T extends number | null | undefined>(v: T): T =>
+export const umaCasa = <T extends number | null | undefined>(v: T): T =>
   (typeof v === "number" ? Math.round(v * 10) / 10 : v) as T;
 
 /**
@@ -289,6 +353,10 @@ function arredondarClasse<
     alturaMaxCm: umaCasa(c.alturaMaxCm),
   };
 }
+
+/** Mesma regra de PUT /parametros para as faixas de peso da classe (também usada pelas sugestões, D7). */
+export const MSG_ORDEM_PESO_CLASSE =
+  "Em cada classe, o peso mínimo não pode passar da média, nem a média do máximo.";
 
 /** Erro de validação de negócio ao atualizar parâmetros (a rota converte em 400). */
 export class ErroParametros extends Error {}
@@ -442,19 +510,6 @@ export async function atualizarParametros(
             `Regra ${codigo} inválida${onde}: ${problema?.message ?? "valor incorreto"}.`,
           );
         }
-        if (codigo === "PERF_PONTOS") {
-          const ind = (parsed.data as { indicador?: string }).indicador;
-          if (ind !== undefined) {
-            const ok = await tx.query(
-              "select 1 from indicadores where id = $1 and tipo = 'T' and not calculado",
-              [ind],
-            );
-            if (ok.rows.length === 0)
-              throw new ErroParametros(
-                `Regra PERF_PONTOS inválida (indicador): "${ind}" não é um indicador T não calculado.`,
-              );
-          }
-        }
         const atual = (
           await tx.query<{ valor: unknown }>("select valor from regras where codigo = $1", [codigo])
         ).rows[0];
@@ -467,6 +522,71 @@ export async function atualizarParametros(
         );
       }
       detalhes.regras = { antes, depois };
+    }
+
+    if (dados.indicadores) {
+      const antes: Record<string, string> = {};
+      const depois: Record<string, string> = {};
+      const autoAntes: Record<string, boolean> = {};
+      const autoDepois: Record<string, boolean> = {};
+      // Só ids e se há texto; o texto da orientação é parâmetro público, mas a auditoria não precisa dele.
+      const orientacaoAntes: Record<string, boolean> = {};
+      const orientacaoDepois: Record<string, boolean> = {};
+      for (const i of dados.indicadores) {
+        const atual = (
+          await tx.query<{
+            evidencia: string;
+            autoavaliacao: boolean;
+            tipo: string;
+            calculado: boolean;
+            orientacao: string | null;
+          }>(
+            "select evidencia, autoavaliacao, tipo, calculado, orientacao from indicadores where id = $1",
+            [i.id],
+          )
+        ).rows[0];
+        if (!atual) throw new ErroParametros(`Indicador desconhecido: ${i.id}.`);
+        if (i.evidencia !== undefined) {
+          antes[i.id] = atual.evidencia;
+          depois[i.id] = i.evidencia;
+          await tx.query("update indicadores set evidencia = $2 where id = $1", [
+            i.id,
+            i.evidencia,
+          ]);
+        }
+        if (i.autoavaliacao !== undefined) {
+          if (i.autoavaliacao && (atual.tipo !== "T" || atual.calculado)) {
+            throw new ErroParametros(
+              `Indicador ${i.id}: só indicador tipo T não calculado pode ter autoavaliação (os tipos A e R usam o questionário; o peso é medida).`,
+            );
+          }
+          autoAntes[i.id] = atual.autoavaliacao;
+          autoDepois[i.id] = i.autoavaliacao;
+          await tx.query("update indicadores set autoavaliacao = $2 where id = $1", [
+            i.id,
+            i.autoavaliacao,
+          ]);
+        }
+        if (i.orientacao !== undefined) {
+          orientacaoAntes[i.id] = atual.orientacao !== null;
+          orientacaoDepois[i.id] = i.orientacao !== null;
+          await tx.query("update indicadores set orientacao = $2 where id = $1", [
+            i.id,
+            i.orientacao,
+          ]);
+        }
+      }
+      if (Object.keys(depois).length > 0) detalhes.indicadores = { antes, depois };
+      if (Object.keys(orientacaoDepois).length > 0) {
+        detalhes.orientacao = {
+          indicadores: Object.keys(orientacaoDepois),
+          comTextoAntes: orientacaoAntes,
+          comTextoDepois: orientacaoDepois,
+        };
+      }
+      if (Object.keys(autoDepois).length > 0) {
+        detalhes.autoavaliacao = { antes: autoAntes, depois: autoDepois };
+      }
     }
 
     if (dados.classes) {
@@ -508,12 +628,10 @@ export async function atualizarParametros(
             alturaNova = [amin, amedia, amax];
           }
         }
-        if (!comFaixa && alturaNova === undefined && c.ativa === undefined)
+        if (!comFaixa && alturaNova === undefined && c.ativa === undefined && c.fonte === undefined)
           throw new ErroParametros(`Classe ${c.id}: nada para alterar.`);
         if (comFaixa && !(min <= medio && medio <= max)) {
-          throw new ErroParametros(
-            "Em cada classe, o peso mínimo não pode passar da média, nem a média do máximo.",
-          );
+          throw new ErroParametros(MSG_ORDEM_PESO_CLASSE);
         }
         const atual = (
           await tx.query<{
@@ -524,8 +642,12 @@ export async function atualizarParametros(
             altura_media_cm: string | null;
             altura_max_cm: string | null;
             ativa: boolean;
+            faixa_fonte_documento: string | null;
+            faixa_fonte_versao: string | null;
+            faixa_fonte_data: string | null;
           }>(
-            `select peso_min_kg, peso_medio_kg, peso_max_kg, altura_min_cm, altura_media_cm, altura_max_cm, ativa
+            `select peso_min_kg, peso_medio_kg, peso_max_kg, altura_min_cm, altura_media_cm, altura_max_cm, ativa,
+                    faixa_fonte_documento, faixa_fonte_versao, faixa_fonte_data::text as faixa_fonte_data
                from classes where id = $1`,
             [c.id],
           )
@@ -557,16 +679,42 @@ export async function atualizarParametros(
               ];
         // A altura só entra na auditoria quando a requisição a altera.
         const comAltura = alturaNova !== undefined;
+        // A fonte só entra na auditoria quando a requisição a altera.
+        const comFonte = c.fonte !== undefined;
+        const fonteAntes = fonteDaFaixa(atual);
+        const fonteDepois: FonteFaixa | null | undefined =
+          c.fonte === undefined
+            ? undefined
+            : c.fonte === null
+              ? null
+              : {
+                  documento: c.fonte.documento.trim(),
+                  versao: c.fonte.versao?.trim() || null,
+                  data: c.fonte.data ?? null,
+                };
         antes[c.id] = {
           pesoKg: pesoAtual,
           ...(comAltura ? { alturaCm: alturaAtual } : {}),
+          ...(comFonte ? { fonte: fonteAntes } : {}),
           ativa: atual.ativa,
         };
         depois[c.id] = {
           pesoKg: comFaixa ? [min, medio, max] : pesoAtual,
           ...(comAltura ? { alturaCm: alturaNova } : {}),
+          ...(comFonte ? { fonte: fonteDepois } : {}),
           ativa: c.ativa ?? atual.ativa,
         };
+        if (fonteDepois !== undefined) {
+          await tx.query(
+            "update classes set faixa_fonte_documento = $1, faixa_fonte_versao = $2, faixa_fonte_data = $3::date where id = $4",
+            [
+              fonteDepois?.documento ?? null,
+              fonteDepois?.versao ?? null,
+              fonteDepois?.data ?? null,
+              c.id,
+            ],
+          );
+        }
         if (alturaNova !== undefined) {
           await tx.query(
             "update classes set altura_min_cm = $1, altura_media_cm = $2, altura_max_cm = $3 where id = $4",

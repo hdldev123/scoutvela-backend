@@ -2,15 +2,17 @@ import { randomBytes, randomUUID } from "node:crypto";
 import type { Db } from "../db/db.js";
 import { conflito, naoEncontrado, requisicaoInvalida } from "../erros.js";
 import type { AdminAuth } from "../integracoes/supabase-admin.js";
+import { apagarConversasDoAtleta } from "../repositories/conversas.js";
 import type { ArmazenamentoEvidencias } from "../storage/index.js";
 
 /**
  * Anonimização do atleta por pedido de exclusão (LGPD, art. 18).
  *
- * Some: nome, contato, clube, cidade, UF, número de vela, ID World Sailing, código VelaID, a linha
+ * Some: nome, contato, clube, cidade, UF, número de vela, ID World Sailing (vira `ANON` + 8 hexadecimais,
+ * porque o campo é obrigatório e único), código VelaID (vira `ANON-xxxxxxxx`), a linha
  * do VelaID, os dados pessoais da conta de login, a conta no Supabase Auth, a foto de perfil, os
  * arquivos de evidência, os textos livres da série histórica (evidência das notas e das medidas,
- * justificativa de gate, plano individual, pedidos de revisão e do titular, nome do evento e link
+ * justificativa de gate, plano individual, pedidos de revisão, de ajuste e do titular, avisos, nome do evento e link
  * dos resultados de regata) e as chaves com dado pessoal da trilha de auditoria. A data de
  * nascimento vira 1º de julho do mesmo ano.
  * Fica: a série histórica (valores, datas, status), ligada ao atleta_id e sem identificação direta.
@@ -70,6 +72,19 @@ async function novoCodigoAnonimo(tx: Db): Promise<string> {
   throw new Error("Não foi possível gerar um código anônimo único.");
 }
 
+/**
+ * ID World Sailing neutro e único: `ANON` + 8 hexadecimais (respeita o formato do banco, que exige
+ * 3 letras e 2 a 12 letras ou números). O campo é obrigatório e único, então nunca fica nulo.
+ */
+async function novoWsIdAnonimo(tx: Db): Promise<string> {
+  for (let i = 0; i < 10; i++) {
+    const wsId = `ANON${randomBytes(4).toString("hex").toUpperCase()}`;
+    const r = await tx.query("select 1 from atletas where ws_id = $1", [wsId]);
+    if (r.rows.length === 0) return wsId;
+  }
+  throw new Error("Não foi possível gerar um ID World Sailing anônimo único.");
+}
+
 export async function anonimizarAtleta(
   deps: DepsAnonimizacao,
   entrada: { atletaId: string; pedidoTitularId: string; gestorId: string },
@@ -123,7 +138,7 @@ async function anonimizarNoBanco(
   await tx.query(`select set_config('scoutvela.anonimizando', lower($1), true)`, [atletaId]);
 
   // Trava o atleta: duas anonimizações ao mesmo tempo não passam juntas.
-  const lock = await tx.query<{ anonimizado_em: Date | null; velaid_codigo: string }>(
+  const lock = await tx.query<{ anonimizado_em: Date | null; velaid_codigo: string | null }>(
     `select anonimizado_em, velaid_codigo from atletas where id = $1::uuid for update`,
     [atletaId],
   );
@@ -141,16 +156,20 @@ async function anonimizarNoBanco(
   if (respondeu.rows.length === 0) throw conflito("Este pedido já foi respondido.");
 
   const codigoAnonimo = await novoCodigoAnonimo(tx);
+  const wsIdAnonimo = await novoWsIdAnonimo(tx);
   await tx.query(
     `update atletas
-        set nome = $2, clube = null, cidade = null, uf = null, numero_vela = null, ws_id = null,
-            email_contato = null, velaid_codigo = $3, ativo = false,
+        set nome = $2, clube = null, cidade = null, uf = null, numero_vela = null, ws_id = $6,
+            email_contato = null, telefone = null, passaporte_valido_ate = null, bio = null,
+            velaid_codigo = $3, ativo = false,
             data_nascimento = make_date(extract(year from data_nascimento)::int, 7, 1),
             anonimizado_em = $4, anonimizado_pedido_id = $5::bigint
       where id = $1::uuid`,
-    [atletaId, NOME_ANONIMIZADO, codigoAnonimo, em, pedidoTitularId],
+    [atletaId, NOME_ANONIMIZADO, codigoAnonimo, em, pedidoTitularId, wsIdAnonimo],
   );
-  await tx.query(`delete from velaid_registros where codigo = $1`, [linha.velaid_codigo]);
+  if (linha.velaid_codigo) {
+    await tx.query(`delete from velaid_registros where codigo = $1`, [linha.velaid_codigo]);
+  }
 
   // Contas de login do atleta. O id do Auth fica guardado até a conta ser apagada de fato.
   const contas = await tx.query<{ id: string; auth_user_id: string | null }>(
@@ -208,9 +227,9 @@ async function anonimizarNoBanco(
 export function textoDaResposta(em: Date): string {
   return [
     `Dados pessoais anonimizados em ${dataBr(em)}.`,
-    "Removidos: nome, e-mail de contato, clube, cidade, UF, número de vela, ID World Sailing e código VelaID (trocado por um código anônimo); o registro no VelaID; os dados da conta de login (nome, e-mail e acesso) e a conta no serviço de login; a foto de perfil e os arquivos de evidência; os textos livres da série histórica (evidências das notas e das medidas, justificativas de gates, plano individual, pedidos de revisão e do titular, nome e link dos resultados de regata); e os dados pessoais da trilha de auditoria. O compartilhamento com o IBVAR e o aceite do termo foram revogados.",
+    "Removidos: nome, e-mail de contato, telefone, validade do passaporte, clube, cidade, UF, número de vela, ID World Sailing e código VelaID (trocado por um código anônimo); o registro no VelaID; os dados da conta de login (nome, e-mail e acesso) e a conta no serviço de login; a foto de perfil e os arquivos de evidência; as aptidões conferidas (dado de saúde); os pedidos de ajuste e os avisos sobre o atleta; os textos livres da série histórica (evidências das notas e das medidas, justificativas de gates, plano individual, pedidos de revisão e do titular, nome e link dos resultados de regata e o motivo da recusa de resultados); e os dados pessoais da trilha de auditoria. O compartilhamento com o IBVAR e o aceite do termo foram revogados.",
     "Alterado: a data de nascimento foi generalizada para 1º de julho do mesmo ano.",
-    "Mantidos, sem identificação direta e ligados apenas a um identificador interno: notas, respostas do questionário, medidas corporais, resultados de regata (nível, data, posição, tamanho da frota e pontos), status e datas das decisões de gate, financeiro da campanha, pontuações dos ciclos e a trilha de auditoria (quem fez o quê e quando, sem dados pessoais).",
+    "Mantidos, sem identificação direta e ligados apenas a um identificador interno: notas, respostas do questionário, medidas corporais, resultados de regata (nível, data, edição, posição, tamanho da frota, pontos e a situação da validação), status e datas das decisões de gate, financeiro da campanha, pontuações dos ciclos e a trilha de auditoria (quem fez o quê e quando, sem dados pessoais).",
   ].join(" ");
 }
 
@@ -237,7 +256,30 @@ async function removerTextosLivres(
   const m = MARCADOR_REMOVIDO;
   const q = (sql: string, params: unknown[] = []) => tx.query(sql, [atletaId, m, ...params]);
 
-  await q(`update avaliacoes set evidencia = $2 where atleta_id = $1::uuid and evidencia <> $2`);
+  // Aptidão é dado de saúde: as linhas saem (a tabela é só de inserção; o gatilho aceita este DELETE
+  // só com a variável da anonimização igual ao atleta).
+  await tx.query(`delete from aptidoes where atleta_id = $1::uuid`, [atletaId]);
+  // Pedidos de ajuste (texto livre sobre o atleta) e avisos que citam o atleta (do treinador e dele).
+  // `pedidos_ajuste` é só de inserção; o gatilho aceita este DELETE pela mesma variável da aptidão.
+  await tx.query(`delete from pedidos_ajuste where atleta_id = $1::uuid`, [atletaId]);
+  await tx.query(`delete from avisos where atleta_id = $1::uuid`, [atletaId]);
+  // Conversas do atleta (D16): mensagens, leituras, acessos de supervisão e avisos, na hora.
+  await apagarConversasDoAtleta(tx, atletaId);
+  // Pesagens informadas pelo atleta (peso é dado sensível): as linhas saem; a tabela só aceita este
+  // DELETE com a variável da anonimização igual ao atleta. A medida validada fica em `medidas_corporais`.
+  await tx.query(`delete from pesagens_atleta where atleta_id = $1::uuid`, [atletaId]);
+  // Conquistas informadas pelo atleta (título e motivo são texto livre): as linhas saem, pela mesma
+  // exceção do DELETE. Os pódios dos resultados seguem como os resultados (evento anonimizado).
+  await tx.query(`delete from conquistas_atleta where atleta_id = $1::uuid`, [atletaId]);
+  // Evidência e justificativa do treinador na mesma atualização (o gatilho confere a linha inteira).
+  await q(
+    `update avaliacoes
+        set evidencia = case when evidencia is null then null else $2 end,
+            justificativa = case when justificativa is null then null else $2 end
+      where atleta_id = $1::uuid
+        and ((evidencia is not null and evidencia <> $2)
+             or (justificativa is not null and justificativa <> $2))`,
+  );
   await q(
     `update medidas_corporais set evidencia = $2 where atleta_id = $1::uuid and evidencia <> $2`,
   );
@@ -251,7 +293,10 @@ async function removerTextosLivres(
         and not (forcas = $2 and lacunas = $2 and meta_12m = $2 and meta_24m = $2 and recomendacao = $2)`,
   );
   await q(
-    `update pedidos_revisao set motivo = $2, resposta = case when resposta is null then null else $2 end
+    `update pedidos_revisao
+        set motivo = $2, resposta = case when resposta is null then null else $2 end,
+            resposta_1 = case when resposta_1 is null then null else $2 end,
+            recurso_texto = case when recurso_texto is null then null else $2 end
       where atleta_id = $1::uuid`,
   );
   // A resposta do pedido de exclusão é o registro da anonimização: fica. Só a descrição sai.
@@ -261,6 +306,14 @@ async function removerTextosLivres(
             resposta = case when resposta is null or id = $3::bigint then resposta else $2 end
       where atleta_id = $1::uuid`,
     [pedidoTitularId],
+  );
+  // Motivo da recusa de um resultado (texto livre do treinador sobre o atleta); a tabela de validações
+  // só aceita este UPDATE com a variável da anonimização igual ao atleta.
+  await q(
+    `update validacoes_resultado v set motivo = $2
+       from resultados_regata r
+      where r.id = v.resultado_id and r.atleta_id = $1::uuid
+        and v.motivo is not null and v.motivo <> $2`,
   );
   await tx.query(
     `update resultados_regata set evento = $2, link_oficial = null, anonimizado = true

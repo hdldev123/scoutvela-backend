@@ -119,7 +119,9 @@ describe("perfil do usuário (/me/perfil e /me/foto)", () => {
       const r = await chamar(a, "GET", "/me/perfil");
       expect(r.status).toBe(200);
       expect(r.corpo.atleta).toEqual({
+        wsId: expect.stringMatching(/^BRA[0-9A-F]{8}$/),
         velaid: expect.stringMatching(/^VELA-/),
+        cadastroCompleto: true,
         classe: { id: "classe_teste", nome: "Classe Teste" },
         numeroVela: "BRA 7",
         dataNascimento: "2000-01-01",
@@ -130,6 +132,10 @@ describe("perfil do usuário (/me/perfil e /me/foto)", () => {
         emailContato: "contato@exemplo.dev",
         termoAceitoEm: "2026-10-01T12:00:00.000Z",
         compartilharIbvar: true,
+        telefone: null,
+        passaporteValidoAte: null,
+        aptidao: null,
+        bio: null,
       });
       expect(r.corpo.treinador).toBeNull();
     });

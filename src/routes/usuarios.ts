@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
+import { normalizarWsId, wsIdValido } from "../domain/index.js";
 import type { Db } from "../db/db.js";
 import {
   conflito,
@@ -42,7 +43,7 @@ interface LinhaUsuario {
   convidado_em: Date | null;
 }
 
-const SELECT_USUARIO = `select u.id, u.nome, u.email, u.papel, u.ativo, u.atleta_id, a.nome as atleta_nome, u.auth_user_id, u.convidado_em
+const SELECT_USUARIO = `select u.id, u.nome, u.email, u.papel, u.ativo, u.atleta_id, coalesce(a.nome, a.ws_id) as atleta_nome, u.auth_user_id, u.convidado_em
   from usuarios u left join atletas a on a.id = u.atleta_id`;
 
 function paraResposta(l: LinhaUsuario) {
@@ -336,13 +337,14 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
       preHandler: soGestor,
       schema: {
         tags: ["usuarios"],
-        summary: "Edita classe, treinador, número de vela ou situação do atleta",
+        summary: "Edita WS ID, classe, treinador, número de vela ou situação do atleta",
         description:
-          "Valida classe ativa e treinador ativo. numeroVela vazio limpa o campo. Atleta anonimizado não pode ser alterado nem reativado: 409.",
+          "Valida classe ativa e treinador ativo. numeroVela vazio limpa o campo. wsId (ID World Sailing, a chave do atleta): só o gestor troca; vira maiúsculas e sem espaços, segue ^[A-Z]{3}[A-Z0-9]{2,12}$ (400) e não pode repetir o de outro atleta (409); a auditoria guarda só o nome do campo. Atleta anonimizado não pode ser alterado nem reativado: 409.",
         security: seguranca,
         params: z.object({ id: z.uuid() }),
         body: z
           .object({
+            wsId: z.string().max(40).optional(),
             classeId: z.string().min(1).max(40).optional(),
             treinadorId: z.uuid().optional(),
             numeroVela: z.string().trim().max(20).optional(),
@@ -354,6 +356,7 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
         response: {
           200: z.object({
             id: z.string(),
+            wsId: z.string(),
             classeId: z.string(),
             treinadorId: z.string().nullable(),
             numeroVela: z.string().nullable(),
@@ -370,8 +373,18 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
     async (req) => {
       const { id } = req.params;
       const { classeId, treinadorId, numeroVela, ativo } = req.body;
+      let wsId: string | undefined;
+      if (req.body.wsId !== undefined) {
+        wsId = normalizarWsId(req.body.wsId);
+        if (!wsIdValido(wsId)) {
+          throw requisicaoInvalida(
+            "ID World Sailing inválido. Use 3 letras do país seguidas de 2 a 12 letras ou números, por exemplo BRARB51.",
+          );
+        }
+      }
       const campos = (
         [
+          ["wsId", wsId],
           ["classeId", classeId],
           ["treinadorId", treinadorId],
           ["numeroVela", numeroVela],
@@ -405,21 +418,37 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
         ) {
           throw requisicaoInvalida("Treinador inválido ou inativo.");
         }
+        if (
+          wsId !== undefined &&
+          (await tx.query("select 1 from atletas where ws_id = $1 and id <> $2", [wsId, id])).rows
+            .length > 0
+        ) {
+          throw conflito("Já existe um atleta com este ID World Sailing.");
+        }
         const res = await tx.query<{
           id: string;
+          ws_id: string;
           classe_id: string;
           treinador_id: string | null;
           numero_vela: string | null;
           ativo: boolean;
         }>(
           `update atletas set
+             ws_id = coalesce($6, ws_id),
              classe_id = coalesce($2, classe_id),
              treinador_id = coalesce($3, treinador_id),
              numero_vela = case when $4::text is null then numero_vela else nullif($4::text, '') end,
              ativo = coalesce($5, ativo)
            where id = $1
-           returning id, classe_id, treinador_id, numero_vela, ativo`,
-          [id, classeId ?? null, treinadorId ?? null, numeroVela ?? null, ativo ?? null],
+           returning id, ws_id, classe_id, treinador_id, numero_vela, ativo`,
+          [
+            id,
+            classeId ?? null,
+            treinadorId ?? null,
+            numeroVela ?? null,
+            ativo ?? null,
+            wsId ?? null,
+          ],
         );
         await tx.query(
           `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
@@ -429,6 +458,7 @@ export async function rotasUsuarios(app: FastifyInstance): Promise<void> {
         const l = res.rows[0]!;
         return {
           id: l.id,
+          wsId: l.ws_id,
           classeId: l.classe_id,
           treinadorId: l.treinador_id,
           numeroVela: l.numero_vela,

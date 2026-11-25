@@ -325,6 +325,7 @@ describe("contas, convites e edição de atleta", () => {
       expect(r.status).toBe(200);
       expect(r.corpo).toEqual({
         id,
+        wsId: "BRASCT01",
         classeId: "ilca6",
         treinadorId: marcos,
         numeroVela: "BRA 1766",

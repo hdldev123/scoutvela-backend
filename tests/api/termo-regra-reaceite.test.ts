@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { criarProvedorEmailMemoria } from "../../src/email/index.js";
 import { executarLembretes } from "../../src/jobs/lembretes.js";
-import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
+import { EMAILS_DEMO, criarPiloto, urlInvestimentoAberto } from "../apoio/piloto.js";
 import type { Piloto } from "../apoio/piloto.js";
 
 /**
@@ -13,7 +13,7 @@ import type { Piloto } from "../apoio/piloto.js";
  * - antecipado = false: ninguém aceitou a v2.
  * Regra ligada: só entra no piloto quem aceitou a versão vigente (v2). Desligada: qualquer aceite vale.
  *
- * Valores esperados do seed (conferidos à mão): 14 atletas ativos, 7 de cada treinador; 33
+ * Valores esperados do seed (conferidos à mão): 14 atletas ativos, 7 de cada treinador; 30
  * indicadores T lançáveis, nenhum com nota no ciclo aberto; 8 perguntas no questionário, nenhuma
  * respondida pela Helena e todas respondidas pelos outros. "faltam" = indicadores T sem nota.
  */
@@ -22,23 +22,26 @@ const TEXTO =
   "Segunda versão do termo do piloto, com o texto revisado pela CBVela para o ciclo seguinte.";
 const HOJE = new Date("2026-11-23T12:00:00-03:00"); // v2 já vigente; 7 dias antes do prazo (30/11)
 
+// D10: perf_mundial, perf_continental e perf_nacional passaram a ser calculados e saíram dos 33 indicadores
+// T lançáveis (agora 30). O seed deixou de lançar nota neles; cada atleta perde de 0 a 3 notas do ciclo
+// aberto (as que tinha com data de novembro), por isso "faltam" cai de 0 a 3 em relação ao valor anterior.
 const FALTAM_ANA: Record<string, number> = {
-  "Bianca Lemos": 26,
-  "Helena Vasques": 28,
-  "Isadora Prates": 26,
-  "Lívia Arruda": 24,
-  "Marina Seixas": 29,
-  "Nina Cardoso": 22,
-  "Pedro Viana": 21,
+  "Bianca Lemos": 24,
+  "Helena Vasques": 25,
+  "Isadora Prates": 23,
+  "Lívia Arruda": 23,
+  "Marina Seixas": 27,
+  "Nina Cardoso": 20,
+  "Pedro Viana": 18,
 };
 const FALTAM_MARCOS: Record<string, number> = {
-  "Caio Tavares": 22,
-  "Davi Moretto": 21,
-  "Gabriel Teles": 16,
-  "Larissa Fontes": 24,
-  "Otávio Brandão": 23,
-  "Rafael Quintela": 24,
-  "Tomás Albuquerque": 28,
+  "Caio Tavares": 19,
+  "Davi Moretto": 19,
+  "Gabriel Teles": 13,
+  "Larissa Fontes": 22,
+  "Otávio Brandão": 20,
+  "Rafael Quintela": 22,
+  "Tomás Albuquerque": 25,
 };
 
 interface Pendencias {
@@ -121,7 +124,7 @@ describe.each([
     const marcos = corpo.treinadores.find((t) => t.nome === "Marcos Pires");
     if (c.regra) {
       // Só a Helena (da Ana) entra, e só se aceitou a v2.
-      expect(faltamPorNome(ana)).toEqual(c.antecipado ? { "Helena Vasques": 28 } : {});
+      expect(faltamPorNome(ana)).toEqual(c.antecipado ? { "Helena Vasques": 25 } : {});
       expect(marcos).toBeUndefined();
       expect(corpo.atletas).toEqual(c.antecipado ? [HELENA] : []);
       expect(corpo.treinadores).toHaveLength(c.antecipado ? 1 : 0);
@@ -161,7 +164,7 @@ describe.each([
 
   it("GET /investimento: os agregados contam só o piloto", async () => {
     for (const email of [EMAILS_DEMO.gestor, EMAILS_DEMO.ibvar]) {
-      const r = await chamar(email, "GET", "/investimento");
+      const r = await chamar(email, "GET", await urlInvestimentoAberto(p.db));
       expect(r.status).toBe(200);
       expect(r.corpo.kpis.atletas, email).toBe(noPiloto);
       expect(

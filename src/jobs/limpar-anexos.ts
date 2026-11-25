@@ -19,14 +19,19 @@ export interface ResultadoLimparAnexos {
   falhas: number;
 }
 
-/** Remove os anexos não vinculados a nenhuma avaliação e enviados há mais de 24 h. */
+/**
+ * Remove os anexos não vinculados a nenhuma avaliação e enviados há mais de 24 h. Fica de fora o que o
+ * atleta enviou e o que não é evidência de nota (súmula, balança): esses esperam as telas da D9 e da
+ * D10 e saem pela remoção do próprio atleta.
+ */
 export async function limparAnexosNaoVinculados(
   o: OpcoesLimparAnexos,
 ): Promise<ResultadoLimparAnexos> {
   const limite = new Date(o.agora.getTime() - HORAS_ANEXO_NAO_VINCULADO * 3_600_000);
   const candidatos = await o.db.query<{ id: string }>(
-    `select a.id from evidencias_anexos a
+    `select a.id from evidencias_anexos a join usuarios u on u.id = a.enviado_por
       where a.removido_em is null and a.enviado_em < $1
+        and a.categoria = 'evidencia' and u.papel <> 'atleta'
         and not exists (select 1 from avaliacoes v where v.anexo_id = a.id)
       order by a.enviado_em, a.id`,
     [limite],

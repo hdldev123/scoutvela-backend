@@ -73,14 +73,26 @@ describe("GET /revisoes/:id/lancamentos", () => {
     ).corpo.id as string;
   const ids = (corpo: { lancamentos: { id: string }[] }) => corpo.lancamentos.map((l) => l.id);
 
-  it("só o gestor acessa; sem token 401; pedido inexistente 404", async () => {
+  it("gestor e treinador do atleta acessam; atleta e IBVAR 403; sem token 401; pedido inexistente 404", async () => {
     const id = await pedir({ indicadorId: indPerf[0]! });
     const url = `/revisoes/${id}/lancamentos`;
     expect((await chamar(null, "GET", url)).status).toBe(401);
-    for (const email of [EMAILS_DEMO.atleta, EMAILS_DEMO.treinadora, EMAILS_DEMO.ibvar]) {
+    for (const email of [EMAILS_DEMO.atleta, EMAILS_DEMO.ibvar]) {
       expect((await chamar(email, "GET", url)).status, email).toBe(403);
     }
     expect((await chamar(EMAILS_DEMO.gestor, "GET", url)).status).toBe(200);
+    // A Helena é atleta da treinadora: ela lê; o pedido de atleta de outro treinador dá 404.
+    expect((await chamar(EMAILS_DEMO.treinadora, "GET", url)).status).toBe(200);
+    const alheio = (
+      await p.db.query<{ id: string }>(
+        `insert into pedidos_revisao (atleta_id, pilar_id, motivo, criado_por)
+         values ($1, 'perf', 'Pedido de atleta de outro treinador.', $2) returning id::text as id`,
+        [await p.idDe("RS-T02"), gestorId],
+      )
+    ).rows[0]!.id;
+    expect(
+      (await chamar(EMAILS_DEMO.treinadora, "GET", `/revisoes/${alheio}/lancamentos`)).status,
+    ).toBe(404);
     expect((await chamar(EMAILS_DEMO.gestor, "GET", "/revisoes/99999/lancamentos")).status).toBe(
       404,
     );

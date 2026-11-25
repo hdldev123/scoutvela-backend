@@ -61,6 +61,7 @@ describe("termos versionados (GET/POST /termos, aceite pendente, TERMO_EXIGE_REA
         titulo: expect.any(String),
         vigenteDesde: "2026-10-01T03:00:00.000Z",
         criadoEm: expect.any(String),
+        incluiFotoBio: false,
         vigente: true,
         futura: false,
         aceites: 14,
@@ -96,6 +97,7 @@ describe("termos versionados (GET/POST /termos, aceite pendente, TERMO_EXIGE_REA
     expect(aud.rows[0]!.detalhes).toEqual({
       versao: V2,
       vigenteDesde: "2026-11-20T03:00:00.000Z",
+      incluiFotoBio: false,
     });
     expect(JSON.stringify(aud.rows[0])).not.toContain("Segunda versão");
 

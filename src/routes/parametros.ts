@@ -9,6 +9,12 @@ import {
   carregarParametrosCompletos,
 } from "../repositories/parametros.js";
 
+export const esquemaFonteFaixa = z.object({
+  documento: z.string().nullable().describe("Documento que traz a faixa de peso"),
+  versao: z.string().nullable().describe("Versão do documento, como ele a informa"),
+  data: z.string().nullable().describe("Data do documento (AAAA-MM-DD)"),
+});
+
 const esquemaParametros = z.object({
   pilares: z.array(
     z.object({
@@ -24,6 +30,25 @@ const esquemaParametros = z.object({
           nome: z.string(),
           tipo: z.enum(["T", "A", "R"]),
           calculado: z.boolean(),
+          evidencia: z
+            .enum(["obrigatoria", "opcional"])
+            .describe(
+              "Se a nota do indicador exige texto de evidência (treinador e sugestão do atleta). O gestor muda em PUT /parametros (indicadores)",
+            ),
+          exigeAnexo: z
+            .boolean()
+            .describe("A nota depende de arquivo anexado (ex.: foto da balança no peso)"),
+          autoavaliacao: z
+            .boolean()
+            .describe(
+              "O atleta pode sugerir a nota deste indicador (POST /autoavaliacoes). O gestor muda em PUT /parametros (indicadores)",
+            ),
+          orientacao: z
+            .string()
+            .nullable()
+            .describe(
+              "Texto de ajuda do indicador, mostrado embaixo do campo; nulo = sem orientação. O gestor muda em PUT /parametros (indicadores)",
+            ),
         }),
       ),
     }),
@@ -47,6 +72,9 @@ const esquemaParametros = z.object({
         .describe("Altura de referência (informativa); nula se não definida"),
       alturaMediaCm: z.number().nullable(),
       alturaMaxCm: z.number().nullable(),
+      fonte: esquemaFonteFaixa
+        .nullable()
+        .describe("De onde vem a faixa de peso da classe; nula se não informada"),
     }),
   ),
   rubricas: z.array(
@@ -67,7 +95,7 @@ const esquemaParametros = z.object({
   componentesCusto: z.array(z.object({ id: z.string(), nome: z.string() })),
 });
 
-const pesoKg = z
+export const pesoKg = z
   .number("Informe o peso em kg.")
   .min(0, "O peso da classe deve ficar entre 0 e 400 kg.")
   .max(400, "O peso da classe deve ficar entre 0 e 400 kg.");
@@ -136,7 +164,48 @@ const esquemaAtualizacao = z
       .record(z.string().min(1).max(40), z.unknown())
       .optional()
       .describe(
-        "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4, RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_PONTOS. O valor segue o formato lido em GET /parametros. PERF_PONTOS: { ativa, indicador (opcional, padrão perf_nacional; precisa ser um indicador T não calculado), faixas: [{ ate, nota }] }, ate crescente e nota de 0 a 5 que não diminui",
+        "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4, RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_RESULTADOS, META_EVOLUCAO, MIN_GRUPO_AGREGADO, TENDENCIA. TENDENCIA (D13): { limiar (maior que 0, até 100) }, pontos de score da tendência do atleta e da faixa de na média da turma. META_EVOLUCAO (D12): { percentual (0 a 1000) }, meta de alta da média do score da turma sobre o ciclo fechado anterior. MIN_GRUPO_AGREGADO (D12): { minimo (inteiro, 1 a 1000) }, menor grupo que o IBVAR vê em agregado. O valor segue o formato lido em GET /parametros. PERF_RESULTADOS (regra provisória P12): { edicoes_max (1 a 20), sem_resultado (nota 0 a 5 do nível sem resultado validado, padrão 0), niveis: { mundial, continental, nacional } }, cada nível uma lista de faixas { ate, nota } em ordem: ate crescente (inteiro, 1 a 500), só a última com ate nulo (qualquer colocação), nota inteira de 0 a 5 que não aumenta",
+      ),
+    indicadores: z
+      .array(
+        z
+          .object({
+            id: z.string().min(1).max(64),
+            evidencia: z
+              .enum(["obrigatoria", "opcional"], {
+                error: "A evidência deve ser obrigatoria ou opcional.",
+              })
+              .optional(),
+            autoavaliacao: z
+              .boolean("Informe verdadeiro ou falso.")
+              .optional()
+              .describe(
+                "Liga ou desliga a autoavaliação do indicador (só tipo T não calculado pode ligar)",
+              ),
+            orientacao: z
+              .string("A orientação deve ser um texto.")
+              .trim()
+              .min(1, "A orientação não pode ficar vazia: envie null para remover.")
+              .max(1000, "A orientação pode ter no máximo 1.000 caracteres.")
+              .nullable()
+              .optional()
+              .describe("Texto de ajuda do indicador (até 1.000 caracteres); null remove"),
+          })
+          .strict()
+          .refine(
+            (i) =>
+              i.evidencia !== undefined ||
+              i.autoavaliacao !== undefined ||
+              i.orientacao !== undefined,
+            "Informe a evidência, a autoavaliação ou a orientação do indicador.",
+          ),
+      )
+      .min(1)
+      .max(100)
+      .refine((l) => new Set(l.map((i) => i.id)).size === l.length, "Indicador repetido.")
+      .optional()
+      .describe(
+        "Regra por indicador: `evidencia` (obrigatoria ou opcional), `autoavaliacao` (boolean) e/ou `orientacao` (texto de ajuda, até 1.000 caracteres; null remove). A auditoria guarda antes e depois (da orientação, só se havia texto)",
       ),
     classes: z
       .array(
@@ -153,6 +222,27 @@ const esquemaAtualizacao = z
           alturaMediaCm: alturaCm.optional(),
           alturaMaxCm: alturaCm.optional(),
           ativa: z.boolean().optional().describe("Não dá para desativar classe com atleta ativo"),
+          fonte: z
+            .object({
+              documento: z
+                .string("Informe o documento.")
+                .trim()
+                .min(1, "Informe o documento.")
+                .max(200, "O documento aceita até 200 caracteres."),
+              versao: z
+                .string()
+                .trim()
+                .min(1, "Informe a versão ou deixe em branco.")
+                .max(40, "A versão aceita até 40 caracteres.")
+                .nullable()
+                .optional(),
+              data: z.iso.date("Informe a data no formato AAAA-MM-DD.").nullable().optional(),
+            })
+            .nullable()
+            .optional()
+            .describe(
+              "Fonte da faixa de peso (documento, versão e data), só informativa. Nulo limpa. A auditoria guarda antes e depois",
+            ),
         }),
       )
       .max(50)
@@ -165,10 +255,11 @@ const esquemaAtualizacao = z
       (d.rubricas?.length ?? 0) > 0 ||
       (d.rubricasRemover?.length ?? 0) > 0 ||
       (d.regras !== undefined && Object.keys(d.regras).length > 0) ||
+      (d.indicadores?.length ?? 0) > 0 ||
       (d.classes?.length ?? 0) > 0,
     {
       message:
-        "Informe ao menos um de: pesos, faixas, rubricas, rubricasRemover, regras ou classes.",
+        "Informe ao menos um de: pesos, faixas, rubricas, rubricasRemover, regras, indicadores ou classes.",
     },
   );
 
@@ -197,7 +288,8 @@ export async function rotasParametros(app: FastifyInstance): Promise<void> {
       preHandler: [app.autenticar, exigirPapel("gestor")],
       schema: {
         tags: ["parametros"],
-        summary: "Atualiza pesos, faixas de score, rubricas, regras e classes",
+        summary:
+          "Atualiza pesos, faixas de score, rubricas, regras, evidência por indicador e classes",
         description:
           "O ranking recalcula sozinho (o cálculo é feito na leitura). Grava auditoria com antes e depois.",
         security: [{ bearerAuth: [] }],

@@ -17,6 +17,11 @@ const esquemaItemTermo = z.object({
   titulo: z.string(),
   vigenteDesde: z.string().describe("Instante ISO"),
   criadoEm: z.string().describe("Instante ISO"),
+  incluiFotoBio: z
+    .boolean()
+    .describe(
+      "A versão cita foto e bio entre o que vai ao IBVAR: só quem aceitou uma versão assim e consentiu com o IBVAR tem foto e bio vistas por ele",
+    ),
   vigente: z.boolean().describe("É a versão vigente agora"),
   futura: z.boolean().describe("Ainda não começou a valer"),
   aceites: z.number().int().describe("Atletas distintos com aceite concedido desta versão"),
@@ -42,6 +47,9 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
             titulo: z.string(),
             texto: z.string(),
             vigenteDesde: z.string().describe("Instante ISO"),
+            incluiFotoBio: z
+              .boolean()
+              .describe("A versão cita foto e bio entre o que vai ao IBVAR"),
           }),
           401: esquemaErro,
           403: esquemaErro,
@@ -67,6 +75,9 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
             titulo: z.string(),
             texto: z.string(),
             vigenteDesde: z.string().describe("Instante ISO em que passa a valer"),
+            incluiFotoBio: z
+              .boolean()
+              .describe("A versão cita foto e bio entre o que vai ao IBVAR"),
           }),
           401: esquemaErro,
           403: esquemaErro,
@@ -162,7 +173,7 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
         tags: ["termo"],
         summary: "Publica uma nova versão do termo (gestor)",
         description:
-          "A versão passa a valer em vigenteDesde, que não pode estar no passado nem ser anterior ou igual à vigência de outra versão (inclusive futura). Quem aceitou só a anterior fica com aceite pendente; se o ranking os exclui depende da regra TERMO_EXIGE_REACEITE. A auditoria não guarda o texto.",
+          "A versão passa a valer em vigenteDesde, que não pode estar no passado nem ser anterior ou igual à vigência de outra versão (inclusive futura). Quem aceitou só a anterior fica com aceite pendente; se o ranking os exclui depende da regra TERMO_EXIGE_REACEITE. `incluiFotoBio` (padrão falso): marque na versão cujo texto cita foto e bio entre o que vai ao IBVAR (decisão D). O IBVAR só recebe foto e bio de quem consentiu com ele e tem como aceite mais recente uma versão com essa marca; quem não aceitar a versão nova segue sem foto e sem bio para ele. A auditoria não guarda o texto.",
         security: seguranca,
         body: z
           .object({
@@ -176,6 +187,7 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
               .string()
               .min(50, "O texto do termo precisa ter ao menos 50 caracteres.")
               .max(50000, "O texto do termo pode ter no máximo 50.000 caracteres."),
+            incluiFotoBio: z.boolean("Informe true ou false.").optional().default(false),
             vigenteDesde: z.iso.datetime({
               offset: true,
               error: "Informe a vigência em formato ISO (ex.: 2026-12-01T00:00:00-03:00).",
@@ -191,7 +203,7 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
       },
     },
     async (req, reply) => {
-      const { versao, titulo, texto } = req.body;
+      const { versao, titulo, texto, incluiFotoBio } = req.body;
       const vigenteDesde = new Date(req.body.vigenteDesde);
       const agora = app.agora();
       if (vigenteDesde.getTime() < agora.getTime()) {
@@ -213,16 +225,16 @@ export async function rotasTermo(app: FastifyInstance): Promise<void> {
           );
         }
         await tx.query(
-          `insert into termos_consentimento (versao, titulo, texto, vigente_desde, criado_em)
-           values ($1, $2, $3, $4, $5)`,
-          [versao, titulo, texto, vigenteDesde, agora],
+          `insert into termos_consentimento (versao, titulo, texto, vigente_desde, inclui_foto_bio, criado_em)
+           values ($1, $2, $3, $4, $5, $6)`,
+          [versao, titulo, texto, vigenteDesde, incluiFotoBio, agora],
         );
         await tx.query(
           `insert into auditoria (usuario_id, acao, entidade, entidade_id, detalhes, em)
            values ($1, 'publicar_termo', 'termos_consentimento', null, $2::jsonb, $3)`,
           [
             req.usuario.id,
-            JSON.stringify({ versao, vigenteDesde: vigenteDesde.toISOString() }),
+            JSON.stringify({ versao, vigenteDesde: vigenteDesde.toISOString(), incluiFotoBio }),
             agora,
           ],
         );

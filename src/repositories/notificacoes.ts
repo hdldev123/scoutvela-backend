@@ -1,14 +1,24 @@
 import type { UsuarioAutenticado } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
+import { contarAvisosNaoLidos } from "./avisos.js";
+import { contarConversasNaoLidas } from "./conversas.js";
 import { pendenciasDoCiclo } from "./pendencias.js";
 import { termoSql } from "./termo.js";
 
-export const CHAVES_NOTIFICACAO = ["painel", "revisoes", "cadastro", "avaliar"] as const;
+export const CHAVES_NOTIFICACAO = [
+  "painel",
+  "revisoes",
+  "cadastro",
+  "avaliar",
+  "investimento",
+] as const;
 export type ChaveNotificacao = (typeof CHAVES_NOTIFICACAO)[number];
 
 /** Chaves que cada papel pode marcar como vistas (PUT /me/notificacoes/vistas). */
 export const CHAVES_VISTAS_POR_PAPEL: Partial<Record<string, ChaveNotificacao[]>> = {
   atleta: ["painel"],
+  gestor: ["investimento"],
+  ibvar: ["investimento"],
 };
 
 type UsuarioDeAcesso = Pick<UsuarioAutenticado, "id" | "papel" | "atletaId">;
@@ -27,37 +37,58 @@ export async function contarNotificacoes(
 ): Promise<Record<string, number>> {
   switch (usuario.papel) {
     case "gestor": {
-      const r = await db.query<{ revisoes: string; cadastro: string }>(
-        `select ((select count(*) from pedidos_revisao where status = 'aberto')
+      const [r, investimento, avisos, sugestoes, conversas] = await Promise.all([
+        db.query<{ revisoes: string; cadastro: string }>(
+          `select ((select count(*) from pedidos_revisao where status = 'aberto')
                + (select count(*) from pedidos_titular where status = 'aberto'))::text as revisoes,
-                (select count(*) from atletas a
-                  where a.ativo and not ${termoSql.aceitoVigente("a.id", "$1")})::text as cadastro`,
-        [agora],
-      );
-      return { revisoes: contagem(r.rows[0]?.revisoes), cadastro: contagem(r.rows[0]?.cadastro) };
+                ((select count(*) from atletas a
+                   where a.ativo and not ${termoSql.aceitoVigente("a.id", "$1")})
+               + (select count(*) from atletas a
+                   where a.cadastro_recusado_em is not null and a.anonimizado_em is null))::text as cadastro`,
+          [agora],
+        ),
+        avisoCicloFechado(db, usuario.id),
+        contarAvisosNaoLidos(db, usuario),
+        db.query<{ n: string }>(
+          `select count(*)::text as n from sugestoes where status = 'aberta'`,
+        ),
+        contarConversasNaoLidas(db, usuario),
+      ]);
+      return {
+        revisoes: contagem(r.rows[0]?.revisoes),
+        cadastro: contagem(r.rows[0]?.cadastro),
+        investimento,
+        avisos,
+        sugestoes: contagem(sugestoes.rows[0]?.n),
+        conversas,
+      };
     }
     case "treinador": {
-      const [rev, ciclo] = await Promise.all([
+      const [rev, ciclo, avisos, conversas] = await Promise.all([
         db.query<{ n: string }>(
           `select count(*)::text as n from pedidos_revisao r
              join atletas a on a.id = r.atleta_id
-            where r.status = 'aberto' and a.treinador_id = $1::uuid`,
+            where r.status = 'aberto' and r.instancia = 1 and a.treinador_id = $1::uuid`,
           [usuario.id],
         ),
         cicloAbertoId(db),
+        contarAvisosNaoLidos(db, usuario),
+        contarConversasNaoLidas(db, usuario),
       ]);
       // Mesma regra do job de lembretes e de GET /ciclos/:id/pendencias.
       const avaliar = ciclo
         ? ((await pendenciasDoCiclo(db, ciclo, agora, { treinadorId: usuario.id })).treinadores[0]
             ?.atletasPendentes.length ?? 0)
         : 0;
-      return { revisoes: contagem(rev.rows[0]?.n), avaliar };
+      return { revisoes: contagem(rev.rows[0]?.n), avaliar, avisos, conversas };
     }
     case "atleta": {
-      if (!usuario.atletaId) return { painel: 0 };
-      const [extras, ciclo] = await Promise.all([
-        db.query<{ termo: boolean; respostas: string }>(
+      if (!usuario.atletaId)
+        return { painel: 0, avisos: await contarAvisosNaoLidos(db, usuario), conversas: 0 };
+      const [extras, ciclo, avisos, conversas] = await Promise.all([
+        db.query<{ termo: boolean; incompleto: boolean; respostas: string }>(
           `select not ${termoSql.aceitoVigente("$1::uuid", "$2")} as termo,
+                  (select cadastro_completo_em is null from atletas where id = $1::uuid) as incompleto,
                   ((select count(*) from pedidos_revisao r
                      where r.atleta_id = $1::uuid and r.status = 'respondido'
                        and r.respondido_em > coalesce(v.visto_em, '-infinity'::timestamptz))
@@ -69,6 +100,8 @@ export async function contarNotificacoes(
           [usuario.atletaId, agora, usuario.id],
         ),
         cicloAbertoId(db),
+        contarAvisosNaoLidos(db, usuario),
+        contarConversasNaoLidas(db, usuario),
       ]);
       // Perguntas ainda sem resposta (regra de repositories/pendencias.ts: não é por ciclo).
       const perguntas = ciclo
@@ -76,12 +109,35 @@ export async function contarNotificacoes(
             ?.perguntasSemResposta ?? 0)
         : 0;
       const l = extras.rows[0];
-      return { painel: perguntas + (l?.termo ? 1 : 0) + contagem(l?.respostas) };
+      return {
+        painel: perguntas + (l?.termo ? 1 : 0) + (l?.incompleto ? 1 : 0) + contagem(l?.respostas),
+        avisos,
+        conversas,
+      };
     }
+    case "ibvar":
+      return { investimento: await avisoCicloFechado(db, usuario.id) };
     default:
-      // IBVAR e demais papéis: nada.
       return {};
   }
+}
+
+/**
+ * Balão de Investimento (gestor e IBVAR): 1 se há ciclo fechado depois da última vez que a pessoa
+ * marcou a tela como vista (nunca marcou: qualquer ciclo fechado conta); senão 0.
+ */
+async function avisoCicloFechado(db: Db, usuarioId: string): Promise<number> {
+  const r = await db.query<{ novo: boolean }>(
+    `select exists (
+              select 1 from ciclos_avaliacao c
+               where c.status = 'fechado' and c.fechado_em is not null
+                 and c.fechado_em > coalesce(
+                       (select v.visto_em from notificacoes_vistas v
+                         where v.usuario_id = $1::uuid and v.chave = 'investimento'),
+                       '-infinity'::timestamptz)) as novo`,
+    [usuarioId],
+  );
+  return r.rows[0]?.novo ? 1 : 0;
 }
 
 async function cicloAbertoId(db: Db): Promise<string | null> {

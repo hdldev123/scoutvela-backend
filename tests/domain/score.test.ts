@@ -8,7 +8,6 @@ import {
   idadeEm,
   notaPeso,
   notaPilar,
-  notaSugeridaPorPontos,
   notasEfetivas,
   pontosRankingCbvela,
 } from "../../src/domain/index.js";
@@ -57,27 +56,48 @@ describe("notaPeso", () => {
 
 describe("notasEfetivas", () => {
   const parametros = parametrosDeTeste();
-  it("calcula cf_peso_kg pela P3 e ignora lançamento", () => {
+  it("calcula cf_peso_kg pela P3 e ignora lançamento; indicador não calculado fica como lançado", () => {
     const n = notasEfetivas(parametros, {
       classe: CLASSE_SINTETICA,
       pesoKg: 90,
-      notas: { cf_peso_kg: 5, perf_mundial: 3 },
+      notas: { cf_peso_kg: 5, perf_consistencia: 3 },
+      resultados: [],
     });
     expect(n.cf_peso_kg).toBe(4); // rel 1 → 4
-    expect(n.perf_mundial).toBe(3);
+    expect(n.perf_consistencia).toBe(3);
+  });
+  it("perf_mundial, perf_continental e perf_nacional saem dos resultados e ignoram lançamento", () => {
+    const n = notasEfetivas(parametros, {
+      classe: CLASSE_SINTETICA,
+      pesoKg: 85,
+      notas: { perf_mundial: 5, perf_continental: 5, perf_nacional: 5 },
+      resultados: [
+        resultadoDeTeste({ nivel: "mundial", posicao: 12, internacional: true }),
+        resultadoDeTeste({ nivel: "brasileiro", posicao: 4 }),
+      ],
+    });
+    expect(n.perf_mundial).toBe(3); // 12º: até o 25º vale 3
+    expect(n.perf_continental).toBe(0); // sem resultado continental: vale 0, mesmo com 5 lançado
+    expect(n.perf_nacional).toBe(0); // fora do pódio
   });
   it("sem peso, cf_peso_kg fica sem nota", () => {
     const n = notasEfetivas(parametros, {
       classe: CLASSE_SINTETICA,
       pesoKg: null,
       notas: { cf_peso_kg: 5 },
+      resultados: [],
     });
     expect(n.cf_peso_kg).toBeNull();
   });
   it("usa os limites dos parâmetros", () => {
     const p = parametrosDeTeste();
     p.regras.p3.limites = [0.1, 0.2, 0.3, 0.4, 0.5];
-    const n = notasEfetivas(p, { classe: CLASSE_SINTETICA, pesoKg: 90, notas: {} });
+    const n = notasEfetivas(p, {
+      classe: CLASSE_SINTETICA,
+      pesoKg: 90,
+      notas: {},
+      resultados: [],
+    });
     expect(n.cf_peso_kg).toBe(0);
   });
 });
@@ -153,20 +173,9 @@ describe("pontosRankingCbvela", () => {
     ];
     expect(pontosRankingCbvela(r, REFERENCIA_TESTE, 52)).toBe(15);
   });
-  it("soma arredondada em 2 casas: 0,1 + 0,2 vale 0,3 e cai na faixa até 0,3", () => {
+  it("soma arredondada em 2 casas: 0,1 + 0,2 vale 0,3 (não 0,30000000000000004)", () => {
     const r = [nac("2026-08-22", 0.1), nac("2026-05-30", 0.2)];
-    const soma = pontosRankingCbvela(r, REFERENCIA_TESTE, 52);
-    expect(soma).toBe(0.3);
-    const regra = {
-      ativa: true,
-      faixas: [
-        { ate: 0.3, nota: 1 },
-        { ate: 100, nota: 3 },
-      ],
-    };
-    expect(notaSugeridaPorPontos(soma, regra)).toEqual({ nota: 1, pontos: 0.3 });
-    // Mesmo sem passar pela soma, 0,30000000000000004 entra na faixa de 0,3.
-    expect(notaSugeridaPorPontos(0.1 + 0.2, regra)?.nota).toBe(1);
+    expect(pontosRankingCbvela(r, REFERENCIA_TESTE, 52)).toBe(0.3);
   });
   it("janela de 52 semanas: início exclusivo, fim inclusivo", () => {
     // referência 2026-11-06; 52 semanas = 364 dias → início 2025-11-07 (exclusivo)
@@ -202,12 +211,22 @@ describe("funcaoNaClasse", () => {
   });
 });
 
+/** Um resultado validado em cada nível: as três notas de resultado passam a existir. */
+const RESULTADOS_DOS_3_NIVEIS = [
+  resultadoDeTeste({ nivel: "mundial", posicao: 2, internacional: true }),
+  resultadoDeTeste({ nivel: "continental", posicao: 2, internacional: true }),
+  resultadoDeTeste({ nivel: "brasileiro", posicao: 2 }),
+];
+
 describe("calcularAtleta", () => {
   it("monta o resultado e conta preenchimento sem R nem nulos", () => {
     const parametros = parametrosDeTeste();
     const r = calcularAtleta(
       parametros,
-      entradaDeTeste({ notas: { ...notasUniformes(4), tec_trim: null } }),
+      entradaDeTeste({
+        notas: { ...notasUniformes(4), tec_trim: null },
+        resultados: RESULTADOS_DOS_3_NIVEIS,
+      }),
     );
     expect(r.total).toBe(41); // 42 indicadores menos 1 do tipo R
     expect(r.preenchidos).toBe(40);
@@ -218,9 +237,31 @@ describe("calcularAtleta", () => {
   });
   it("completo quando todos pontuam; sem peso fica incompleto e sem classFit", () => {
     const parametros = parametrosDeTeste();
-    expect(calcularAtleta(parametros, entradaDeTeste()).completo).toBe(true);
-    const r = calcularAtleta(parametros, entradaDeTeste({ pesoKg: null }));
+    const completa = entradaDeTeste({ resultados: RESULTADOS_DOS_3_NIVEIS });
+    expect(calcularAtleta(parametros, completa).completo).toBe(true);
+    const r = calcularAtleta(parametros, { ...completa, pesoKg: null });
     expect(r.completo).toBe(false);
     expect(r.classFit).toBeNull();
+  });
+  it("sem resultado validado em um nível, o indicador vale 0 e conta como preenchido (atleta completo)", () => {
+    const parametros = parametrosDeTeste();
+    const r = calcularAtleta(
+      parametros,
+      entradaDeTeste({ resultados: RESULTADOS_DOS_3_NIVEIS.slice(0, 2) }),
+    );
+    expect(r.notas.perf_nacional).toBe(0);
+    expect(r.notasResultados.nacional).toMatchObject({ nota: 0, posicao: null });
+    expect(r.notasResultados.mundial).toMatchObject({ nota: 5, posicao: 2, edicao: 2026 });
+    expect(r.completo).toBe(true);
+    expect(r.preenchidos).toBe(r.total);
+  });
+  it("sem nenhum resultado, os três valem 0 e o pilar de Performance não ignora o nível sem resultado", () => {
+    const r = calcularAtleta(parametrosDeTeste(), entradaDeTeste());
+    expect([r.notas.perf_mundial, r.notas.perf_continental, r.notas.perf_nacional]).toEqual([
+      0, 0, 0,
+    ]);
+    // média de (0, 0, 0, 4, 4) = 1,6 — e não 4, que seria a média só de consistência e frota
+    expect(r.pilares.find((x) => x.pilarId === "perf")!.nota).toBeCloseTo(1.6, 9);
+    expect(r.completo).toBe(true);
   });
 });

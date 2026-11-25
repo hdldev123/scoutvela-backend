@@ -5,6 +5,8 @@ export interface TermoVigente {
   titulo: string;
   texto: string;
   vigenteDesde: string;
+  /** A versão cita foto e bio entre o que vai ao IBVAR (decisão D). */
+  incluiFotoBio: boolean;
 }
 
 /**
@@ -20,6 +22,12 @@ export const termoSql = {
     `termo_aceito_vigente(${atleta}, ${agora}::timestamptz)`,
   /** Aceitou a versão informada ou uma mais nova (aceite antecipado), sem revogação depois. */
   aceitoVersao: (atleta: string, versao: string) => `termo_aceito_versao(${atleta}, ${versao})`,
+  /**
+   * O aceite mais recente do termo é de uma versão que inclui foto e bio e que já vale em `agora`
+   * (migration 0036). Junto com o consentimento do IBVAR, é o que libera foto e bio a ele.
+   */
+  ibvarVeFotoBio: (atleta: string, agora: string) =>
+    `ibvar_ve_foto_bio(${atleta}, ${agora}::timestamptz)`,
   /** Aceitou alguma versão. */
   aceitoAlguma: (atleta: string) => `termo_aceito_alguma(${atleta})`,
   /** Vale para o piloto (ranking, listas, lembretes): segue TERMO_EXIGE_REACEITE. */
@@ -29,8 +37,14 @@ export const termoSql = {
 
 /** Termo vigente em `agora`: o de maior vigente_desde que já começou. */
 export async function buscarTermoVigente(db: Db, agora: Date): Promise<TermoVigente> {
-  const r = await db.query<{ versao: string; titulo: string; texto: string; vigente_desde: Date }>(
-    `select versao, titulo, texto, vigente_desde from termos_consentimento
+  const r = await db.query<{
+    versao: string;
+    titulo: string;
+    texto: string;
+    vigente_desde: Date;
+    inclui_foto_bio: boolean;
+  }>(
+    `select versao, titulo, texto, vigente_desde, inclui_foto_bio from termos_consentimento
       where vigente_desde <= $1::timestamptz
       order by vigente_desde desc, criado_em desc limit 1`,
     [agora],
@@ -42,6 +56,7 @@ export async function buscarTermoVigente(db: Db, agora: Date): Promise<TermoVige
     titulo: l.titulo,
     texto: l.texto,
     vigenteDesde: new Date(l.vigente_desde).toISOString(),
+    incluiFotoBio: l.inclui_foto_bio,
   };
 }
 
@@ -50,8 +65,14 @@ export async function buscarTermoVigente(db: Db, agora: Date): Promise<TermoVige
  * Nula se não houver versão futura.
  */
 export async function buscarTermoProximo(db: Db, agora: Date): Promise<TermoVigente | null> {
-  const r = await db.query<{ versao: string; titulo: string; texto: string; vigente_desde: Date }>(
-    `select versao, titulo, texto, vigente_desde from termos_consentimento
+  const r = await db.query<{
+    versao: string;
+    titulo: string;
+    texto: string;
+    vigente_desde: Date;
+    inclui_foto_bio: boolean;
+  }>(
+    `select versao, titulo, texto, vigente_desde, inclui_foto_bio from termos_consentimento
       where vigente_desde > $1::timestamptz
       order by vigente_desde asc, criado_em asc limit 1`,
     [agora],
@@ -63,6 +84,7 @@ export async function buscarTermoProximo(db: Db, agora: Date): Promise<TermoVige
     titulo: l.titulo,
     texto: l.texto,
     vigenteDesde: new Date(l.vigente_desde).toISOString(),
+    incluiFotoBio: l.inclui_foto_bio,
   };
 }
 
@@ -86,6 +108,7 @@ export interface ItemTermo {
   titulo: string;
   vigenteDesde: string;
   criadoEm: string;
+  incluiFotoBio: boolean;
   vigente: boolean;
   futura: boolean;
   aceites: number;
@@ -98,10 +121,11 @@ export async function listarTermos(db: Db, agora: Date): Promise<ItemTermo[]> {
     titulo: string;
     vigente_desde: Date;
     criado_em: Date;
+    inclui_foto_bio: boolean;
     vigente: boolean;
     aceites: string;
   }>(
-    `select t.versao, t.titulo, t.vigente_desde, t.criado_em,
+    `select t.versao, t.titulo, t.vigente_desde, t.criado_em, t.inclui_foto_bio,
             (t.versao = ${termoSql.vigenteVersao("$1")}) as vigente,
             (select count(distinct c.atleta_id) from consentimentos c
               where c.tipo = 'termo_piloto' and c.concedido and c.versao_termo = t.versao)::text as aceites
@@ -114,6 +138,7 @@ export async function listarTermos(db: Db, agora: Date): Promise<ItemTermo[]> {
     titulo: l.titulo,
     vigenteDesde: new Date(l.vigente_desde).toISOString(),
     criadoEm: new Date(l.criado_em).toISOString(),
+    incluiFotoBio: l.inclui_foto_bio,
     vigente: l.vigente,
     futura: new Date(l.vigente_desde).getTime() > agora.getTime(),
     aceites: Number(l.aceites),

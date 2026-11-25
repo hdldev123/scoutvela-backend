@@ -3,11 +3,17 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
-import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
+import { ErroApi, conflito, esquemaErro, naoEncontrado, semAcesso } from "../erros.js";
 import { travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { buscarAtletaVisivel, cicloAberto } from "../repositories/atletas.js";
 import { buscarTermoProximo, buscarTermoVigente, termoSql } from "../repositories/termo.js";
-import { lancamentoEhElegivel, listarLancamentosElegiveis } from "../repositories/revisoes.js";
+import {
+  buscarPedidoDoAvaliador,
+  lancamentoEhElegivel,
+  listarLancamentosElegiveis,
+} from "../repositories/revisoes.js";
+import { avisarTreinadorDoAtleta } from "../repositories/avisos.js";
+import { sqlNotaDoAvaliador } from "../repositories/origens.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 
@@ -72,6 +78,12 @@ const esquemaPainel = z.object({
     ),
 });
 
+const esquemaRespostaRevisao = z.object({
+  texto: z.string(),
+  papel: z.enum(["gestor", "treinador"]).describe("Papel de quem respondeu"),
+  respondidoEm: z.string(),
+});
+
 const esquemaRevisao = z.object({
   id: z.string(),
   atleta: z.object({ id: z.string(), nome: z.string() }),
@@ -80,8 +92,31 @@ const esquemaRevisao = z.object({
   motivo: z.string(),
   status: z.enum(["aberto", "respondido"]),
   criadoEm: z.string(),
-  resposta: z.string().nullable(),
+  resposta: z
+    .string()
+    .nullable()
+    .describe(
+      "Resposta vigente: a da 1ª instância enquanto não há recurso; depois do recurso, a da 2ª (nula até o gestor responder)",
+    ),
   respondidoEm: z.string().nullable(),
+  instancia: z
+    .union([z.literal(1), z.literal(2)])
+    .describe("1: treinador ou gestor responde; 2: recurso do atleta, só o gestor responde"),
+  primeiraResposta: esquemaRespostaRevisao
+    .nullable()
+    .describe("Resposta da 1ª instância (também depois do recurso); nula enquanto não respondida"),
+  recurso: z
+    .object({ texto: z.string(), em: z.string() })
+    .nullable()
+    .describe("Recurso do atleta contra a resposta da 1ª instância; nulo se não houve"),
+  respostaFinal: esquemaRespostaRevisao
+    .nullable()
+    .describe("Resposta do gestor na 2ª instância; nula se não houve recurso ou se ainda aberto"),
+  podeRecurso: z
+    .boolean()
+    .describe(
+      "true quando o atleta ainda pode pedir a 2ª instância (respondido pelo treinador, sem recurso)",
+    ),
   avaliacaoId: z.string().nullable().describe("Lançamento ligado à resposta, se houver"),
   notaAnterior: z
     .number()
@@ -166,6 +201,13 @@ interface LinhaRevisao {
   criado_em: Date;
   resposta: string | null;
   respondido_em: Date | null;
+  instancia: 1 | 2;
+  p1_texto: string | null;
+  p1_papel: "gestor" | "treinador" | null;
+  p1_em: Date | null;
+  recurso_texto: string | null;
+  recurso_em: Date | null;
+  final_papel: "gestor" | "treinador" | null;
   avaliacao_id: string | null;
   nota_anterior: number | null;
   nota_nova: number | null;
@@ -173,17 +215,23 @@ interface LinhaRevisao {
 
 const SQL_REVISAO = `select r.id::text as id, r.atleta_id, a.nome as atleta_nome,
          r.pilar_id, p.nome_curto as pilar_nome_curto, r.indicador_id, i.nome as indicador_nome,
-         r.motivo, r.status, r.criado_em, r.resposta, r.respondido_em,
+         r.motivo, r.status, r.criado_em, r.resposta, r.respondido_em, r.instancia,
+         case when r.instancia = 2 then r.resposta_1 else r.resposta end as p1_texto,
+         u1.papel as p1_papel,
+         case when r.instancia = 2 then r.respondido_em_1 else r.respondido_em end as p1_em,
+         r.recurso_texto, r.recurso_em, u2.papel as final_papel,
          r.avaliacao_id::text as avaliacao_id, av.valor as nota_nova,
          (select ant.valor from avaliacoes ant
            where ant.atleta_id = av.atleta_id and ant.indicador_id = av.indicador_id
-             and ant.origem <> 'resposta_sugerida'
+             and ${sqlNotaDoAvaliador("ant")}
              and (ant.lancado_em < av.lancado_em or (ant.lancado_em = av.lancado_em and ant.id < av.id))
            order by ant.lancado_em desc, ant.id desc limit 1) as nota_anterior
     from pedidos_revisao r
     join atletas a on a.id = r.atleta_id
     left join pilares p on p.id = r.pilar_id
     left join indicadores i on i.id = r.indicador_id
+    left join usuarios u1 on u1.id = case when r.instancia = 2 then r.respondido_por_1 else r.respondido_por end
+    left join usuarios u2 on u2.id = r.respondido_por and r.instancia = 2
     left join avaliacoes av on av.id = r.avaliacao_id`;
 
 const paraRevisao = (l: LinhaRevisao) => ({
@@ -196,6 +244,20 @@ const paraRevisao = (l: LinhaRevisao) => ({
   criadoEm: iso(l.criado_em),
   resposta: l.resposta,
   respondidoEm: l.respondido_em ? iso(l.respondido_em) : null,
+  instancia: l.instancia,
+  primeiraResposta:
+    l.p1_texto !== null && l.p1_papel && l.p1_em
+      ? { texto: l.p1_texto, papel: l.p1_papel, respondidoEm: iso(l.p1_em) }
+      : null,
+  recurso:
+    l.recurso_texto !== null && l.recurso_em
+      ? { texto: l.recurso_texto, em: iso(l.recurso_em) }
+      : null,
+  respostaFinal:
+    l.instancia === 2 && l.resposta !== null && l.final_papel && l.respondido_em
+      ? { texto: l.resposta, papel: l.final_papel, respondidoEm: iso(l.respondido_em) }
+      : null,
+  podeRecurso: l.status === "respondido" && l.instancia === 1 && l.p1_papel === "treinador",
   avaliacaoId: l.avaliacao_id,
   notaAnterior: l.avaliacao_id ? l.nota_anterior : null,
   notaNova: l.avaliacao_id ? l.nota_nova : null,
@@ -393,6 +455,12 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
             geraSugestao: notaSugerida !== null,
           },
         );
+        await avisarTreinadorDoAtleta(tx, usuario.atletaId!, {
+          tipo: "atleta_respondeu",
+          referencia: { indicadorId },
+          autorId: usuario.id,
+          em: agora,
+        });
       });
       return reply.code(201).send({ ok: true as const, notaSugerida });
     },
@@ -531,6 +599,8 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
         tags: ["revisoes"],
         summary:
           "Lista pedidos de revisão (gestor: todos, abertos primeiro; treinador: dos próprios atletas; atleta: os seus)",
+        description:
+          "Cada pedido traz a instância (1 ou 2), a resposta da 1ª instância (texto, papel e data de quem respondeu), o recurso do atleta e a resposta final do gestor na 2ª instância.",
         security: seguranca,
         querystring: z.object({ status: z.enum(["aberto", "respondido"]).optional() }),
         response: { 200: z.array(esquemaRevisao), 401: esquemaErro, 403: esquemaErro },
@@ -566,12 +636,12 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
   rotas.get(
     "/revisoes/:id/lancamentos",
     {
-      preHandler: [app.autenticar, exigirPapel("gestor")],
+      preHandler: [app.autenticar, exigirPapel("gestor", "treinador")],
       schema: {
         tags: ["revisoes"],
         summary: "Lista os lançamentos que podem ser ligados ao pedido de revisão",
         description:
-          "Só os lançamentos que o PUT /revisoes/:id aceitaria em avaliacaoId (mesmo atleta, indicador do pedido ou de um indicador do pilar, e lançados depois do pedido), do mais novo para o mais antigo. Vale para pedido aberto ou respondido. Sem evidência.",
+          "Gestor (qualquer pedido) e treinador (só de atleta dele; outro pedido dá 404). Só os lançamentos que o PUT /revisoes/:id aceitaria em avaliacaoId (mesmo atleta, indicador do pedido ou de um indicador do pilar, e lançados depois do pedido), do mais novo para o mais antigo. Vale para pedido aberto ou respondido. Sem evidência.",
         security: seguranca,
         params: z.object({ id: z.string().regex(/^\d{1,18}$/, "Identificador inválido.") }),
         response: {
@@ -596,18 +666,7 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       },
     },
     async (req) => {
-      const pedido = (
-        await app.db.query<{
-          atleta_id: string;
-          pilar_id: string | null;
-          indicador_id: string | null;
-          criado_em: Date;
-        }>(
-          `select atleta_id, pilar_id, indicador_id, criado_em
-             from pedidos_revisao where id = $1::bigint`,
-          [req.params.id],
-        )
-      ).rows[0];
+      const pedido = await buscarPedidoDoAvaliador(app.db, req.usuario, req.params.id);
       if (!pedido) throw naoEncontrado("Pedido de revisão não encontrado.");
       return { lancamentos: await listarLancamentosElegiveis(app.db, pedido) };
     },
@@ -616,12 +675,12 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
   rotas.put(
     "/revisoes/:id",
     {
-      preHandler: [app.autenticar, exigirPapel("gestor")],
+      preHandler: [app.autenticar, exigirPapel("gestor", "treinador")],
       schema: {
         tags: ["revisoes"],
         summary: "Responde um pedido de revisão",
         description:
-          "Pedido já respondido devolve 409 (código requisicao_invalida). avaliacaoId (opcional) liga a resposta ao lançamento que a atendeu: do mesmo atleta, do indicador do pedido (ou de um indicador do pilar, se o pedido foi por pilar) e lançado depois do pedido. Depois de gravar, o atleta recebe um e-mail só com o aviso e o link; falha no envio não desfaz a resposta.",
+          "Gestor responde qualquer pedido; treinador, só o de atleta dele (outro dá 404) e só na 1ª instância (pedido em 2ª instância dá 403). A resposta do gestor na 2ª instância encerra o pedido. Pedido já respondido devolve 409 (código requisicao_invalida). avaliacaoId (opcional) liga a resposta ao lançamento que a atendeu: do mesmo atleta, do indicador do pedido (ou de um indicador do pilar, se o pedido foi por pilar) e lançado depois do pedido. Depois de gravar, o atleta recebe um e-mail só com o aviso e o link; falha no envio não desfaz a resposta.",
         security: seguranca,
         params: z.object({ id: z.string().regex(/^\d{1,18}$/, "Identificador inválido.") }),
         body: z.object({
@@ -653,20 +712,10 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
       const { id } = req.params;
       const avaliacaoId = req.body.avaliacaoId === undefined ? null : String(req.body.avaliacaoId);
       const atletaDoPedido = await app.db.transacao(async (tx) => {
-        const pedido = (
-          await tx.query<{
-            atleta_id: string;
-            pilar_id: string | null;
-            indicador_id: string | null;
-            status: string;
-            criado_em: Date;
-          }>(
-            `select atleta_id, pilar_id, indicador_id, status, criado_em
-               from pedidos_revisao where id = $1::bigint for update`,
-            [id],
-          )
-        ).rows[0];
+        const pedido = await buscarPedidoDoAvaliador(tx, usuario, id, true);
         if (!pedido) throw naoEncontrado("Pedido de revisão não encontrado.");
+        if (usuario.papel !== "gestor" && pedido.instancia === 2)
+          throw semAcesso("Este pedido está na 2ª instância: só o gestor responde.");
         await travarAtletaEditavel(tx, pedido.atleta_id);
         if (pedido.status !== "aberto")
           throw new ErroApi(409, "requisicao_invalida", "Este pedido já foi respondido.");
@@ -689,6 +738,8 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
         );
         await auditar(tx, app.agora(), usuario.id, "responder_revisao", "pedidos_revisao", id, {
           avaliacaoId,
+          papel: usuario.papel,
+          instancia: pedido.instancia,
         });
         return pedido.atleta_id;
       });
@@ -724,6 +775,79 @@ export async function rotasPainel(app: FastifyInstance): Promise<void> {
         );
       }
 
+      const r = await app.db.query<LinhaRevisao>(`${SQL_REVISAO} where r.id = $1::bigint`, [id]);
+      return paraRevisao(r.rows[0]!);
+    },
+  );
+
+  rotas.post(
+    "/revisoes/:id/recurso",
+    {
+      preHandler: [app.autenticar, exigirPapel("atleta")],
+      schema: {
+        tags: ["revisoes"],
+        summary: "Atleta discorda da resposta do treinador e pede a 2ª instância (gestor)",
+        description:
+          "Só o atleta dono do pedido (outro pedido dá 404). Só uma vez por pedido e só depois da resposta do treinador na 1ª instância; fora disso, 409 (inclusive pedido respondido pelo gestor, que já é a instância final). O pedido volta a `aberto` com `instancia` 2 e só o gestor responde. A auditoria guarda a instância, sem o texto.",
+        security: seguranca,
+        params: z.object({ id: z.string().regex(/^\d{1,18}$/, "Identificador inválido.") }),
+        body: z.object({
+          texto: z
+            .string()
+            .trim()
+            .min(1, "Explique por que você discorda da resposta.")
+            .max(1000, "O texto pode ter no máximo 1.000 caracteres."),
+        }),
+        response: {
+          200: esquemaRevisao,
+          400: esquemaErro,
+          401: esquemaErro,
+          403: esquemaErro,
+          404: esquemaErro,
+          409: esquemaErro,
+        },
+      },
+    },
+    async (req) => {
+      const usuario = req.usuario;
+      if (!usuario.atletaId) throw naoEncontrado("Pedido de revisão não encontrado.");
+      const atletaId = usuario.atletaId;
+      const { id } = req.params;
+      await app.db.transacao(async (tx) => {
+        const pedido = (
+          await tx.query<{
+            status: string;
+            instancia: number;
+            papel_respondeu: string | null;
+          }>(
+            `select p.status, p.instancia, u.papel as papel_respondeu
+               from pedidos_revisao p
+               left join usuarios u on u.id = p.respondido_por
+              where p.id = $1::bigint and p.atleta_id = $2::uuid
+              for update of p`,
+            [id, atletaId],
+          )
+        ).rows[0];
+        if (!pedido) throw naoEncontrado("Pedido de revisão não encontrado.");
+        await travarAtletaEditavel(tx, atletaId);
+        if (pedido.instancia === 2) throw conflito("Este pedido já teve recurso.");
+        if (pedido.status !== "respondido")
+          throw conflito("O recurso só é possível depois da resposta do treinador.");
+        if (pedido.papel_respondeu !== "treinador")
+          throw conflito("Este pedido foi respondido pelo gestor, que é a instância final.");
+        await tx.query(
+          `update pedidos_revisao
+              set instancia = 2, status = 'aberto',
+                  resposta_1 = resposta, respondido_por_1 = respondido_por, respondido_em_1 = respondido_em,
+                  resposta = null, respondido_por = null, respondido_em = null,
+                  recurso_texto = $2, recurso_em = $3
+            where id = $1::bigint`,
+          [id, req.body.texto, app.agora()],
+        );
+        await auditar(tx, app.agora(), usuario.id, "recurso_revisao", "pedidos_revisao", id, {
+          instancia: 2,
+        });
+      });
       const r = await app.db.query<LinhaRevisao>(`${SQL_REVISAO} where r.id = $1::bigint`, [id]);
       return paraRevisao(r.rows[0]!);
     },

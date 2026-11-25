@@ -1,12 +1,14 @@
 import type { Db } from "../db/db.js";
+import { cadastroCompletoSql } from "./atletas.js";
+import { sqlNotaDoAvaliador } from "./origens.js";
 import { termoSql } from "./termo.js";
 
 /**
  * Regra única de pendência do ciclo, usada pelo job de lembretes e pela tela do gestor
- * (GET /ciclos/:id/pendencias). Só entram atletas ativos com o termo do piloto aceito.
+ * (GET /ciclos/:id/pendencias). Só entram atletas ativos, com o cadastro completo e o termo do piloto aceito.
  *
  * - Treinador: treinador ativo com atleta sem nota, no ciclo, em algum indicador T não calculado
- *   (a nota sugerida pela resposta do atleta não conta).
+ *   (a sugestão do atleta, por resposta ou autoavaliação, não conta).
  * - Atleta: perguntas do questionário ainda sem resposta.
  */
 
@@ -89,11 +91,11 @@ export async function pendenciasDoCiclo(
                 where i.tipo = 'T' and not i.calculado
                   and not exists (select 1 from avaliacoes n
                                    where n.atleta_id = a.id and n.indicador_id = i.id
-                                     and n.ciclo_id = $1::uuid and n.origem <> 'resposta_sugerida'))::text as faltam
+                                     and n.ciclo_id = $1::uuid and ${sqlNotaDoAvaliador("n")}))::text as faltam
          from usuarios u
          join atletas a on a.treinador_id = u.id and a.ativo
         where u.papel = 'treinador' and u.ativo
-          and ${termoSql.aceitoNoPiloto("a.id", "$2")}
+          and ${cadastroCompletoSql("a")} and ${termoSql.aceitoNoPiloto("a.id", "$2")}
           and ($3::uuid is null or u.id = $3::uuid)
         order by u.nome, u.id, a.nome, a.id`,
           [cicloId, agora, filtro.treinadorId ?? null],
@@ -116,7 +118,7 @@ export async function pendenciasDoCiclo(
          left join lateral (select u.id, u.email from usuarios u
                              where u.atleta_id = a.id and u.papel = 'atleta' and u.ativo
                              order by u.criado_em, u.id limit 1) conta on true
-        where a.ativo and ${termoSql.aceitoNoPiloto("a.id", "$1")}
+        where a.ativo and ${cadastroCompletoSql("a")} and ${termoSql.aceitoNoPiloto("a.id", "$1")}
           and ($2::uuid is null or a.id = $2::uuid)
         order by a.nome, a.id`,
           [agora, filtro.atletaId ?? null],

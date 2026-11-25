@@ -49,23 +49,33 @@ describe("notificações do menu (GET /me/notificacoes, PUT /me/notificacoes/vis
     ).toBe(401);
   });
 
-  it("IBVAR: objeto vazio e total 0", async () => {
-    expect(await contagens(EMAILS_DEMO.ibvar)).toEqual({ contagens: {}, total: 0 });
+  it("IBVAR: só a chave investimento (o seed tem ciclo fechado e a tela ainda não foi vista)", async () => {
+    expect(await contagens(EMAILS_DEMO.ibvar)).toEqual({
+      contagens: { investimento: 1 },
+      total: 1,
+    });
   });
 
   it("chaves por papel (sempre presentes, mesmo com 0) e total é a soma", async () => {
     const g = await contagens(EMAILS_DEMO.gestor);
-    expect(Object.keys(g.contagens).sort()).toEqual(["cadastro", "revisoes"]);
-    expect(g.total).toBe(g.contagens.cadastro! + g.contagens.revisoes!);
+    expect(Object.keys(g.contagens).sort()).toEqual([
+      "avisos",
+      "cadastro",
+      "conversas",
+      "investimento",
+      "revisoes",
+      "sugestoes",
+    ]);
+    expect(g.total).toBe(Object.values(g.contagens).reduce((s, n) => s + n, 0));
     const t = await contagens(EMAILS_DEMO.treinadora);
-    expect(Object.keys(t.contagens).sort()).toEqual(["avaliar", "revisoes"]);
+    expect(Object.keys(t.contagens).sort()).toEqual(["avaliar", "avisos", "conversas", "revisoes"]);
     const a = await contagens(EMAILS_DEMO.atleta);
-    expect(Object.keys(a.contagens)).toEqual(["painel"]);
-    expect(a.total).toBe(a.contagens.painel);
+    expect(Object.keys(a.contagens).sort()).toEqual(["avisos", "conversas", "painel"]);
+    expect(a.total).toBe(a.contagens.painel! + a.contagens.avisos! + a.contagens.conversas!);
   });
 
   it("treinador: avaliar conta os atletas próprios com indicador T sem nota no ciclo; sem ciclo aberto, 0", async () => {
-    // Seed: a Ana tem 7 atletas ativos e nenhum tem nota de ciclo nos 33 indicadores T lançáveis.
+    // Seed: a Ana tem 7 atletas ativos e nenhum tem nota de ciclo nos 30 indicadores T lançáveis (os de resultado são calculados desde a D10).
     // O Marcos (outro treinador) tem 7 atletas e não entra na conta dela.
     const ciclo = (
       await p.db.query<{ id: string }>("select id from ciclos_avaliacao where status = 'aberto'")
@@ -76,7 +86,7 @@ describe("notificações do menu (GET /me/notificacoes, PUT /me/notificacoes/vis
     const indicadores = await p.db.query<{ id: string }>(
       "select id from indicadores where tipo = 'T' and not calculado",
     );
-    expect(indicadores.rows).toHaveLength(33);
+    expect(indicadores.rows).toHaveLength(30);
     const r = await chamar(
       EMAILS_DEMO.treinadora,
       "POST",
@@ -207,12 +217,15 @@ describe("notificações do menu (GET /me/notificacoes, PUT /me/notificacoes/vis
   });
 
   it("PUT vistas: chave fora do papel ou do enum -> 400", async () => {
-    for (const email of [EMAILS_DEMO.gestor, EMAILS_DEMO.treinadora, EMAILS_DEMO.ibvar]) {
+    for (const email of [EMAILS_DEMO.gestor, EMAILS_DEMO.ibvar]) {
       for (const chave of ["painel", "revisoes", "cadastro", "avaliar"]) {
         expect((await vista(email, chave)).status, `${email} ${chave}`).toBe(400);
       }
     }
-    for (const chave of ["revisoes", "cadastro", "avaliar", "outra"]) {
+    for (const chave of ["painel", "revisoes", "cadastro", "avaliar", "investimento"]) {
+      expect((await vista(EMAILS_DEMO.treinadora, chave)).status, chave).toBe(400);
+    }
+    for (const chave of ["revisoes", "cadastro", "avaliar", "investimento", "outra"]) {
       expect((await vista(EMAILS_DEMO.atleta, chave)).status, chave).toBe(400);
     }
     expect((await chamar(EMAILS_DEMO.atleta, "PUT", "/me/notificacoes/vistas", {})).status).toBe(

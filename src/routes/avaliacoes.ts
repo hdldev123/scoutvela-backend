@@ -3,12 +3,16 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
 import type { Db } from "../db/db.js";
-import { notaSugeridaPorPontos } from "../domain/index.js";
-import type { Parametros, ResultadoCalculo, StatusGate, SugestaoPontos } from "../domain/index.js";
-import { ErroApi, esquemaErro, naoEncontrado } from "../erros.js";
+import { NIVEIS_DE_NOTA, INDICADOR_DO_NIVEL } from "../domain/index.js";
+import type { Parametros, ResultadoCalculo, StatusGate } from "../domain/index.js";
+import { ErroApi, esquemaErro, naoEncontrado, requisicaoInvalidaCampos } from "../erros.js";
+import { esquemaLinkHttps } from "../validacao.js";
 import { recusarAtletaAnonimizado, travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { buscarAtletaVisivel } from "../repositories/atletas.js";
 import type { AtletaBase, DadosAtleta } from "../repositories/atletas.js";
+import { sugestoesDoCicloAberto } from "../repositories/autoavaliacao.js";
+import type { SugestaoDoAtleta } from "../repositories/autoavaliacao.js";
+import { avisarContasDoAtleta } from "../repositories/avisos.js";
 import { carregarParametros } from "../repositories/parametros.js";
 import { avaliarAtletas, carregarEAvaliarAtletas } from "../servicos/avaliacao-atletas.js";
 
@@ -23,7 +27,7 @@ const statusGate = z.enum(["apto", "condicional", "alerta"]);
 const statusFinal = z.enum(["apto", "condicional", "nao_prioritario"]);
 const faixa = z.object({ id: z.string(), nome: z.string(), nomeCurto: z.string() });
 
-const esquemaNota = z
+export const esquemaNota = z
   .object({
     indicadorId: z.string().min(1, "Informe o indicador.").max(64),
     valor: z
@@ -32,14 +36,35 @@ const esquemaNota = z
       .min(0, "A nota mínima é 0.")
       .max(5, "A nota máxima é 5."),
     evidencia: z
-      .string("Informe a evidência da nota.")
+      .string("A evidência deve ser um texto.")
       .trim()
-      .min(3, "A evidência precisa ter ao menos 3 caracteres.")
-      .max(500, "A evidência pode ter no máximo 500 caracteres."),
+      .max(500, "A evidência pode ter no máximo 500 caracteres.")
+      .refine((v) => v === "" || v.length >= 3, "A evidência precisa ter ao menos 3 caracteres.")
+      .optional()
+      .describe(
+        "Texto da evidência. Obrigatório nos indicadores com evidência `obrigatoria` (GET /parametros); opcional nos demais. Vazio vale como ausente",
+      ),
+    link: esquemaLinkHttps
+      .optional()
+      .describe(
+        "Link de vídeo ou outro conteúdo externo da nota: só https://, até 500 caracteres. A API não acessa o endereço. Vazio vale como ausente",
+      ),
     /** Evidência anexada antes (POST /atletas/:id/evidencias), do mesmo atleta. A prévia ignora. */
     anexoId: z.uuid().optional(),
   })
   .strict();
+
+/** Nota do treinador: a nota comum mais a justificativa (obrigatória só ao corrigir a sugestão do atleta). */
+const esquemaNotaAvaliador = esquemaNota.extend({
+  justificativa: z
+    .string("A justificativa deve ser um texto.")
+    .trim()
+    .max(500, "A justificativa pode ter no máximo 500 caracteres.")
+    .optional()
+    .describe(
+      "Obrigatória quando o atleta sugeriu (autoavaliação) outra nota para o indicador no ciclo aberto; opcional nos demais. Vazio vale como ausente",
+    ),
+});
 
 const esquemaMedida = z
   .object({
@@ -67,7 +92,7 @@ const esquemaMedida = z
 
 const esquemaCorpo = z
   .object({
-    notas: z.array(esquemaNota).max(60).default([]),
+    notas: z.array(esquemaNotaAvaliador).max(60).default([]),
     medida: esquemaMedida.optional(),
   })
   .strict()
@@ -75,6 +100,69 @@ const esquemaCorpo = z
     message: "Informe ao menos uma nota ou uma medida.",
   });
 type Corpo = z.infer<typeof esquemaCorpo>;
+
+/** Texto e link vazios valem como ausentes (o formulário pode mandar "" num campo opcional). */
+function semVazios(corpo: Corpo): Corpo {
+  return {
+    ...corpo,
+    notas: corpo.notas.map(({ evidencia, link, justificativa, ...resto }) => ({
+      ...resto,
+      ...(evidencia ? { evidencia } : {}),
+      ...(link ? { link } : {}),
+      ...(justificativa ? { justificativa } : {}),
+    })),
+  };
+}
+
+type OrigemLancada = "avaliacao" | "resposta_confirmada" | "autoavaliacao_aprovada";
+
+interface DecisaoDaNota {
+  origem: OrigemLancada;
+  /** A nota difere da sugestão do atleta (o atleta é avisado). */
+  corrigiu: boolean;
+}
+
+/**
+ * Origem de cada nota e a regra da justificativa. Com sugestão do atleta (autoavaliação) no ciclo
+ * aberto: nota igual aprova (`autoavaliacao_aprovada`); nota diferente corrige e exige justificativa
+ * (400 em `notas.N.justificativa`). Sem sugestão, segue como sempre (`avaliacao` ou `resposta_confirmada`).
+ */
+function decidirNotas(
+  corpo: Corpo,
+  sugestoes: Map<string, SugestaoDoAtleta>,
+  respostas: Record<string, string>,
+): DecisaoDaNota[] {
+  const semJustificativa: { campo: string; mensagem: string }[] = [];
+  const decisoes = corpo.notas.map((n, i): DecisaoDaNota => {
+    const sug = sugestoes.get(n.indicadorId);
+    const comum = respostas[n.indicadorId] ? "resposta_confirmada" : "avaliacao";
+    if (!sug) return { origem: comum, corrigiu: false };
+    if (sug.valor === n.valor) return { origem: "autoavaliacao_aprovada", corrigiu: false };
+    if (!n.justificativa) {
+      semJustificativa.push({
+        campo: `notas.${i}.justificativa`,
+        mensagem: "Informe a justificativa: a nota difere da sugestão do atleta.",
+      });
+    }
+    return { origem: comum, corrigiu: true };
+  });
+  if (semJustificativa.length > 0) {
+    throw requisicaoInvalidaCampos(
+      semJustificativa,
+      "Há nota diferente da sugestão do atleta sem justificativa.",
+    );
+  }
+  return decisoes;
+}
+
+const esquemaSugestaoAtleta = z.object({
+  indicadorId: z.string(),
+  valor: z.number().int().describe("Nota sugerida pelo atleta, de 0 a 5"),
+  evidencia: z.string().nullable(),
+  link: z.string().nullable(),
+  anexo: z.object({ id: z.string(), nomeArquivo: z.string() }).nullable(),
+  em: z.string().describe("Instante ISO"),
+});
 
 const esquemaGates = z.object({
   statusFinal,
@@ -103,12 +191,16 @@ function validarNotas(parametros: Parametros, corpo: Corpo): void {
     parametros.pilares.flatMap((p) => p.indicadores).map((i) => [i.id, i]),
   );
   const vistos = new Set<string>();
-  for (const n of corpo.notas) {
+  const semEvidencia: { campo: string; mensagem: string }[] = [];
+  for (const [i, n] of corpo.notas.entries()) {
     const ind = indicadores.get(n.indicadorId);
     if (!ind) throw requisicaoInvalida(`Indicador inexistente: ${n.indicadorId}.`);
     if (ind.calculado) {
+      const deResultado = NIVEIS_DE_NOTA.some((nivel) => INDICADOR_DO_NIVEL[nivel] === ind.id);
       throw requisicaoInvalida(
-        `O indicador ${n.indicadorId} é calculado pelo sistema: informe o peso na medida.`,
+        deResultado
+          ? `O indicador ${n.indicadorId} é calculado pelo sistema a partir dos resultados validados do atleta.`
+          : `O indicador ${n.indicadorId} é calculado pelo sistema: informe o peso na medida.`,
       );
     }
     if (ind.tipo === "R") {
@@ -117,6 +209,15 @@ function validarNotas(parametros: Parametros, corpo: Corpo): void {
     if (vistos.has(n.indicadorId))
       throw requisicaoInvalida(`Indicador repetido no envio: ${n.indicadorId}.`);
     vistos.add(n.indicadorId);
+    if (ind.evidencia === "obrigatoria" && !n.evidencia) {
+      semEvidencia.push({
+        campo: `notas.${i}.evidencia`,
+        mensagem: "Informe a evidência da nota: este indicador a exige.",
+      });
+    }
+  }
+  if (semEvidencia.length > 0) {
+    throw requisicaoInvalidaCampos(semEvidencia, "Há nota sem a evidência exigida pelo indicador.");
   }
 }
 
@@ -137,14 +238,21 @@ function arredondarMedida(corpo: Corpo): Corpo {
 }
 
 /** Dados do atleta como ficariam depois do lançamento (sem gravar). */
-function aplicarProposta(dados: DadosAtleta, corpo: Corpo, agora: Date): DadosAtleta {
+function aplicarProposta(
+  dados: DadosAtleta,
+  corpo: Corpo,
+  decisoes: DecisaoDaNota[],
+  agora: Date,
+): DadosAtleta {
   const notas = new Map(dados.notas.map((n) => [n.indicadorId, n]));
-  for (const n of corpo.notas) {
+  for (const [i, n] of corpo.notas.entries()) {
     notas.set(n.indicadorId, {
       indicadorId: n.indicadorId,
       valor: n.valor,
-      evidencia: n.evidencia,
-      origem: dados.respostas[n.indicadorId] ? "resposta_confirmada" : "avaliacao",
+      evidencia: n.evidencia ?? null,
+      link: n.link ?? null,
+      origem: decisoes[i]!.origem,
+      justificativa: n.justificativa ?? null,
       avaliador: null,
       lancadoEm: agora.toISOString(),
       anexo: null,
@@ -179,9 +287,6 @@ async function avaliarUm(db: Db, parametros: Parametros, atleta: AtletaBase, ref
   return avaliado;
 }
 
-const sugestaoComIndicador = (s: SugestaoPontos | null, indicadorId: string) =>
-  s ? { indicadorId, ...s } : null;
-
 export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
   const rota = app.withTypeProvider<ZodTypeProvider>();
   const acessoAvaliador = [app.autenticar, exigirPapel("gestor", "treinador")];
@@ -209,15 +314,10 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
               pilares: z.array(z.object({ id: z.string(), nota: z.number().nullable() })),
               statusGates: statusFinal,
             }),
-            sugestaoPontos: z
-              .object({
-                indicadorId: z.string(),
-                nota: z.number().int(),
-                pontos: z.number().describe("Pontos do Ranking CBVela na janela"),
-              })
-              .nullable()
+            sugestoesAtleta: z
+              .array(esquemaSugestaoAtleta)
               .describe(
-                "Nota sugerida para perf_nacional pelos pontos do Ranking CBVela (regra PERF_PONTOS). Nula com a regra desligada. Não entra na prévia nem no score: o avaliador confirma lançando a nota.",
+                "Sugestões do atleta (autoavaliação) no ciclo aberto, uma por indicador, para a tela mostrar ao lado da nota. Vazio sem sugestão ou sem ciclo aberto",
               ),
           }),
           400: esquemaErro,
@@ -232,14 +332,17 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
       const base = await buscarAtletaVisivel(app.db, req.usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
-      const corpo = arredondarMedida(req.body);
+      const corpo = semVazios(arredondarMedida(req.body));
       validarNotas(parametros, corpo);
 
       const antes = await avaliarUm(app.db, parametros, base, referencia);
+      const aberto = await sugestoesDoCicloAberto(app.db, base.id);
+      const sugestoes = aberto?.sugestoes ?? new Map<string, SugestaoDoAtleta>();
+      const decisoes = decidirNotas(corpo, sugestoes, antes.dados.respostas);
       const [depois] = avaliarAtletas(
         parametros,
         [base],
-        new Map([[base.id, aplicarProposta(antes.dados, corpo, referencia)]]),
+        new Map([[base.id, aplicarProposta(antes.dados, corpo, decisoes, referencia)]]),
         referencia,
       );
       if (!depois) throw naoEncontrado("Atleta não encontrado.");
@@ -252,10 +355,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           pilares: pilares(depois.calculo),
           statusGates: depois.calculo.statusFinal,
         },
-        sugestaoPontos: sugestaoComIndicador(
-          notaSugeridaPorPontos(antes.calculo.pontosCbvela, parametros.regras.perfPontos),
-          parametros.regras.perfPontos.indicador,
-        ),
+        sugestoesAtleta: [...sugestoes].map(([indicadorId, s]) => ({ indicadorId, ...s })),
       };
     },
   );
@@ -268,7 +368,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
         tags: ["avaliacoes"],
         summary: "Lança notas e/ou medida do atleta (série histórica: só insere)",
         description:
-          "Origem da nota: resposta_confirmada se o atleta respondeu à pergunta do indicador, senão avaliacao. Indicador calculado (peso) ou tipo R é recusado.",
+          "Origem da nota: se o atleta sugeriu a nota (autoavaliação) no ciclo aberto, nota igual grava `autoavaliacao_aprovada` e nota diferente grava a correção, com `justificativa` obrigatória (400 em `notas.N.justificativa`) e aviso `autoavaliacao_corrigida` ao atleta. Sem sugestão: resposta_confirmada se o atleta respondeu à pergunta do indicador, senão avaliacao (justificativa opcional). Indicador calculado (o peso e os de resultado: perf_mundial, perf_continental, perf_nacional) ou tipo R é recusado (400).",
         security: [{ bearerAuth: [] }],
         params: esquemaParams,
         body: esquemaCorpo,
@@ -288,7 +388,7 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
     async (req, reply) => {
       const referencia = app.agora();
       const { usuario } = req;
-      const body = arredondarMedida(req.body);
+      const body = semVazios(arredondarMedida(req.body));
       const base = await buscarAtletaVisivel(app.db, usuario, req.params.id, app.agora());
       if (!base) throw naoEncontrado("Atleta não encontrado.");
       const parametros = await carregarParametros(app.db);
@@ -313,23 +413,39 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
           `select id from ciclos_avaliacao where status = 'aberto' limit 1 for share`,
         );
         const cicloId = ciclo.rows[0]?.id ?? null;
+        const aberto = await sugestoesDoCicloAberto(tx, base.id);
+        const decisoes = decidirNotas(
+          body,
+          aberto?.sugestoes ?? new Map<string, SugestaoDoAtleta>(),
+          antes.dados.respostas,
+        );
 
-        for (const n of body.notas) {
+        for (const [i, n] of body.notas.entries()) {
           await tx.query(
-            `insert into avaliacoes (atleta_id, indicador_id, ciclo_id, valor, evidencia, origem, avaliador_id, lancado_em, anexo_id)
-             values ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+            `insert into avaliacoes (atleta_id, indicador_id, ciclo_id, valor, evidencia, link, origem, avaliador_id, lancado_em, anexo_id, justificativa)
+             values ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
             [
               base.id,
               n.indicadorId,
               cicloId,
               n.valor,
-              n.evidencia,
-              antes.dados.respostas[n.indicadorId] ? "resposta_confirmada" : "avaliacao",
+              n.evidencia ?? null,
+              n.link ?? null,
+              decisoes[i]!.origem,
               usuario.id,
               referencia,
               n.anexoId ?? null,
+              n.justificativa ?? null,
             ],
           );
+          if (decisoes[i]!.corrigiu) {
+            await avisarContasDoAtleta(tx, base.id, {
+              tipo: "autoavaliacao_corrigida",
+              referencia: { indicadorId: n.indicadorId },
+              autorId: usuario.id,
+              em: referencia,
+            });
+          }
         }
 
         const m = body.medida;
@@ -356,6 +472,9 @@ export async function rotasAvaliacoes(app: FastifyInstance): Promise<void> {
             JSON.stringify({
               indicadores: body.notas.map((n) => n.indicadorId),
               comAnexo: body.notas.some((n) => n.anexoId),
+              comLink: body.notas.some((n) => n.link),
+              aprovouSugestao: decisoes.some((d) => d.origem === "autoavaliacao_aprovada"),
+              corrigiuSugestao: decisoes.some((d) => d.corrigiu),
               medida: m
                 ? [
                     m.pesoKg !== undefined ? "pesoKg" : null,

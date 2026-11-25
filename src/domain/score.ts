@@ -8,14 +8,23 @@ import type {
 } from "./tipos.js";
 import { distanciaClassFit, notaPeso } from "./classfit.js";
 import { dataIso, menosDias, naJanela } from "./datas.js";
+import { INDICADOR_DO_NIVEL, NIVEIS_DE_NOTA, notaDeResultados } from "./resultados.js";
 
-/** Notas lançadas + indicadores calculados (cf_peso_kg pela P3). Calculado ignora qualquer lançamento. */
+/**
+ * Notas lançadas + indicadores calculados: cf_peso_kg pela P3 e perf_mundial, perf_continental e
+ * perf_nacional pelos resultados (PERF_RESULTADOS). Calculado ignora qualquer lançamento.
+ */
 export function notasEfetivas(
   parametros: Parametros,
-  entrada: Pick<EntradaCalculo, "classe" | "pesoKg" | "notas">,
+  entrada: Pick<EntradaCalculo, "classe" | "pesoKg" | "notas" | "resultados">,
 ): Record<string, number | null> {
   const efetivas: Record<string, number | null> = {};
   for (const [id, valor] of Object.entries(entrada.notas)) efetivas[id] = valor ?? null;
+  const doResultado = notaDeResultados(entrada.resultados, parametros.regras.perfResultados);
+  const notaDeResultado = new Map<string, number>();
+  for (const nivel of NIVEIS_DE_NOTA) {
+    notaDeResultado.set(INDICADOR_DO_NIVEL[nivel], doResultado[nivel].nota);
+  }
   for (const pilar of parametros.pilares) {
     for (const ind of pilar.indicadores) {
       if (!ind.calculado) continue;
@@ -25,7 +34,7 @@ export function notasEfetivas(
               distanciaClassFit(entrada.pesoKg, entrada.classe).distanciaRelativa,
               parametros.regras.p3.limites,
             )
-          : null;
+          : (notaDeResultado.get(ind.id) ?? null);
     }
   }
   return efetivas;
@@ -70,6 +79,6 @@ export function pontosRankingCbvela(
     .filter((r) => !r.internacional && naJanela(r.data, inicio, fim))
     .reduce((s, r) => s + (r.pontosCbvela ?? 0), 0);
   // Os pontos têm 2 casas: arredonda a soma para não carregar erro de ponto flutuante
-  // (0,1 + 0,2 = 0,30000000000000004), que mudaria a faixa de PERF_PONTOS na fronteira.
+  // (0,1 + 0,2 = 0,30000000000000004).
   return Math.round(soma * 100) / 100;
 }

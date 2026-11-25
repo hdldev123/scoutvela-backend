@@ -2,6 +2,19 @@ import type { Db } from "../db/db.js";
 import { travarAtletaEditavel } from "../repositories/anonimizado.js";
 import { ErroArmazenamento, type ArmazenamentoEvidencias } from "../storage/index.js";
 
+export const CATEGORIAS_ANEXO = ["evidencia", "sumula", "balanca"] as const;
+export type CategoriaAnexo = (typeof CATEGORIAS_ANEXO)[number];
+
+/** Soma dos bytes dos anexos do atleta que ainda não foram removidos. */
+export async function bytesUsadosPeloAtleta(db: Db, atletaId: string): Promise<number> {
+  const r = await db.query<{ total: string }>(
+    `select coalesce(sum(tamanho_bytes), 0)::text as total
+       from evidencias_anexos where atleta_id = $1::uuid and removido_em is null`,
+    [atletaId],
+  );
+  return Number(r.rows[0]?.total ?? 0);
+}
+
 export type ResultadoRemocaoAnexo = "removido" | "vinculado" | "ja_removido" | "inexistente";
 
 export interface DepsRemocaoAnexo {
@@ -11,7 +24,7 @@ export interface DepsRemocaoAnexo {
 }
 
 /**
- * Remove um anexo AINDA NÃO ligado a nenhuma avaliação.
+ * Remove um anexo AINDA NÃO ligado a nenhuma avaliação (nota ou autoavaliação), pesagem, resultado nem conquista.
  *
  * Saída escolhida para a regra de só-inserção de `evidencias_anexos` (opção "a"): o registro fica e
  * é marcado como removido (`removido_em` + `nome_arquivo = 'removido'`), a mesma exceção controlada
@@ -42,9 +55,15 @@ export async function removerAnexoNaoVinculado(
     if (anexo.removido_em) return "ja_removido";
 
     await travarAtletaEditavel(tx, anexo.atleta_id);
-    const ligado = await tx.query(`select 1 from avaliacoes where anexo_id = $1::uuid limit 1`, [
-      anexoId,
-    ]);
+    // Ligado a uma nota (do treinador ou autoavaliação), a uma pesagem, a um resultado do atleta
+    // (a súmula) ou a uma conquista (a prova): não sai por aqui.
+    const ligado = await tx.query(
+      `select 1 from avaliacoes where anexo_id = $1::uuid
+       union all select 1 from pesagens_atleta where anexo_id = $1::uuid
+       union all select 1 from resultados_regata where anexo_id = $1::uuid
+       union all select 1 from conquistas_atleta where anexo_id = $1::uuid limit 1`,
+      [anexoId],
+    );
     if (ligado.rows.length > 0) return "vinculado";
 
     // Storage primeiro: se falhar, a exceção desfaz a transação e o registro continua como estava.

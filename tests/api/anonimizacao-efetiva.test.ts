@@ -88,9 +88,12 @@ describe("anonimização efetiva (de fato)", () => {
       ])
     ).rows[0]!.id;
     const cad = await gestor("POST", "/atletas", {
-      velaidCodigo: VELAID,
+      wsId: WS_ID,
+      email: EMAIL,
+      velaid: VELAID,
       classeId: "ilca6",
       treinadorId,
+      confirmaMaioridade: true,
       criarConta: true,
     });
     expect(cad.status).toBe(201);
@@ -105,6 +108,16 @@ describe("anonimização efetiva (de fato)", () => {
     contaId = conta.id;
     authAtleta = conta.auth_user_id;
     const atleta = cabecalhoAuth(await tokenPara(authAtleta));
+    // O atleta completa o cadastro no primeiro acesso (nome, gênero e nascimento).
+    expect(
+      (
+        await chamar(atleta, "PUT", "/me/cadastro", {
+          nome: NOME,
+          genero: "F",
+          dataNascimento: "2000-03-15",
+        })
+      ).status,
+    ).toBe(200);
 
     expect((await gestor("PUT", `/atletas/${atletaId}`, { numeroVela: NUMERO_VELA })).status).toBe(
       200,
@@ -130,6 +143,51 @@ describe("anonimização efetiva (de fato)", () => {
       medida: { pesoKg: 70.2, evidencia: `Pesagem de ${NOME}` },
     });
     expect(lanc.status).toBe(201);
+
+    // D9: autoavaliação corrigida (a justificativa cita o nome) e pesagens do atleta (uma recusada com
+    // motivo citando o nome, outra pendente). Tudo some ou vira marcador na anonimização.
+    expect(
+      (
+        await chamar(atleta, "POST", "/autoavaliacoes", {
+          notas: [{ indicadorId: "tec_largada", valor: 2 }],
+        })
+      ).status,
+    ).toBe(201);
+    expect(
+      (
+        await gestor("POST", `/atletas/${atletaId}/avaliacoes`, {
+          notas: [{ indicadorId: "tec_largada", valor: 4, justificativa: `${NOME} larga mal` }],
+        })
+      ).status,
+    ).toBe(201);
+    const balanca = () =>
+      chamar(atleta, "POST", `/atletas/${atletaId}/evidencias`, {
+        nomeArquivo: `balanca ${NOME}.jpg`,
+        tipoMime: "image/jpeg",
+        conteudoBase64: jpegValido().toString("base64"),
+        categoria: "balanca",
+      });
+    const recusada = await chamar(atleta, "POST", "/me/pesagens", {
+      pesoKg: 71.3,
+      anexoId: (await balanca()).corpo.id,
+    });
+    expect(recusada.status).toBe(201);
+    expect(
+      (
+        await gestor("PUT", `/pesagens/${recusada.corpo.id}/validacao`, {
+          decisao: "recusar",
+          motivo: `Foto de ${NOME} ilegível`,
+        })
+      ).status,
+    ).toBe(200);
+    expect(
+      (
+        await chamar(atleta, "POST", "/me/pesagens", {
+          pesoKg: 70.9,
+          anexoId: (await balanca()).corpo.id,
+        })
+      ).status,
+    ).toBe(201);
 
     expect(
       (
@@ -158,6 +216,47 @@ describe("anonimização efetiva (de fato)", () => {
     });
     expect(anexo.status).toBe(201);
 
+    // D14: bio e conquistas (título e motivo citam o nome): saem na anonimização.
+    expect(
+      (await chamar(atleta, "PUT", "/me/perfil", { bio: `Sou ${NOME}, velejadora de Niterói.` }))
+        .status,
+    ).toBe(200);
+    const provaConquista = async () =>
+      (
+        await chamar(atleta, "POST", `/atletas/${atletaId}/evidencias`, {
+          nomeArquivo: "titulo.pdf",
+          tipoMime: "application/pdf",
+          conteudoBase64: pdf().toString("base64"),
+        })
+      ).corpo.id as string;
+    const conquistaValidada = await chamar(atleta, "POST", "/me/conquistas", {
+      titulo: `Campeã estadual ${NOME}`,
+      ano: 2025,
+      anexoId: await provaConquista(),
+    });
+    expect(conquistaValidada.status).toBe(201);
+    expect(
+      (
+        await gestor("PUT", `/conquistas/${conquistaValidada.corpo.id}/validacao`, {
+          decisao: "validar",
+        })
+      ).status,
+    ).toBe(200);
+    const conquistaRecusada = await chamar(atleta, "POST", "/me/conquistas", {
+      titulo: "Medalha de bronze",
+      ano: 2024,
+      anexoId: await provaConquista(),
+    });
+    expect(conquistaRecusada.status).toBe(201);
+    expect(
+      (
+        await gestor("PUT", `/conquistas/${conquistaRecusada.corpo.id}/validacao`, {
+          decisao: "recusar",
+          motivo: `Documento de ${NOME} ilegível`,
+        })
+      ).status,
+    ).toBe(200);
+
     const foto = await chamar(atleta, "POST", "/me/foto", {
       tipoMime: "image/jpeg",
       conteudoBase64: jpegValido().toString("base64"),
@@ -178,6 +277,20 @@ describe("anonimização efetiva (de fato)", () => {
         })
       ).status,
     ).toBe(201);
+    // Pedido em 2ª instância (D6): resposta do treinador e recurso trazem o nome do atleta.
+    await p.db.query(
+      `insert into pedidos_revisao (atleta_id, pilar_id, motivo, criado_por, instancia, resposta_1,
+                                    respondido_por_1, respondido_em_1, recurso_texto, recurso_em)
+       select $1, 'tec', 'Motivo do recurso, longo o bastante.', u.id, 2, $2, u.id, now(), $3, now()
+         from usuarios u where u.papel = 'gestor' limit 1`,
+      [atletaId, `Resposta para ${NOME}.`, `Recurso de ${NOME}.`],
+    );
+    // D15: telefone, validade do passaporte e aptidão conferida.
+    await p.db.query(
+      "update atletas set telefone = '+5521988887777', passaporte_valido_ate = '2029-03-31' where id = $1",
+      [atletaId],
+    );
+    expect((await gestor("POST", `/atletas/${atletaId}/aptidao`, { apto: true })).status).toBe(201);
     const pedido = await chamar(atleta, "POST", "/pedidos-titular", {
       tipo: "exclusao",
       descricao: `Eu, ${NOME}, quero que apaguem meus dados.`,
@@ -209,7 +322,10 @@ describe("anonimização efetiva (de fato)", () => {
     );
     expect(r.rows).toHaveLength(3);
     const novos = r.rows.slice(0, 2);
-    for (const l of novos) expect(l.detalhes).not.toHaveProperty("velaid");
+    for (const l of novos) {
+      expect(l.detalhes).not.toHaveProperty("velaid");
+      expect(l.detalhes).not.toHaveProperty("wsId");
+    }
   });
 
   it("antes de anonimizar a busca acha os dados (a busca não é vazia)", async () => {
@@ -238,6 +354,22 @@ describe("anonimização efetiva (de fato)", () => {
     expect(sobras).toEqual([]);
   });
 
+  it("D14: bio e conquistas saem; os avisos delas também", async () => {
+    const bio = await p.db.query("select 1 from atletas where id = $1 and bio is not null", [
+      atletaId,
+    ]);
+    expect(bio.rows).toHaveLength(0);
+    const conquistas = await p.db.query("select 1 from conquistas_atleta where atleta_id = $1", [
+      atletaId,
+    ]);
+    expect(conquistas.rows).toHaveLength(0);
+    const avisos = await p.db.query(
+      "select 1 from avisos where atleta_id = $1 and tipo like '%conquista%'",
+      [atletaId],
+    );
+    expect(avisos.rows).toHaveLength(0);
+  });
+
   it("o que ficou: série histórica sem texto, data de nascimento generalizada, regata sem link", async () => {
     const a = (
       await p.db.query<{ nome: string; ativo: boolean; dn: string; genero: string }>(
@@ -251,9 +383,14 @@ describe("anonimização efetiva (de fato)", () => {
       (await p.db.query<Record<string, unknown>>(sql, [atletaId])).rows;
     expect(
       (await q("select evidencia from avaliacoes where atleta_id = $1")).every(
-        (l) => l.evidencia === MARCADOR,
+        (l) => l.evidencia === MARCADOR || l.evidencia === null,
       ),
     ).toBe(true);
+    const justificativas = await q(
+      "select justificativa from avaliacoes where atleta_id = $1 and justificativa is not null",
+    );
+    expect(justificativas).toEqual([{ justificativa: MARCADOR }]);
+    expect(await q("select id from pesagens_atleta where atleta_id = $1")).toEqual([]);
     const medidas = await q(
       "select peso_kg::float8 as peso, evidencia from medidas_corporais where atleta_id = $1",
     );
@@ -290,8 +427,23 @@ describe("anonimização efetiva (de fato)", () => {
       },
     ]);
     expect(
-      await q("select motivo, status, resposta from pedidos_revisao where atleta_id = $1"),
-    ).toEqual([{ motivo: MARCADOR, status: "aberto", resposta: null }]);
+      await q(
+        "select motivo, status, resposta, resposta_1, recurso_texto from pedidos_revisao where atleta_id = $1 order by id",
+      ),
+    ).toEqual([
+      { motivo: MARCADOR, status: "aberto", resposta: null, resposta_1: null, recurso_texto: null },
+      {
+        motivo: MARCADOR,
+        status: "aberto",
+        resposta: null,
+        resposta_1: MARCADOR,
+        recurso_texto: MARCADOR,
+      },
+    ]);
+    expect(await q("select telefone, passaporte_valido_ate from atletas where id = $1")).toEqual([
+      { telefone: null, passaporte_valido_ate: null },
+    ]);
+    expect(await q("select id from aptidoes where atleta_id = $1")).toEqual([]);
     const titular = await q(
       "select tipo, descricao, status, resposta from pedidos_titular where atleta_id = $1 order by id",
     );
@@ -471,7 +623,7 @@ describe("anonimização efetiva (de fato)", () => {
     it("gestor: responder revisão e pedido do titular do atleta anonimizado", async () => {
       const rev = (
         await p.db.query<{ id: string }>(
-          "select id::text as id from pedidos_revisao where atleta_id = $1",
+          "select id::text as id from pedidos_revisao where atleta_id = $1 order by id",
           [atletaId],
         )
       ).rows[0]!.id;

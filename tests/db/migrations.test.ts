@@ -40,8 +40,8 @@ describe("Migrations", () => {
       insert into classes (id, nome, evento, posicao, peso_min_kg, peso_medio_kg, peso_max_kg, ordem)
         values ('t_cls', 'Classe teste', 'Teste', 'ind', 60, 65, 70, 99);
       insert into usuarios (id, email, nome, papel) values ('00000000-0000-0000-0000-0000000000aa', 't@t.dev', 'T', 'gestor');
-      insert into atletas (id, velaid_codigo, nome, genero, data_nascimento, classe_id)
-        values ('00000000-0000-0000-0000-0000000000bb', 'XX-T99', 'Atleta Teste', 'F', '2000-01-01', 't_cls');
+      insert into atletas (id, velaid_codigo, ws_id, nome, genero, data_nascimento, classe_id)
+        values ('00000000-0000-0000-0000-0000000000bb', 'XX-T99', 'BRAXXT99', 'Atleta Teste', 'F', '2000-01-01', 't_cls');
       insert into avaliacoes (atleta_id, indicador_id, valor, evidencia, origem, avaliador_id)
         values ('00000000-0000-0000-0000-0000000000bb', 't_ind', 3, 'Obs', 'avaliacao', '00000000-0000-0000-0000-0000000000aa');
     `);
@@ -58,8 +58,8 @@ describe("Migrations", () => {
         insert into classes (id, nome, evento, posicao, peso_min_kg, peso_medio_kg, peso_max_kg, ordem)
           values ('t_cls2', 'Classe teste 2', 'Teste', 'ind', 60, 65, 70, 98);
         insert into usuarios (id, email, nome, papel) values ('${USUARIO}', 'ev@t.dev', 'Ev', 'gestor');
-        insert into atletas (id, velaid_codigo, nome, genero, data_nascimento, classe_id)
-          values ('${ATLETA}', 'XX-EV1', 'Atleta Ev', 'F', '2000-01-01', 't_cls2');
+        insert into atletas (id, velaid_codigo, ws_id, nome, genero, data_nascimento, classe_id)
+          values ('${ATLETA}', 'XX-EV1', 'BRAXXEV1', 'Atleta Ev', 'F', '2000-01-01', 't_cls2');
       `);
     });
     const inserir = async (caminho: string) => {
@@ -157,8 +157,8 @@ describe("Migrations", () => {
       await db.exec(`
         insert into classes (id, nome, evento, posicao, peso_min_kg, peso_medio_kg, peso_max_kg, ordem)
           values ('t_cls3', 'Classe teste 3', 'Teste', 'ind', 60, 65, 70, 97);
-        insert into atletas (id, velaid_codigo, nome, genero, data_nascimento, classe_id)
-          values ('${ATLETA}', 'XX-RK1', 'Atleta Rk', 'F', '2000-01-01', 't_cls3');
+        insert into atletas (id, velaid_codigo, ws_id, nome, genero, data_nascimento, classe_id)
+          values ('${ATLETA}', 'XX-RK1', 'BRAXXRK1', 'Atleta Rk', 'F', '2000-01-01', 't_cls3');
       `);
     });
     const inserir = (evento: string, fonte: "ranking_cbvela" | "manual" = "ranking_cbvela") =>
@@ -190,6 +190,59 @@ describe("Migrations", () => {
       await anonimizarResultados("Copa Anon");
       await inserir("Copa Anon");
       await anonimizarResultados("Copa Anon");
+    });
+  });
+  describe("WS ID como chave e cadastro incompleto (0018)", () => {
+    const ins = (cols: string, vals: string) =>
+      db.exec(`insert into atletas (${cols}) values (${vals})`);
+
+    beforeAll(async () => {
+      await db.exec(`
+        insert into classes (id, nome, evento, posicao, peso_min_kg, peso_medio_kg, peso_max_kg, ordem)
+          values ('t_cls4', 'Classe teste 4', 'Teste', 'ind', 60, 65, 70, 96);
+      `);
+    });
+
+    it("ws_id é obrigatório, único e no formato; velaid_codigo aceita nulo e continua único", async () => {
+      await expect(ins("classe_id", "'t_cls4'")).rejects.toThrow(/ws_id/);
+      await ins("ws_id, classe_id", "'BRAWS001', 't_cls4'");
+      await expect(ins("ws_id, classe_id", "'BRAWS001', 't_cls4'")).rejects.toThrow(
+        /atletas_ws_id_unico/,
+      );
+      for (const ruim of ["bra001", "BR", "1BRA23", "BRA-123", "BRAABCDEFGHIJKLM"]) {
+        await expect(ins("ws_id, classe_id", `'${ruim}', 't_cls4'`), ruim).rejects.toThrow(
+          /atletas_ws_id_formato/,
+        );
+      }
+      // Dois atletas sem VelaID convivem; o mesmo VelaID preenchido não.
+      await ins("ws_id, classe_id", "'BRAWS002', 't_cls4'");
+      await ins("ws_id, classe_id", "'BRAWS003', 't_cls4'");
+      await ins("ws_id, velaid_codigo, classe_id", "'BRAWS004', 'XX-W04', 't_cls4'");
+      await expect(
+        ins("ws_id, velaid_codigo, classe_id", "'BRAWS005', 'XX-W04', 't_cls4'"),
+      ).rejects.toThrow(/velaid_codigo/);
+    });
+
+    it("nome, gênero e nascimento aceitam nulo só com o cadastro incompleto", async () => {
+      await ins("ws_id, classe_id", "'BRAWS006', 't_cls4'");
+      // Completo exige os três.
+      await expect(
+        ins(
+          "ws_id, classe_id, cadastro_completo_em, nome",
+          "'BRAWS007', 't_cls4', now(), 'Só Nome'",
+        ),
+      ).rejects.toThrow(/atletas_cadastro_completo_dados/);
+      await ins(
+        "ws_id, classe_id, cadastro_completo_em, nome, genero, data_nascimento",
+        "'BRAWS008', 't_cls4', now(), 'Atleta Completo', 'F', '2000-01-01'",
+      );
+      // Não dá para completar sem os dados, nem recusar quem já completou.
+      await expect(
+        db.exec("update atletas set cadastro_completo_em = now() where ws_id = 'BRAWS006'"),
+      ).rejects.toThrow(/atletas_cadastro_completo_dados/);
+      await expect(
+        db.exec("update atletas set cadastro_recusado_em = now() where ws_id = 'BRAWS008'"),
+      ).rejects.toThrow(/atletas_cadastro_recusado_incompleto/);
     });
   });
 });

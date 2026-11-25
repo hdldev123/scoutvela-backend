@@ -339,7 +339,7 @@ describe("revisões para o treinador", () => {
     return { status: r.statusCode, corpo: r.json() };
   };
 
-  it("treinadora vê só os pedidos dos próprios atletas; filtro de status; não responde", async () => {
+  it("treinadora vê só os pedidos dos próprios atletas; filtro de status; responde só os próprios", async () => {
     const gestorId = (
       await p.db.query<{ id: string }>("select id from usuarios where email = $1", [
         EMAILS_DEMO.gestor,
@@ -366,7 +366,7 @@ describe("revisões para o treinador", () => {
         [atleta, motivo, gestorId],
       );
     const dele = (await ins(meu, "Pedido de um atleta da Ana.")).rows[0]!.id;
-    await ins(alheio, "Pedido de atleta de outro treinador, sigiloso.");
+    const dele2 = (await ins(alheio, "Pedido de atleta de outro treinador, sigiloso.")).rows[0]!.id;
 
     const lista = await ler(EMAILS_DEMO.treinadora);
     expect(lista.status).toBe(200);
@@ -376,20 +376,17 @@ describe("revisões para o treinador", () => {
     const gestor = await ler(EMAILS_DEMO.gestor);
     expect(gestor.corpo).toHaveLength(2);
 
-    const put = await p.app.inject({
-      method: "PUT",
-      url: `/revisoes/${dele}`,
-      headers: await p.como(EMAILS_DEMO.treinadora),
-      payload: { resposta: "Tentando responder." },
-    });
-    expect(put.statusCode).toBe(403);
-
-    await p.app.inject({
-      method: "PUT",
-      url: `/revisoes/${dele}`,
-      headers: await p.como(EMAILS_DEMO.gestor),
-      payload: { resposta: "Nota mantida com a evidência." },
-    });
+    const responder = async (id: string, email: string) =>
+      (
+        await p.app.inject({
+          method: "PUT",
+          url: `/revisoes/${id}`,
+          headers: await p.como(email),
+          payload: { resposta: "Nota mantida com a evidência." },
+        })
+      ).statusCode;
+    expect(await responder(dele2, EMAILS_DEMO.treinadora)).toBe(404);
+    expect(await responder(dele, EMAILS_DEMO.treinadora)).toBe(200);
     expect((await ler(EMAILS_DEMO.treinadora, "/revisoes?status=aberto")).corpo).toEqual([]);
     expect((await ler(EMAILS_DEMO.treinadora, "/revisoes?status=respondido")).corpo).toHaveLength(
       1,

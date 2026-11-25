@@ -39,6 +39,8 @@ export interface OpcoesAppDeTeste {
   armazenamento?: ArmazenamentoEvidencias;
   adminAuth?: AdminAuth | null;
   email?: ProvedorEmail;
+  /** Captura as linhas do log (testes de segurança dos logs). */
+  destinoLog?: { write(linha: string): void };
 }
 
 /** App completo sobre o banco de teste, com verificador HS256 real. */
@@ -59,6 +61,7 @@ export async function criarAppDeTeste(
     armazenamento: opcoes.armazenamento ?? criarArmazenamentoFake(),
     ...(opcoes.adminAuth !== undefined ? { adminAuth: opcoes.adminAuth } : {}),
     ...(opcoes.email ? { email: opcoes.email } : {}),
+    ...(opcoes.destinoLog ? { destinoLog: opcoes.destinoLog } : {}),
     logger: false,
   });
   await app.ready();
@@ -109,9 +112,13 @@ export async function criarAtletaDeTeste(db: Db, nome = "Atleta Teste"): Promise
      on conflict (id) do nothing`,
   );
   const r = await db.query<{ id: string }>(
-    `insert into atletas (velaid_codigo, nome, genero, data_nascimento, classe_id)
-     values ($1, $2, 'F', '2000-01-01', 'classe_teste') returning id`,
-    [`VELA-${crypto.randomUUID().slice(0, 8)}`, nome],
+    `insert into atletas (velaid_codigo, ws_id, nome, genero, data_nascimento, classe_id, cadastro_completo_em)
+     values ($1, $3, $2, 'F', '2000-01-01', 'classe_teste', now()) returning id`,
+    [
+      `VELA-${crypto.randomUUID().slice(0, 8)}`,
+      nome,
+      `BRA${crypto.randomUUID().replaceAll("-", "").slice(0, 8).toUpperCase()}`,
+    ],
   );
   return r.rows[0]!.id;
 }

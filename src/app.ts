@@ -3,7 +3,7 @@ import helmet from "@fastify/helmet";
 import rateLimit from "@fastify/rate-limit";
 import swagger from "@fastify/swagger";
 import swaggerUi from "@fastify/swagger-ui";
-import Fastify, { type FastifyInstance } from "fastify";
+import Fastify, { type FastifyInstance, type FastifyRequest } from "fastify";
 import {
   jsonSchemaTransform,
   serializerCompiler,
@@ -19,15 +19,23 @@ import { registrarTratamentoDeErros } from "./erros.js";
 import type { AdminAuth } from "./integracoes/supabase-admin.js";
 import { rotasHealth } from "./routes/health.js";
 import { rotasAnonimizacao } from "./routes/anonimizacao.js";
+import { rotasAptidao } from "./routes/aptidao.js";
 import { rotasAtletas } from "./routes/atletas.js";
 import { rotasAuditoria } from "./routes/auditoria.js";
+import { rotasAvisos } from "./routes/avisos.js";
 import { rotasAvaliacoes } from "./routes/avaliacoes.js";
+import { rotasAutoavaliacoes } from "./routes/autoavaliacoes.js";
+import { rotasConquistas } from "./routes/conquistas.js";
+import { rotasConversas } from "./routes/conversas.js";
+import { rotasPesagens } from "./routes/pesagens.js";
+import { rotasResultados } from "./routes/resultados.js";
 import { rotasCadastro } from "./routes/cadastro.js";
 import { rotasCampanha } from "./routes/campanha.js";
 import { rotasCiclos } from "./routes/ciclos.js";
 import { rotasEvidencias } from "./routes/evidencias.js";
 import { rotasInvestimento } from "./routes/investimento.js";
 import { rotasMe } from "./routes/me.js";
+import { rotasMeCadastro } from "./routes/me-cadastro.js";
 import { rotasNotificacoes } from "./routes/notificacoes.js";
 import { rotasPainel } from "./routes/painel.js";
 import { rotasPerfil } from "./routes/perfil.js";
@@ -36,6 +44,7 @@ import { rotasParametros } from "./routes/parametros.js";
 import { rotasRanking } from "./routes/ranking.js";
 import { rotasTitular } from "./routes/titular.js";
 import { criarArmazenamentoLocal, type ArmazenamentoEvidencias } from "./storage/index.js";
+import { rotasSugestoes } from "./routes/sugestoes.js";
 import { rotasTermo } from "./routes/termo.js";
 import { rotasUsuarios } from "./routes/usuarios.js";
 
@@ -54,6 +63,8 @@ export interface DepsApp {
   armazenamento?: ArmazenamentoEvidencias;
   /** Cliente admin do Supabase Auth (convites). Ausente = convite indisponível. */
   adminAuth?: AdminAuth | null;
+  /** Só para testes: recebe as linhas do log (liga o logger mesmo com `logger: false`). */
+  destinoLog?: { write(linha: string): void };
 }
 
 declare module "fastify" {
@@ -77,11 +88,18 @@ type PluginDeRotas = (app: FastifyInstance) => Promise<void>;
 const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasHealth,
   rotasMe,
+  rotasMeCadastro,
   rotasNotificacoes,
   rotasPerfil,
   rotasRanking,
   rotasAtletas,
+  rotasAptidao,
   rotasAvaliacoes,
+  rotasAutoavaliacoes,
+  rotasPesagens,
+  rotasConquistas,
+  rotasConversas,
+  rotasResultados,
   rotasCadastro,
   rotasPainel,
   rotasInvestimento,
@@ -95,6 +113,8 @@ const PLUGINS_DE_ROTAS: PluginDeRotas[] = [
   rotasEvidencias,
   rotasUsuarios,
   rotasTermo,
+  rotasAvisos,
+  rotasSugestoes,
 ];
 
 export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
@@ -106,12 +126,22 @@ export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
       config.TRUST_PROXY_HOPS > 0 ? (_endereco, salto) => salto < config.TRUST_PROXY_HOPS : false,
     bodyLimit: 1024 * 1024,
     logger:
-      deps.logger === false
+      deps.logger === false && !deps.destinoLog
         ? false
         : {
             level: "info",
             // Nunca registrar credenciais. O corpo da requisição não é logado.
             redact: ["req.headers.authorization", "req.headers.cookie"],
+            // Sem a query string: ela pode trazer dado pessoal (ex.: ?busca=<nome do atleta>)
+            // (auditoria de 25/11/2026, A2).
+            serializers: {
+              req: (req: FastifyRequest) => ({
+                method: req.method,
+                url: req.url.split("?")[0],
+                remoteAddress: req.ip,
+              }),
+            },
+            ...(deps.destinoLog ? { stream: deps.destinoLog } : {}),
           },
   });
 
@@ -139,6 +169,13 @@ export async function criarApp(deps: DepsApp): Promise<FastifyInstance> {
     global: true,
     max: deps.limiteRequisicoes?.max ?? 300,
     timeWindow: deps.limiteRequisicoes?.janelaMs ?? 60_000,
+  });
+
+  // Toda resposta da API traz dado de sessão ou pessoal: nada fica no cache do navegador nem de
+  // proxy (auditoria de 25/11/2026, A3). Quem já definiu o próprio Cache-Control mantém.
+  app.addHook("onSend", async (_req, reply, payload) => {
+    if (!reply.hasHeader("cache-control")) reply.header("cache-control", "no-store");
+    return payload;
   });
 
   await app.register(cors, {
