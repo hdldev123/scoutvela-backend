@@ -28,6 +28,10 @@ services:
         value: smtp
       - key: STORAGE_PROVEDOR
         value: supabase
+      # D19: importação do perfil World Sailing. Desligada até a CBVela e o controlador dos dados liberarem;
+      # em homologação use "simulado" (dados fictícios) ou deixe sem a variável.
+      - key: WORLD_SAILING_MODO
+        value: desligado
       - key: DATABASE_URL
         sync: false
       - key: DATABASE_CA_CERT

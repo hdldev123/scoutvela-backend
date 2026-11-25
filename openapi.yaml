@@ -101,28 +101,41 @@ paths:
                         type: string
                       sugestao:
                         nullable: true
-                        description: Dados do VelaID para o atleta confirmar; nula sem VelaID
+                        description: Dados do VelaID ou, sem eles, do perfil da World Sailing, para o
+                          atleta confirmar ou corrigir; nula sem nenhum dos dois
                         type: object
                         properties:
                           nome:
                             type: string
                           genero:
+                            nullable: true
+                            description: Nulo se a World Sailing não informa
                             type: string
                             enum:
                               - F
                               - M
                           dataNascimento:
+                            nullable: true
+                            description: AAAA-MM-DD; nula se a World Sailing não informa
                             type: string
-                            description: AAAA-MM-DD
                         required:
                           - nome
                           - genero
                           - dataNascimento
                         additionalProperties: false
+                      origemSugestao:
+                        nullable: true
+                        description: De onde veio a sugestão (o VelaID vale antes da World Sailing);
+                          nula sem sugestão
+                        type: string
+                        enum:
+                          - velaid
+                          - world_sailing
                     required:
                       - wsId
                       - velaid
                       - sugestao
+                      - origemSugestao
                     additionalProperties: false
                   telas:
                     type: array
@@ -920,6 +933,27 @@ paths:
                     required:
                       - quantidadeAtletas
                     additionalProperties: false
+                  sugestaoWorldSailing:
+                    nullable: true
+                    description: Sugestão de foto e bio do perfil da World Sailing (D19). Só para o
+                      atleta, enquanto ele não decidiu (POST
+                      /me/perfil/world-sailing) e houver foto ou bio; nulo nos
+                      demais casos
+                    type: object
+                    properties:
+                      fotoUrl:
+                        nullable: true
+                        description: Foto de https://assets.sailing.org/, para a prévia (o servidor é
+                          quem a baixa)
+                        type: string
+                      bio:
+                        nullable: true
+                        description: Texto da World Sailing; vai cortado em 500 caracteres
+                        type: string
+                    required:
+                      - fotoUrl
+                      - bio
+                    additionalProperties: false
                 required:
                   - nome
                   - email
@@ -928,6 +962,7 @@ paths:
                   - mfaAtivo
                   - atleta
                   - treinador
+                  - sugestaoWorldSailing
                 additionalProperties: false
         "401":
           description: Default Response
@@ -1216,6 +1251,27 @@ paths:
                     required:
                       - quantidadeAtletas
                     additionalProperties: false
+                  sugestaoWorldSailing:
+                    nullable: true
+                    description: Sugestão de foto e bio do perfil da World Sailing (D19). Só para o
+                      atleta, enquanto ele não decidiu (POST
+                      /me/perfil/world-sailing) e houver foto ou bio; nulo nos
+                      demais casos
+                    type: object
+                    properties:
+                      fotoUrl:
+                        nullable: true
+                        description: Foto de https://assets.sailing.org/, para a prévia (o servidor é
+                          quem a baixa)
+                        type: string
+                      bio:
+                        nullable: true
+                        description: Texto da World Sailing; vai cortado em 500 caracteres
+                        type: string
+                    required:
+                      - fotoUrl
+                      - bio
+                    additionalProperties: false
                 required:
                   - nome
                   - email
@@ -1224,6 +1280,7 @@ paths:
                   - mfaAtivo
                   - atleta
                   - treinador
+                  - sugestaoWorldSailing
                 additionalProperties: false
         "400":
           description: Default Response
@@ -1640,6 +1697,300 @@ paths:
                   - mensagem
                 additionalProperties: false
         "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "503":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /me/perfil/world-sailing:
+    post:
+      summary: O atleta aceita ou dispensa a foto e a bio sugeridas pela World Sailing
+      tags:
+        - sessao
+      description: "Só o atleta, uma vez (a decisão fica marcada, também quando ele
+        dispensa com `usarFoto` e `usarBio` falsos; depois disso, 409). Sem
+        sugestão, 404. `usarFoto`: o SERVIDOR baixa a foto, só de
+        https://assets.sailing.org/ (sem seguir redirecionamento, até 5 MB, só
+        JPEG ou PNG conferidos pela assinatura do arquivo; outro formato dá 400,
+        falha de rede ou tempo esgotado dá 503), tira EXIF e GPS e a guarda como
+        a foto do perfil (a regra de foto e bio para o IBVAR é a mesma de
+        sempre: só com consentimento na versão do termo que inclui foto e bio).
+        `usarBio`: a bio da World Sailing, cortada em 500 caracteres no fim de
+        uma palavra, substitui a bio do perfil. Pedir uma delas sem a sugestão
+        correspondente dá 400. A auditoria guarda só se usou foto e bio (nunca o
+        texto)."
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                usarFoto:
+                  type: boolean
+                usarBio:
+                  type: boolean
+              required:
+                - usarFoto
+                - usarBio
+              additionalProperties: false
+      security:
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  usouFoto:
+                    type: boolean
+                  usouBio:
+                    type: boolean
+                  fotoUrl:
+                    nullable: true
+                    description: Link assinado curto da foto do perfil
+                    type: string
+                  bio:
+                    nullable: true
+                    description: Bio atual do perfil
+                    type: string
+                required:
+                  - usouFoto
+                  - usouBio
+                  - fotoUrl
+                  - bio
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
           description: Default Response
           content:
             application/json:
@@ -2756,8 +3107,12 @@ paths:
                             - ranking_cbvela
                             - manual
                             - atleta
+                            - world_sailing
                           description: "ranking_cbvela: importado; manual: lançado por gestor ou
-                            treinador; atleta: informado pelo atleta"
+                            treinador; atleta: informado pelo atleta;
+                            world_sailing: importado do perfil da World Sailing
+                            (fonte oficial: vale direto, e o treinador do atleta
+                            ou o gestor pode invalidar com motivo)"
                         linkOficial:
                           nullable: true
                           type: string
@@ -2767,9 +3122,12 @@ paths:
                             - validado
                             - pendente
                             - recusado
-                          description: Só o resultado do atleta (fonte `atleta`) passa por validação; os
-                            demais vêm `validado`. Só o validado conta na nota e
-                            nos gates
+                          description: "`atleta`: pendente até a validação do treinador. `world_sailing`:
+                            `validado` (vigente) até o treinador ou o gestor
+                            invalidar (`recusado`, com `motivo`); revalidar
+                            volta a `validado`. Manual e Ranking CBVela vêm
+                            sempre `validado`. Só o validado conta na nota e nos
+                            gates"
                         motivo:
                           nullable: true
                           description: Motivo da recusa; nulo para o IBVAR
@@ -9065,8 +9423,12 @@ paths:
                       - ranking_cbvela
                       - manual
                       - atleta
+                      - world_sailing
                     description: "ranking_cbvela: importado; manual: lançado por gestor ou
-                      treinador; atleta: informado pelo atleta"
+                      treinador; atleta: informado pelo atleta; world_sailing:
+                      importado do perfil da World Sailing (fonte oficial: vale
+                      direto, e o treinador do atleta ou o gestor pode invalidar
+                      com motivo)"
                   linkOficial:
                     nullable: true
                     type: string
@@ -9076,9 +9438,11 @@ paths:
                       - validado
                       - pendente
                       - recusado
-                    description: Só o resultado do atleta (fonte `atleta`) passa por validação; os
-                      demais vêm `validado`. Só o validado conta na nota e nos
-                      gates
+                    description: "`atleta`: pendente até a validação do treinador. `world_sailing`:
+                      `validado` (vigente) até o treinador ou o gestor invalidar
+                      (`recusado`, com `motivo`); revalidar volta a `validado`.
+                      Manual e Ranking CBVela vêm sempre `validado`. Só o
+                      validado conta na nota e nos gates"
                   motivo:
                     nullable: true
                     description: Motivo da recusa; nulo para o IBVAR
@@ -9329,20 +9693,25 @@ paths:
                 additionalProperties: false
   /resultados/{id}/validacao:
     put:
-      summary: Valida ou recusa um resultado informado pelo atleta
+      summary: Valida ou recusa um resultado do atleta, ou invalida e revalida um
+        resultado da World Sailing
       tags:
         - resultados
       description: "Gestor ou treinador do atleta (outro treinador e resultado
-        inexistente: 404; atleta e IBVAR: 403). Só vale para resultado da fonte
-        `atleta`; os lançados por gestor ou treinador e os do Ranking CBVela já
-        valem (400). `recusar` exige `motivo` (até 300 caracteres; 400 em
-        `motivo`). A decisão vira uma linha nova na série (nada é sobrescrito):
-        a situação vigente é a da validação mais recente, então dá para mudar de
-        `validado` para `recusado` e vice-versa; repetir a situação atual dá
-        409. Só o `validado` entra na nota (PERF_RESULTADOS) e nos gates G2 e
-        G3. A súmula fica guardada. Avisa o atleta (`resultado_validado` ou
-        `resultado_recusado`, `referencia: { resultadoId }`). Auditoria
-        `decidir_resultado` sem o motivo."
+        inexistente: 404; atleta e IBVAR: 403). Vale para resultado da fonte
+        `atleta` (valida ou recusa) e da fonte `world_sailing` (D19: `recusar`
+        invalida o resultado importado, `validar` o revalida); os lançados por
+        gestor ou treinador e os do Ranking CBVela já valem (400). `recusar`
+        exige `motivo` (até 300 caracteres; 400 em `motivo`). A decisão vira uma
+        linha nova na série (nada é sobrescrito): a situação vigente é a da
+        validação mais recente, então dá para mudar de `validado` para
+        `recusado` e vice-versa; repetir a situação atual dá 409 (o resultado da
+        World Sailing já nasce vigente, então só `recusar` vale antes da
+        primeira invalidação). Só o `validado` entra na nota (PERF_RESULTADOS) e
+        nos gates G2 e G3: o resultado da World Sailing invalidado sai da nota e
+        dos gates até ser revalidado. A súmula fica guardada. Avisa o atleta
+        (`resultado_validado` ou `resultado_recusado`, `referencia: {
+        resultadoId }`). Auditoria `decidir_resultado` sem o motivo."
       requestBody:
         required: true
         content:
@@ -9415,8 +9784,12 @@ paths:
                       - ranking_cbvela
                       - manual
                       - atleta
+                      - world_sailing
                     description: "ranking_cbvela: importado; manual: lançado por gestor ou
-                      treinador; atleta: informado pelo atleta"
+                      treinador; atleta: informado pelo atleta; world_sailing:
+                      importado do perfil da World Sailing (fonte oficial: vale
+                      direto, e o treinador do atleta ou o gestor pode invalidar
+                      com motivo)"
                   linkOficial:
                     nullable: true
                     type: string
@@ -9426,9 +9799,11 @@ paths:
                       - validado
                       - pendente
                       - recusado
-                    description: Só o resultado do atleta (fonte `atleta`) passa por validação; os
-                      demais vêm `validado`. Só o validado conta na nota e nos
-                      gates
+                    description: "`atleta`: pendente até a validação do treinador. `world_sailing`:
+                      `validado` (vigente) até o treinador ou o gestor invalidar
+                      (`recusado`, com `motivo`); revalidar volta a `validado`.
+                      Manual e Ranking CBVela vêm sempre `validado`. Só o
+                      validado conta na nota e nos gates"
                   motivo:
                     nullable: true
                     description: Motivo da recusa; nulo para o IBVAR
@@ -9685,9 +10060,11 @@ paths:
       description: "Gestor, treinador dos próprios atletas e o próprio atleta (IBVAR:
         403; outro atleta ou treinador: 404). Do mais recente para o mais
         antigo. `?status=validado|pendente|recusado` filtra pela situação (os
-        resultados lançados por gestor, treinador ou importados do Ranking
-        CBVela são sempre `validado`). Cada item traz fonte, edição, súmula
-        (`anexo`), motivo da recusa e quem validou."
+        lançados por gestor, treinador ou importados do Ranking CBVela são
+        sempre `validado`; os da World Sailing (`fonte: world_sailing`) são
+        `validado` até serem invalidados, e então `recusado`, com o motivo).
+        Cada item traz fonte, edição, súmula (`anexo`), motivo da recusa ou da
+        invalidação e quem validou."
       parameters:
         - schema:
             type: string
@@ -9757,8 +10134,12 @@ paths:
                             - ranking_cbvela
                             - manual
                             - atleta
+                            - world_sailing
                           description: "ranking_cbvela: importado; manual: lançado por gestor ou
-                            treinador; atleta: informado pelo atleta"
+                            treinador; atleta: informado pelo atleta;
+                            world_sailing: importado do perfil da World Sailing
+                            (fonte oficial: vale direto, e o treinador do atleta
+                            ou o gestor pode invalidar com motivo)"
                         linkOficial:
                           nullable: true
                           type: string
@@ -9768,9 +10149,12 @@ paths:
                             - validado
                             - pendente
                             - recusado
-                          description: Só o resultado do atleta (fonte `atleta`) passa por validação; os
-                            demais vêm `validado`. Só o validado conta na nota e
-                            nos gates
+                          description: "`atleta`: pendente até a validação do treinador. `world_sailing`:
+                            `validado` (vigente) até o treinador ou o gestor
+                            invalidar (`recusado`, com `motivo`); revalidar
+                            volta a `validado`. Manual e Ranking CBVela vêm
+                            sempre `validado`. Só o validado conta na nota e nos
+                            gates"
                         motivo:
                           nullable: true
                           description: Motivo da recusa; nulo para o IBVAR
@@ -10091,8 +10475,12 @@ paths:
                       - ranking_cbvela
                       - manual
                       - atleta
+                      - world_sailing
                     description: "ranking_cbvela: importado; manual: lançado por gestor ou
-                      treinador; atleta: informado pelo atleta"
+                      treinador; atleta: informado pelo atleta; world_sailing:
+                      importado do perfil da World Sailing (fonte oficial: vale
+                      direto, e o treinador do atleta ou o gestor pode invalidar
+                      com motivo)"
                   linkOficial:
                     nullable: true
                     type: string
@@ -10102,9 +10490,11 @@ paths:
                       - validado
                       - pendente
                       - recusado
-                    description: Só o resultado do atleta (fonte `atleta`) passa por validação; os
-                      demais vêm `validado`. Só o validado conta na nota e nos
-                      gates
+                    description: "`atleta`: pendente até a validação do treinador. `world_sailing`:
+                      `validado` (vigente) até o treinador ou o gestor invalidar
+                      (`recusado`, com `motivo`); revalidar volta a `validado`.
+                      Manual e Ranking CBVela vêm sempre `validado`. Só o
+                      validado conta na nota e nos gates"
                   motivo:
                     nullable: true
                     description: Motivo da recusa; nulo para o IBVAR
@@ -10704,7 +11094,14 @@ paths:
         confirmaMaioridade deve ser true. Se o velaid vier e existir no VelaID,
         o vínculo é guardado e os dados de lá ficam como sugestão para o atleta;
         velaid de menor de 18 anos é recusado. Código fora do VelaID importado é
-        aceito, sem sugestão. Revalida classe ativa e treinador válido."
+        aceito, sem sugestão. Revalida classe ativa e treinador válido. Depois
+        de gravar o cadastro, busca o perfil na World Sailing pelo WS ID (D19;
+        até 15 s) e importa os resultados de regata (valem direto, com `fonte:
+        world_sailing`), o histórico de ranking e a sugestão de nome, gênero,
+        nascimento, foto e bio para o atleta; o resumo vem em `worldSailing`. O
+        cadastro NUNCA falha por causa da World Sailing: ID não encontrado,
+        falha ou tempo esgotado voltam em `worldSailing.status` e o gestor pode
+        tentar de novo em POST /atletas/:id/world-sailing."
       requestBody:
         required: true
         content:
@@ -10794,6 +11191,36 @@ paths:
                       nenhuma conta criada (e-mail já em uso ou
                       criarConta=false). indisponivel: conta criada, mas o
                       convite não foi enviado (use POST /usuarios/:id/convite)."
+                  worldSailing:
+                    type: object
+                    properties:
+                      status:
+                        type: string
+                        enum:
+                          - ok
+                          - nao_encontrado
+                          - falhou
+                          - desligado
+                        description: "ok: buscou (veja as contagens). nao_encontrado: o ID não existe na
+                          World Sailing. falhou: a World Sailing não respondeu
+                          direito (nada foi importado; tente de novo depois).
+                          desligado: a integração está desligada neste ambiente"
+                      resultadosNovos:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                        description: Resultados de regata novos nesta busca
+                      rankingNovos:
+                        type: integer
+                        minimum: -9007199254740991
+                        maximum: 9007199254740991
+                        description: Posições de ranking novas nesta busca
+                    required:
+                      - status
+                      - resultadosNovos
+                      - rankingNovos
+                    additionalProperties: false
+                    description: Resumo da busca na World Sailing feita logo depois do cadastro
                 required:
                   - id
                   - wsId
@@ -10801,6 +11228,7 @@ paths:
                   - cadastroCompleto
                   - termo
                   - conta
+                  - worldSailing
                 additionalProperties: false
         "400":
           description: Default Response
@@ -15259,22 +15687,31 @@ paths:
                     type: string
                     maxLength: 40
                 regras:
-                  description: "{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4,
+                  description: '{codigo: valor}; códigos aceitos: P3, G1, G2, G3, G4,
                     RANKING_CBVELA, TERMO_EXIGE_REACEITE, PERF_RESULTADOS,
-                    META_EVOLUCAO, MIN_GRUPO_AGREGADO, TENDENCIA. TENDENCIA
-                    (D13): { limiar (maior que 0, até 100) }, pontos de score da
-                    tendência do atleta e da faixa de na média da turma.
-                    META_EVOLUCAO (D12): { percentual (0 a 1000) }, meta de alta
-                    da média do score da turma sobre o ciclo fechado anterior.
-                    MIN_GRUPO_AGREGADO (D12): { minimo (inteiro, 1 a 1000) },
-                    menor grupo que o IBVAR vê em agregado. O valor segue o
-                    formato lido em GET /parametros. PERF_RESULTADOS (regra
-                    provisória P12): { edicoes_max (1 a 20), sem_resultado (nota
-                    0 a 5 do nível sem resultado validado, padrão 0), niveis: {
-                    mundial, continental, nacional } }, cada nível uma lista de
-                    faixas { ate, nota } em ordem: ate crescente (inteiro, 1 a
-                    500), só a última com ate nulo (qualquer colocação), nota
-                    inteira de 0 a 5 que não aumenta"
+                    META_EVOLUCAO, MIN_GRUPO_AGREGADO, TENDENCIA, WS_NIVEIS.
+                    WS_NIVEIS (regra provisória P13, D19): { niveis: { "<nome do
+                    nível na World Sailing>": "<nível no Scout Vela>" } }, até
+                    100 entradas, nome de 1 a 120 caracteres e destino mundial,
+                    sul_americano, continental, internacional_aberto,
+                    brasileiro, estadual ou regional; evento sem nível na World
+                    Sailing, ou com nível fora da regra, vira
+                    internacional_aberto (registrado, sem nota). Vale nas
+                    próximas importações (os resultados já importados não
+                    mudam). TENDENCIA (D13): { limiar (maior que 0, até 100) },
+                    pontos de score da tendência do atleta e da faixa de na
+                    média da turma. META_EVOLUCAO (D12): { percentual (0 a 1000)
+                    }, meta de alta da média do score da turma sobre o ciclo
+                    fechado anterior. MIN_GRUPO_AGREGADO (D12): { minimo
+                    (inteiro, 1 a 1000) }, menor grupo que o IBVAR vê em
+                    agregado. O valor segue o formato lido em GET /parametros.
+                    PERF_RESULTADOS (regra provisória P12): { edicoes_max (1 a
+                    20), sem_resultado (nota 0 a 5 do nível sem resultado
+                    validado, padrão 0), niveis: { mundial, continental,
+                    nacional } }, cada nível uma lista de faixas { ate, nota }
+                    em ordem: ate crescente (inteiro, 1 a 500), só a última com
+                    ate nulo (qualquer colocação), nota inteira de 0 a 5 que não
+                    aumenta'
                   type: object
                   additionalProperties: {}
                 indicadores:
@@ -17551,8 +17988,9 @@ paths:
         titular, telefone, validade do passaporte e aptidões conferidas,
         pesagens informadas, pedidos de ajuste recebidos, mensagens das
         conversas (D16), foto de perfil (tipo e link de 5 minutos), lista de
-        evidências anexadas (metadados, sem o arquivo) e plano individual (todas
-        as versões). Só o atleta logado, só os próprios dados."
+        evidências anexadas (metadados, sem o arquivo), plano individual (todas
+        as versões) e os dados importados da World Sailing (D19). Só o atleta
+        logado, só os próprios dados."
       security: &a11
         - bearerAuth: []
       responses:
@@ -17708,6 +18146,35 @@ paths:
                       additionalProperties: {}
                     description: "Plano individual: todas as versões registradas, da mais antiga
                       para a mais nova"
+                  worldSailing:
+                    type: object
+                    properties:
+                      sugestao:
+                        nullable: true
+                        description: "Perfil importado da World Sailing como sugestão: nome, gênero,
+                          nascimento, foto, bio, quando importou e quando
+                          decidiu sobre foto e bio"
+                        type: object
+                        additionalProperties: {}
+                      ranking:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: {}
+                        description: Histórico de ranking importado da World Sailing
+                      buscas:
+                        type: array
+                        items:
+                          type: object
+                          additionalProperties: {}
+                        description: "Buscas feitas na World Sailing: quando, modo, status e contagens"
+                    required:
+                      - sugestao
+                      - ranking
+                      - buscas
+                    additionalProperties: false
+                    description: Dados importados da World Sailing (D19). Os resultados de regata
+                      importados estão em resultados (fonte world_sailing)
                 required:
                   - geradoEm
                   - conta
@@ -17729,6 +18196,7 @@ paths:
                   - foto
                   - evidencias
                   - plano
+                  - worldSailing
                 additionalProperties: false
         "401":
           description: Default Response
@@ -23738,6 +24206,463 @@ paths:
                   - mensagem
                 additionalProperties: false
         "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/world-sailing:
+    get:
+      summary: "Seção World Sailing da ficha: link do perfil, última busca e histórico
+        de ranking"
+      tags:
+        - world-sailing
+      description: "Gestor, treinador dos próprios atletas e o próprio atleta (IBVAR:
+        403; outro atleta ou treinador: 404). `perfilUrl` leva ao perfil público
+        do atleta na World Sailing. `ultimaImportacao`: quando e como terminou a
+        última busca (nulo se nunca houve). `importacaoAtiva`: falso com a
+        integração desligada (o front esconde o botão de atualizar). `ranking`:
+        o histórico de ranking importado (só informação, não entra na nota), do
+        mais recente para o mais antigo. Os resultados de regata importados
+        ficam em GET /atletas/:id/resultados (`fonte: world_sailing`)."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: &a16
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  perfilUrl:
+                    type: string
+                    description: https://www.sailing.org/sailor/?ref=<ID>
+                  importacaoAtiva:
+                    type: boolean
+                  ultimaImportacao:
+                    nullable: true
+                    type: object
+                    properties:
+                      em:
+                        type: string
+                        description: Instante ISO
+                      status:
+                        type: string
+                        enum:
+                          - ok
+                          - nao_encontrado
+                          - falhou
+                    required:
+                      - em
+                      - status
+                    additionalProperties: false
+                  ranking:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        data:
+                          type: string
+                          description: AAAA-MM-DD
+                        classe:
+                          type: string
+                        tipo:
+                          nullable: true
+                          description: "Ex.: Senior, Youth"
+                          type: string
+                        posicao:
+                          type: integer
+                          minimum: -9007199254740991
+                          maximum: 9007199254740991
+                        pontos:
+                          nullable: true
+                          type: number
+                      required:
+                        - data
+                        - classe
+                        - tipo
+                        - posicao
+                        - pontos
+                      additionalProperties: false
+                required:
+                  - perfilUrl
+                  - importacaoAtiva
+                  - ultimaImportacao
+                  - ranking
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+    post:
+      summary: Busca de novo o perfil do atleta na World Sailing
+      tags:
+        - world-sailing
+      description: "Gestor, ou treinador dos próprios atletas (outro treinador e
+        atleta inexistente: 404; atleta e IBVAR: 403; atleta anonimizado: 409).
+        Importa só o que é novo (resultados com `fonte: world_sailing`, que
+        valem direto na nota P12 e nos gates, e o histórico de ranking) e renova
+        a sugestão de cadastro, foto e bio; repetir a busca não duplica nada. No
+        máximo uma busca por atleta a cada 60 segundos (429 `limite_excedido`).
+        Com a integração desligada responde `status: desligado`. Atleta não
+        encontrado na World Sailing ou falha da World Sailing não são erro da
+        API: respondem 200 com `status` `nao_encontrado` ou `falhou`. Auditoria
+        `importar_world_sailing` só com o modo, o status e as contagens."
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: *a16
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum:
+                      - ok
+                      - nao_encontrado
+                      - falhou
+                      - desligado
+                    description: "ok: buscou (veja as contagens). nao_encontrado: o ID não existe na
+                      World Sailing. falhou: a World Sailing não respondeu
+                      direito (nada foi importado; tente de novo depois).
+                      desligado: a integração está desligada neste ambiente"
+                  resultadosNovos:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                    description: Resultados de regata novos nesta busca
+                  rankingNovos:
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                    description: Posições de ranking novas nesta busca
+                required:
+                  - status
+                  - resultadosNovos
+                  - rankingNovos
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "429":
           description: Default Response
           content:
             application/json:
