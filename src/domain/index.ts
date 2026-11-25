@@ -11,3 +11,4 @@ export * from "./ws-id.js";
 export * from "./contato.js";
 export * from "./evolucao.js";
 export * from "./turma.js";
+export * from "./world-sailing.js";
