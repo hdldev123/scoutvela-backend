@@ -5056,8 +5056,9 @@ paths:
         nota do treinador − nota do atleta. `resumoPorPilar` (diferença média
         por pilar) só vem para o gestor. Cada indicador traz `evidencia`
         (obrigatoria|opcional) e `orientacao`, e a resposta traz `rubricas`
-        (escala geral com `pilarId` nulo e a de cada pilar com rubrica própria),
-        porque o atleta não lê GET /parametros."
+        (escala geral com `pilarId` nulo e a de cada pilar com rubrica própria)
+        e `orientacoesResultados` (orientação dos indicadores de resultado, de
+        nota calculada), porque o atleta não lê GET /parametros."
       parameters:
         - schema:
             type: string
@@ -5217,6 +5218,32 @@ paths:
                         - treinador
                         - diferenca
                       additionalProperties: false
+                  orientacoesResultados:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        nivel:
+                          type: string
+                          enum:
+                            - mundial
+                            - continental
+                            - nacional
+                        indicadorId:
+                          type: string
+                        nome:
+                          type: string
+                        orientacao:
+                          nullable: true
+                          type: string
+                      required:
+                        - nivel
+                        - indicadorId
+                        - nome
+                        - orientacao
+                      additionalProperties: false
+                    description: Orientação dos indicadores de resultado (nota calculada, sem
+                      autoavaliação), para a tela Meus resultados do atleta
                   rubricas:
                     type: array
                     items:
@@ -5272,6 +5299,7 @@ paths:
                 required:
                   - ciclo
                   - indicadores
+                  - orientacoesResultados
                   - rubricas
                   - resumoPorPilar
                 additionalProperties: false

@@ -2,6 +2,7 @@ import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { exigirPapel } from "../auth/plugin.js";
+import { INDICADOR_DO_NIVEL, NIVEIS_DE_NOTA } from "../domain/resultados.js";
 import { conflito, esquemaErro, naoEncontrado, requisicaoInvalidaCampos } from "../erros.js";
 import type { CampoInvalido } from "../validacao.js";
 import { travarAtletaEditavel } from "../repositories/anonimizado.js";
@@ -61,6 +62,18 @@ const esquemaComparacao = z.object({
         .describe("Nota do treinador menos a do atleta; nulo se falta uma das duas"),
     }),
   ),
+  orientacoesResultados: z
+    .array(
+      z.object({
+        nivel: z.enum(NIVEIS_DE_NOTA),
+        indicadorId: z.string(),
+        nome: z.string(),
+        orientacao: z.string().nullable(),
+      }),
+    )
+    .describe(
+      "Orientação dos indicadores de resultado (nota calculada, sem autoavaliação), para a tela Meus resultados do atleta",
+    ),
   rubricas: z
     .array(
       z.object({
@@ -251,7 +264,7 @@ export async function rotasAutoavaliacoes(app: FastifyInstance): Promise<void> {
         tags: ["autoavaliacao"],
         summary: "Atleta × treinador: a sugestão do atleta e a nota do treinador por indicador",
         description:
-          "Gestor, treinador dos próprios atletas e o próprio atleta (IBVAR: 403; outro atleta ou treinador: 404). `?ciclo=<id>`; sem ele, o ciclo aberto ou, não havendo, o último fechado. Traz os indicadores com autoavaliação ligada e os que já têm sugestão no ciclo. `diferenca` = nota do treinador − nota do atleta. `resumoPorPilar` (diferença média por pilar) só vem para o gestor. Cada indicador traz `evidencia` (obrigatoria|opcional) e `orientacao`, e a resposta traz `rubricas` (escala geral com `pilarId` nulo e a de cada pilar com rubrica própria), porque o atleta não lê GET /parametros.",
+          "Gestor, treinador dos próprios atletas e o próprio atleta (IBVAR: 403; outro atleta ou treinador: 404). `?ciclo=<id>`; sem ele, o ciclo aberto ou, não havendo, o último fechado. Traz os indicadores com autoavaliação ligada e os que já têm sugestão no ciclo. `diferenca` = nota do treinador − nota do atleta. `resumoPorPilar` (diferença média por pilar) só vem para o gestor. Cada indicador traz `evidencia` (obrigatoria|opcional) e `orientacao`, e a resposta traz `rubricas` (escala geral com `pilarId` nulo e a de cada pilar com rubrica própria) e `orientacoesResultados` (orientação dos indicadores de resultado, de nota calculada), porque o atleta não lê GET /parametros.",
         security: seguranca,
         params: z.object({ id: z.uuid() }),
         querystring: z.object({ ciclo: z.uuid().optional() }),
@@ -326,7 +339,15 @@ export async function rotasAutoavaliacoes(app: FastifyInstance): Promise<void> {
         grupo.notas.push({ nota: r.nota, descricao: r.descricao });
       }
 
-      return { ciclo, indicadores, rubricas, resumoPorPilar };
+      const todos = parametros.pilares.flatMap((p) => p.indicadores);
+      const orientacoesResultados = NIVEIS_DE_NOTA.flatMap((nivel) => {
+        const ind = todos.find((i) => i.id === INDICADOR_DO_NIVEL[nivel]);
+        return ind
+          ? [{ nivel, indicadorId: ind.id, nome: ind.nome, orientacao: ind.orientacao }]
+          : [];
+      });
+
+      return { ciclo, indicadores, orientacoesResultados, rubricas, resumoPorPilar };
     },
   );
 }

@@ -53,6 +53,24 @@ describe("D9: a autoavaliação traz evidência, orientação e rubricas (o atle
     expect(itens.find((i) => i.indicadorId === "men_disciplina")?.evidencia).toBe("obrigatoria");
   });
 
+  it("traz a orientação dos indicadores de resultado, que não entram na autoavaliação (D10)", async () => {
+    const r = await ler(EMAILS_DEMO.atleta, helena);
+    const itens = r.corpo.indicadores as ItemEscala[];
+    expect(itens.some((i) => i.indicadorId === "perf_mundial")).toBe(false);
+    const orientacoes = r.corpo.orientacoesResultados as {
+      nivel: string;
+      indicadorId: string;
+      orientacao: string | null;
+    }[];
+    expect(orientacoes.map((o) => [o.nivel, o.indicadorId])).toEqual([
+      ["mundial", "perf_mundial"],
+      ["continental", "perf_continental"],
+      ["nacional", "perf_nacional"],
+    ]);
+    // A migration da D10 escreve a orientação inicial dos três.
+    for (const o of orientacoes) expect(o.orientacao).toEqual(expect.any(String));
+  });
+
   it("traz a escala geral (pilarId nulo) e as rubricas próprias, com as notas de 0 a 5", async () => {
     const r = await ler(EMAILS_DEMO.atleta, helena);
     const rubricas = r.corpo.rubricas as Escala[];
