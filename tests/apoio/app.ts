@@ -7,6 +7,7 @@ import type { Db } from "../../src/db/db.js";
 import type { ProvedorEmail } from "../../src/email/index.js";
 import { ContaJaExiste, type AdminAuth } from "../../src/integracoes/supabase-admin.js";
 import type { Papel } from "../../src/domain/tipos.js";
+import type { IntegracaoWorldSailing } from "../../src/integracoes/world-sailing/index.js";
 import { criarArmazenamentoFake } from "./armazenamento.js";
 import type { ArmazenamentoEvidencias } from "../../src/storage/index.js";
 
@@ -25,6 +26,8 @@ export function configDeTeste(parcial: Partial<Config> = {}): Config {
       SUPABASE_URL: SUPABASE_URL_TESTE,
       SUPABASE_JWT_SECRET: SEGREDO_JWT_TESTE,
       CORS_ORIGINS: ORIGEM_PERMITIDA_TESTE,
+      // Os testes nunca chamam a World Sailing: desligado por padrão; quem precisa injeta a fonte simulada.
+      WORLD_SAILING_MODO: "desligado",
     }),
     PORT: 0,
     ...parcial,
@@ -39,6 +42,8 @@ export interface OpcoesAppDeTeste {
   armazenamento?: ArmazenamentoEvidencias;
   adminAuth?: AdminAuth | null;
   email?: ProvedorEmail;
+  /** World Sailing: fonte (simulada ou falsa) e `fetch` falso da foto. Padrão: desligada. */
+  worldSailing?: Partial<IntegracaoWorldSailing>;
   /** Captura as linhas do log (testes de segurança dos logs). */
   destinoLog?: { write(linha: string): void };
 }
@@ -61,6 +66,7 @@ export async function criarAppDeTeste(
     armazenamento: opcoes.armazenamento ?? criarArmazenamentoFake(),
     ...(opcoes.adminAuth !== undefined ? { adminAuth: opcoes.adminAuth } : {}),
     ...(opcoes.email ? { email: opcoes.email } : {}),
+    ...(opcoes.worldSailing ? { worldSailing: opcoes.worldSailing } : {}),
     ...(opcoes.destinoLog ? { destinoLog: opcoes.destinoLog } : {}),
     logger: false,
   });

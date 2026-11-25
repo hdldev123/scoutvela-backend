@@ -94,6 +94,22 @@ const esquemaExportacao = z.object({
   plano: registros.describe(
     "Plano individual: todas as versões registradas, da mais antiga para a mais nova",
   ),
+  worldSailing: z
+    .object({
+      sugestao: z
+        .record(z.string(), z.unknown())
+        .nullable()
+        .describe(
+          "Perfil importado da World Sailing como sugestão: nome, gênero, nascimento, foto, bio, quando importou e quando decidiu sobre foto e bio",
+        ),
+      ranking: registros.describe("Histórico de ranking importado da World Sailing"),
+      buscas: registros.describe(
+        "Buscas feitas na World Sailing: quando, modo, status e contagens",
+      ),
+    })
+    .describe(
+      "Dados importados da World Sailing (D19). Os resultados de regata importados estão em resultados (fonte world_sailing)",
+    ),
 });
 
 async function auditar(
@@ -209,7 +225,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         tags: ["titular"],
         summary: "Exporta em JSON tudo o que o sistema guarda sobre o atleta (LGPD)",
         description:
-          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados (com a edição e a situação da validação), decisões de gate, financeiro, pedidos de revisão (com o recurso, se houve) e pedidos do titular, telefone, validade do passaporte e aptidões conferidas, pesagens informadas, pedidos de ajuste recebidos, mensagens das conversas (D16), foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo) e plano individual (todas as versões). Só o atleta logado, só os próprios dados.",
+          "Devolve como anexo (meus-dados-scout-vela.json): cadastro, consentimentos, notas com evidência e avaliador, respostas, medidas, resultados (com a edição e a situação da validação), decisões de gate, financeiro, pedidos de revisão (com o recurso, se houve) e pedidos do titular, telefone, validade do passaporte e aptidões conferidas, pesagens informadas, pedidos de ajuste recebidos, mensagens das conversas (D16), foto de perfil (tipo e link de 5 minutos), lista de evidências anexadas (metadados, sem o arquivo), plano individual (todas as versões) e os dados importados da World Sailing (D19). Só o atleta logado, só os próprios dados.",
         security: seguranca,
         response: { 200: esquemaExportacao, 401: esquemaErro, 403: esquemaErro, 404: esquemaErro },
       },
@@ -240,6 +256,9 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         pedidosAjuste,
         mensagens,
         caminhoFoto,
+        wsPerfil,
+        wsRanking,
+        wsBuscas,
       ] = await Promise.all([
         q<Record<string, unknown>>(
           `select a.velaid_codigo as "velaid", a.nome, a.genero, a.data_nascimento::text as "dataNascimento",
@@ -360,6 +379,20 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
               where c.atleta_id = $1::uuid order by m.enviada_em, m.id`,
         ),
         caminhoDaFotoDoAtleta(app.db, id),
+        q<Record<string, unknown>>(
+          `select p.nome, p.genero, p.data_nascimento::text as "dataNascimento", p.foto_url as "fotoUrl", p.bio,
+                    p.importado_em as "importadoEm", p.foto_bio_decidida_em as "fotoBioDecididaEm"
+               from world_sailing_perfis p where p.atleta_id = $1::uuid`,
+        ),
+        q<Record<string, unknown>>(
+          `select k.data::text as data, k.classe, k.tipo, k.posicao, k.pontos::float8 as pontos
+               from world_sailing_ranking k where k.atleta_id = $1::uuid order by k.data, k.id`,
+        ),
+        q<Record<string, unknown>>(
+          `select i.executada_em as "executadaEm", i.modo, i.status, i.resultados_novos as "resultadosNovos",
+                    i.ranking_novos as "rankingNovos"
+               from world_sailing_importacoes i where i.atleta_id = $1::uuid order by i.executada_em, i.id`,
+        ),
       ]);
       if (!cadastro[0]) throw naoEncontrado("Atleta não encontrado.");
 
@@ -398,6 +431,7 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
           : null,
         evidencias,
         plano,
+        worldSailing: { sugestao: wsPerfil[0] ?? null, ranking: wsRanking, buscas: wsBuscas },
       };
     },
   );

@@ -9,6 +9,8 @@ import { erroAtletaAnonimizado, recusarAtletaAnonimizado } from "../repositories
 import { listarAtletasGestao } from "../repositories/atletas.js";
 import { buscarTermoVigente, termoAceitavel, termoSql } from "../repositories/termo.js";
 import { ArquivoRejeitado, importarCsv } from "../importacao/index.js";
+import { importarSemLancar } from "../servicos/importacao-world-sailing.js";
+import { esquemaResumoWorldSailing } from "./esquemas-world-sailing.js";
 
 const IDADE_MINIMA_PILOTO = 18;
 const CODIGO_VELAID = /^[A-Z]{2}-[A-Z0-9]{2,10}$/;
@@ -206,7 +208,7 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         tags: ["cadastro"],
         summary: "Cadastra o atleta pelo ID World Sailing e registra o envio do termo",
         description:
-          "O atleta nasce com cadastro incompleto (sem nome, gênero e data de nascimento): ele os informa no primeiro acesso, em PUT /me/cadastro. Até lá fica fora do ranking, do score, das pendências, do fechamento de ciclo e do investimento. wsId duplicado ou velaid já usado dão 409. confirmaMaioridade deve ser true. Se o velaid vier e existir no VelaID, o vínculo é guardado e os dados de lá ficam como sugestão para o atleta; velaid de menor de 18 anos é recusado. Código fora do VelaID importado é aceito, sem sugestão. Revalida classe ativa e treinador válido.",
+          "O atleta nasce com cadastro incompleto (sem nome, gênero e data de nascimento): ele os informa no primeiro acesso, em PUT /me/cadastro. Até lá fica fora do ranking, do score, das pendências, do fechamento de ciclo e do investimento. wsId duplicado ou velaid já usado dão 409. confirmaMaioridade deve ser true. Se o velaid vier e existir no VelaID, o vínculo é guardado e os dados de lá ficam como sugestão para o atleta; velaid de menor de 18 anos é recusado. Código fora do VelaID importado é aceito, sem sugestão. Revalida classe ativa e treinador válido. Depois de gravar o cadastro, busca o perfil na World Sailing pelo WS ID (D19; até 15 s) e importa os resultados de regata (valem direto, com `fonte: world_sailing`), o histórico de ranking e a sugestão de nome, gênero, nascimento, foto e bio para o atleta; o resumo vem em `worldSailing`. O cadastro NUNCA falha por causa da World Sailing: ID não encontrado, falha ou tempo esgotado voltam em `worldSailing.status` e o gestor pode tentar de novo em POST /atletas/:id/world-sailing.",
         security: seguranca,
         body: esquemaCadastro,
         response: {
@@ -221,6 +223,9 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
               .describe(
                 "convite_enviado: conta criada e convite enviado. sem_email: nenhuma conta criada (e-mail já em uso ou criarConta=false). indisponivel: conta criada, mas o convite não foi enviado (use POST /usuarios/:id/convite).",
               ),
+            worldSailing: esquemaResumoWorldSailing.describe(
+              "Resumo da busca na World Sailing feita logo depois do cadastro",
+            ),
           }),
           400: esquemaErro,
           401: esquemaErro,
@@ -408,6 +413,16 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         { evento: "termo_enviado", atletaId: criado.id, versao: termo.versao },
         "termo do piloto enviado",
       );
+
+      // World Sailing (D19): o cadastro já está gravado e nunca falha por causa dela.
+      const worldSailing = await importarSemLancar(
+        app.db,
+        app.worldSailing,
+        criado.id,
+        usuarioId,
+        app.agora(),
+        req.log,
+      );
       return reply.code(201).send({
         id: criado.id,
         wsId,
@@ -415,6 +430,7 @@ export async function rotasCadastro(app: FastifyInstance): Promise<void> {
         cadastroCompleto: false as const,
         termo: { status: "aguardando_aceite" as const, versao: termo.versao },
         conta,
+        worldSailing,
       });
     },
   );
