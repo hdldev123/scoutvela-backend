@@ -18152,8 +18152,9 @@ paths:
                       sugestao:
                         nullable: true
                         description: "Perfil importado da World Sailing como sugestão: nome, gênero,
-                          nascimento, foto, bio, quando importou e quando
-                          decidiu sobre foto e bio"
+                          nascimento, foto, bio, peso e altura autodeclarados,
+                          quando importou e quando decidiu sobre foto, bio e
+                          medida"
                         type: object
                         additionalProperties: {}
                       ranking:
@@ -24257,7 +24258,14 @@ paths:
         integração desligada (o front esconde o botão de atualizar). `ranking`:
         o histórico de ranking importado (só informação, não entra na nota), do
         mais recente para o mais antigo. Os resultados de regata importados
-        ficam em GET /atletas/:id/resultados (`fonte: world_sailing`)."
+        ficam em GET /atletas/:id/resultados (`fonte: world_sailing`).
+        `medidaSugerida` (D20): peso e altura autodeclarados no perfil,
+        oferecidos como sugestão de medida enquanto não houver decisão (ou se o
+        velejador atualizou o perfil depois dela); nulo sem pendência.
+        `podeDecidir` é verdadeiro para o gestor e o treinador do atleta, e
+        falso para o atleta (ele vê, mas não decide). É dado sensível: o IBVAR
+        recebe 403 na rota inteira. Quem decide usa POST
+        /atletas/:id/world-sailing/medida."
       parameters:
         - schema:
             type: string
@@ -24326,11 +24334,38 @@ paths:
                         - posicao
                         - pontos
                       additionalProperties: false
+                  medidaSugerida:
+                    nullable: true
+                    type: object
+                    properties:
+                      pesoKg:
+                        nullable: true
+                        description: Peso autodeclarado no perfil (30 a 160 kg)
+                        type: number
+                      alturaCm:
+                        nullable: true
+                        description: Altura autodeclarada no perfil (120 a 230 cm)
+                        type: number
+                      informadoEm:
+                        nullable: true
+                        description: "AAAA-MM-DD: quando o velejador atualizou o perfil na World
+                          Sailing"
+                        type: string
+                      podeDecidir:
+                        type: boolean
+                        description: "Gestor e treinador do atleta: true; atleta: false"
+                    required:
+                      - pesoKg
+                      - alturaCm
+                      - informadoEm
+                      - podeDecidir
+                    additionalProperties: false
                 required:
                   - perfilUrl
                   - importacaoAtiva
                   - ultimaImportacao
                   - ranking
+                  - medidaSugerida
                 additionalProperties: false
         "401":
           description: Default Response
@@ -24663,6 +24698,267 @@ paths:
                   - mensagem
                 additionalProperties: false
         "429":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+  /atletas/{id}/world-sailing/medida:
+    post:
+      summary: Usa ou dispensa o peso e a altura do perfil World Sailing como medida
+      tags:
+        - world-sailing
+      description: 'Gestor, ou treinador dos próprios atletas (outro treinador e
+        atleta inexistente: 404; atleta e IBVAR: 403; atleta anonimizado: 409).
+        Decide sobre a `medidaSugerida` de GET /atletas/:id/world-sailing; sem
+        sugestão pendente: 409. `usar` grava o peso e a altura que existirem em
+        `medidas_corporais` como medida validada (`medido_em` = data de
+        atualização do perfil às 12:00 UTC, ou agora se não houver; evidência
+        "Perfil World Sailing (autodeclarado), atualizado em DD/MM/AAAA";
+        `registrado_por` = quem decidiu) na mesma transação: a partir daí vale
+        no Class Fit, no G1 e na altura da ficha, pela ordem de `medido_em` como
+        qualquer outra medida. `dispensar` só registra a decisão. Se o velejador
+        atualizar o perfil depois (data diferente), a sugestão é oferecida de
+        novo. Auditoria `usar_medida_world_sailing` ou
+        `dispensar_medida_world_sailing`, só com ids e a decisão (nunca peso nem
+        altura).'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                decisao:
+                  type: string
+                  enum:
+                    - usar
+                    - dispensar
+              required:
+                - decisao
+              additionalProperties: false
+      parameters:
+        - schema:
+            type: string
+            format: uuid
+            pattern: ^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$
+          in: path
+          name: id
+          required: true
+      security: *a16
+      responses:
+        "200":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  decisao:
+                    type: string
+                    enum:
+                      - usar
+                      - dispensar
+                  medidaId:
+                    nullable: true
+                    description: Identificador da medida criada; nulo ao dispensar
+                    type: integer
+                    minimum: -9007199254740991
+                    maximum: 9007199254740991
+                required:
+                  - decisao
+                  - medidaId
+                additionalProperties: false
+        "400":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "401":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "403":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "404":
+          description: Default Response
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  erro:
+                    type: string
+                    enum:
+                      - nao_autenticado
+                      - sem_acesso
+                      - nao_encontrado
+                      - requisicao_invalida
+                      - erro_interno
+                      - limite_excedido
+                      - mfa_obrigatorio
+                      - servico_indisponivel
+                      - evidencia_removida
+                      - cota_excedida
+                  mensagem:
+                    type: string
+                  campos:
+                    type: array
+                    items:
+                      type: object
+                      properties:
+                        campo:
+                          type: string
+                        mensagem:
+                          type: string
+                      required:
+                        - campo
+                        - mensagem
+                      additionalProperties: false
+                required:
+                  - erro
+                  - mensagem
+                additionalProperties: false
+        "409":
           description: Default Response
           content:
             application/json:
