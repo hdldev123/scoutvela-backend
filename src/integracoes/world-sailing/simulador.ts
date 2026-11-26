@@ -4,7 +4,7 @@ import type { FonteWorldSailing } from "./tipos.js";
 /**
  * Fonte simulada: dados FICTÍCIOS (nomes, datas, eventos e posições inventados) para desenvolvimento,
  * homologação e testes. Nunca chama a rede. IDs reconhecidos: BRATESTE01 (perfil completo),
- * BRATESTE02 (perfil sem resultados e sem ranking) e BRASPT08 (atleta do seed, mesmo perfil do
+ * BRATESTE02 (perfil sem resultados, ranking, peso nem altura) e BRASPT08 (atleta do seed, mesmo perfil do
  * BRATESTE01). Qualquer outro ID não existe.
  */
 
@@ -16,6 +16,9 @@ const BRATESTE01: PerfilWorldSailing = {
   dataNascimento: "2003-04-12",
   fotoUrl: "https://assets.sailing.org/simulado/bratesteos01-headshot.png",
   bio: "Velejadora fictícia do simulador. Começou na classe ILCA 6 e hoje compete no circuito internacional.",
+  pesoKg: 71.5,
+  alturaCm: 176,
+  atualizadoEm: "2026-10-15",
   resultados: [
     {
       ref: "sim-b01-r1",
@@ -102,6 +105,9 @@ const BRATESTE02: PerfilWorldSailing = {
   dataNascimento: "2004-09-30",
   fotoUrl: null,
   bio: null,
+  pesoKg: null,
+  alturaCm: null,
+  atualizadoEm: null,
   resultados: [],
   ranking: [],
 };

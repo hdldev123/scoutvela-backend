@@ -21,6 +21,7 @@ export function respostaPerfil(sobrescrever: Record<string, unknown> = {}) {
         placeOfBirth: "SEGREDO-LOCAL-DE-NASCIMENTO",
         height: 199,
         weight: 99,
+        updatedAt: "2026-10-15 14:30:00",
         profileQuestions: [{ question: "SEGREDO-PERGUNTA", answer: "SEGREDO-RESPOSTA" }],
         socialMedia: [{ url: "https://exemplo.invalid/SEGREDO-REDE" }],
         categorisation: "SEGREDO-CATEGORIA",

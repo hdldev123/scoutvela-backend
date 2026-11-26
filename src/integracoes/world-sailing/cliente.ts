@@ -28,6 +28,10 @@ const esquemaVelejador = z.object({
   gender: nome,
   dateOfBirth: texto,
   biography: texto,
+  // Peso e altura são autodeclarados: qualquer coisa fora do esperado vira nulo, sem derrubar o perfil.
+  height: z.unknown(),
+  weight: z.unknown(),
+  updatedAt: z.unknown(),
   images: z.array(z.unknown()).nullish(),
   crews: z.array(z.unknown()).nullish(),
 });
@@ -105,6 +109,15 @@ function temTag(tags: unknown, alvo: string): boolean {
           : "";
     return valor.toLowerCase().includes(alvo);
   });
+}
+
+/** Número (ou texto numérico, com vírgula ou ponto) dentro da faixa, em uma casa; fora dela, nulo. */
+export function medidaDoValor(valor: unknown, min: number, max: number): number | null {
+  if (typeof valor !== "number" && typeof valor !== "string") return null;
+  const t = typeof valor === "string" ? valor.trim().replace(",", ".") : valor;
+  if (typeof t === "string" && !/^\d{1,4}(\.\d{1,6})?$/.test(t)) return null;
+  const n = Math.round(Number(t) * 10) / 10;
+  return Number.isFinite(n) && n >= min && n <= max ? n : null;
 }
 
 function bioDoTexto(valor: string | null | undefined): string | null {
@@ -199,6 +212,9 @@ export function normalizarPerfil(
     dataNascimento: dataDoTexto(velejador.dateOfBirth),
     fotoUrl,
     bio: bioDoTexto(velejador.biography),
+    pesoKg: medidaDoValor(velejador.weight, 30, 160),
+    alturaCm: medidaDoValor(velejador.height, 120, 230),
+    atualizadoEm: typeof velejador.updatedAt === "string" ? dataDoTexto(velejador.updatedAt) : null,
     resultados,
     ranking,
   };

@@ -95,6 +95,35 @@ describe("parse da resposta da World Sailing", () => {
     expect(p).toMatchObject({ genero: null, dataNascimento: null, bio: null });
   });
 
+  it("peso e altura autodeclarados viram sugestão de medida, com a data da atualização do perfil (D20)", () => {
+    expect(perfil).toMatchObject({ pesoKg: 99, alturaCm: 199, atualizadoEm: "2026-10-15" });
+    const texto = normalizarPerfil(
+      "BRATESTE09",
+      respostaPerfil({ weight: "71,55", height: " 176.04 ", updatedAt: "2026-10-15T10:00:00Z" }),
+      { data: [] },
+    )!;
+    expect(texto).toMatchObject({ pesoKg: 71.6, alturaCm: 176, atualizadoEm: "2026-10-15" });
+  });
+
+  it("peso e altura fora da faixa, inválidos ou nulos viram nulos (D20)", () => {
+    const fora = normalizarPerfil(
+      "BRATESTE09",
+      respostaPerfil({ weight: 29.9, height: 231, updatedAt: "ontem" }),
+      { data: [] },
+    )!;
+    expect(fora).toMatchObject({ pesoKg: null, alturaCm: null, atualizadoEm: null });
+    for (const v of ["abc", "", "7e1", -70, 0, Number.NaN, null, undefined]) {
+      const p = normalizarPerfil("BRATESTE09", respostaPerfil({ weight: v, height: v }), {
+        data: [],
+      })!;
+      expect(p).toMatchObject({ pesoKg: null, alturaCm: null });
+    }
+    const limites = normalizarPerfil("BRATESTE09", respostaPerfil({ weight: 160, height: 120 }), {
+      data: [],
+    })!;
+    expect(limites).toMatchObject({ pesoKg: 160, alturaCm: 120 });
+  });
+
   it("ID diferente do pedido, ou lista vazia, é não encontrado (sem diferenciar maiúsculas)", () => {
     expect(normalizarPerfil("OUTRO0001", respostaPerfil(), { data: [] })).toBeNull();
     expect(normalizarPerfil("brateste09", respostaPerfil(), { data: [] })).not.toBeNull();
@@ -204,6 +233,22 @@ describe("simulador e fábrica", () => {
     expect(p.resultados.some((r) => r.nivelWs === null)).toBe(true);
     expect(p.resultados.some((r) => r.nivelWs === "Sailing World Cup Series")).toBe(true);
     expect(new Set(p.ranking.map((k) => k.classe)).size).toBeGreaterThanOrEqual(2);
+  });
+
+  it("o simulador traz peso e altura fictícios no BRATESTE01 e no BRASPT08, e nada no BRATESTE02 (D20)", async () => {
+    const fonte = criarFonteSimulada();
+    for (const id of ["BRATESTE01", "BRASPT08"]) {
+      expect(await fonte.buscarPerfil(id)).toMatchObject({
+        pesoKg: 71.5,
+        alturaCm: 176,
+        atualizadoEm: "2026-10-15",
+      });
+    }
+    expect(await fonte.buscarPerfil("BRATESTE02")).toMatchObject({
+      pesoKg: null,
+      alturaCm: null,
+      atualizadoEm: null,
+    });
   });
 
   it("BRATESTE02 não tem resultados nem ranking; outros IDs não existem", async () => {
