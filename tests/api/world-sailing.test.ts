@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { cabecalhoAuth, criarAppDeTeste, tokenPara } from "../apoio/app.js";
 import { jpegValido, segmentoJpeg } from "../apoio/imagens.js";
 import { EMAILS_DEMO, criarPiloto } from "../apoio/piloto.js";
@@ -23,6 +23,9 @@ const avancar = (segundos: number) => {
 type ModoFonte = "simulada" | "clone" | "falha" | "lenta";
 let modoFonte: ModoFonte = "simulada";
 let bioLonga = false;
+/** Muda o perfil devolvido pela fonte "clone" (peso, altura e data de atualização do perfil). */
+let ajusteDoPerfil: Partial<Pick<PerfilWorldSailing, "pesoKg" | "alturaCm" | "atualizadoEm">> = {};
+const logs: string[] = [];
 const buscas: string[] = [];
 
 /** Fonte de teste: o simulador, um clone dele para qualquer ID, uma falha ou uma busca que não termina. */
@@ -41,6 +44,7 @@ const fonte: FonteWorldSailing = {
     clone.wsId = wsId;
     clone.sailorId = `uuid-${wsId}`;
     if (bioLonga) clone.bio = "palavra ".repeat(120);
+    Object.assign(clone, ajusteDoPerfil);
     return clone;
   },
 };
@@ -70,6 +74,7 @@ describe("D19: World Sailing", () => {
   beforeAll(async () => {
     p = await criarPiloto(() => agora, {
       worldSailing: { fonte, fetch: fetchFalso, limiteCadastroMs: 300 },
+      destinoLog: { write: (linha: string) => void logs.push(linha) },
     });
     treinadora = (
       await p.db.query<{ id: string }>("select id from usuarios where email = $1", [
@@ -418,6 +423,259 @@ describe("D19: World Sailing", () => {
       // Sem consentimento, o atleta nem aparece para o IBVAR.
       const r = await chamar(EMAILS_DEMO.ibvar, "GET", `/atletas/${id}/resultados`);
       expect(r.status).toBe(403);
+    });
+  });
+
+  describe("D20: peso e altura do perfil como sugestão de medida", () => {
+    beforeEach(() => {
+      ajusteDoPerfil = {};
+    });
+
+    interface LinhaMedida {
+      id: string;
+      peso_kg: string | null;
+      altura_cm: string | null;
+      medido_em: Date;
+      evidencia: string;
+      registrado_por: string;
+    }
+    const medidas = async (id: string) =>
+      (
+        await p.db.query<LinhaMedida>(
+          `select id::text as id, peso_kg, altura_cm, medido_em, evidencia, registrado_por::text as registrado_por
+             from medidas_corporais where atleta_id = $1 order by id`,
+          [id],
+        )
+      ).rows;
+    const sugestao = async (quem: Quem, id: string) =>
+      (await chamar(quem, "GET", `/atletas/${id}/world-sailing`)).corpo.medidaSugerida;
+    const decidir = (quem: Quem, id: string, decisao: string) =>
+      chamar(quem, "POST", `/atletas/${id}/world-sailing/medida`, { decisao });
+    const classFit = async (id: string) =>
+      (await chamar(EMAILS_DEMO.gestor, "GET", `/atletas/${id}`)).corpo.classFit;
+    const buscarDeNovo = async (id: string) => {
+      avancar(61);
+      return chamar(EMAILS_DEMO.gestor, "POST", `/atletas/${id}/world-sailing`);
+    };
+
+    async function novo(wsId: string) {
+      const c = await cadastrar(wsId);
+      await completar(c.auth, `Atleta ${wsId}`);
+      await chamar(EMAILS_DEMO.gestor, "POST", `/atletas/${c.id}/termo`, {
+        versao: "Piloto 18+ · v1",
+      });
+      return c;
+    }
+    const anonimizar = async (alvo: string) => {
+      const gestorId = (
+        await p.db.query<{ id: string }>("select id from usuarios where email = $1", [
+          EMAILS_DEMO.gestor,
+        ])
+      ).rows[0]!.id;
+      const pedido = (
+        await p.db.query<{ id: string }>(
+          `insert into pedidos_titular (atleta_id, tipo, descricao, criado_por)
+           values ($1, 'exclusao', 'Quero que apaguem meus dados.', $2) returning id::text as id`,
+          [alvo, gestorId],
+        )
+      ).rows[0]!.id;
+      return chamar(EMAILS_DEMO.gestor, "POST", `/atletas/${alvo}/anonimizar`, {
+        pedidoTitularId: pedido,
+        confirmacao: "ANONIMIZAR",
+      });
+    };
+
+    it("a importação guarda peso, altura e a data de atualização do perfil", async () => {
+      const c = await novo("BRATESTE81");
+      const l = (
+        await p.db.query<Record<string, unknown>>(
+          `select peso_kg, altura_cm, perfil_atualizado_em::text as atualizado, medida_decidida_em
+             from world_sailing_perfis where atleta_id = $1`,
+          [c.id],
+        )
+      ).rows[0]!;
+      expect(l).toEqual({
+        peso_kg: "71.5",
+        altura_cm: "176.0",
+        atualizado: "2026-10-15",
+        medida_decidida_em: null,
+      });
+    });
+
+    it("a sugestão aparece para gestor, treinador e atleta (este sem poder decidir); IBVAR recebe 403", async () => {
+      const c = await novo("BRATESTE82");
+      const esperado = { pesoKg: 71.5, alturaCm: 176, informadoEm: "2026-10-15" };
+      expect(await sugestao(EMAILS_DEMO.gestor, c.id)).toEqual({ ...esperado, podeDecidir: true });
+      expect(await sugestao(treinadoraAuth, c.id)).toEqual({ ...esperado, podeDecidir: true });
+      expect(await sugestao(c.auth, c.id)).toEqual({ ...esperado, podeDecidir: false });
+      expect(
+        (await chamar(EMAILS_DEMO.ibvar, "GET", `/atletas/${c.id}/world-sailing`)).status,
+      ).toBe(403);
+      // Só sugestão: nada entra no Class Fit sozinho.
+      expect(await classFit(c.id)).toBeNull();
+    });
+
+    it("usar cria a medida validada, e o Class Fit e a altura da ficha passam a valer", async () => {
+      const c = await novo("BRATESTE83");
+      const r = await decidir(treinadoraAuth, c.id, "usar");
+      expect(r.status).toBe(200);
+      expect(r.corpo).toEqual({ decisao: "usar", medidaId: expect.any(Number) });
+      const m = await medidas(c.id);
+      expect(m).toHaveLength(1);
+      expect(m[0]).toMatchObject({
+        id: String(r.corpo.medidaId),
+        peso_kg: "71.5",
+        altura_cm: "176.0",
+        evidencia: "Perfil World Sailing (autodeclarado), atualizado em 15/10/2026",
+        registrado_por: treinadora,
+      });
+      expect(m[0]!.medido_em.toISOString()).toBe("2026-10-15T12:00:00.000Z");
+      const cf = await classFit(c.id);
+      expect(cf).toMatchObject({ pesoKg: 71.5, alturaCm: 176 });
+      expect(cf.altura.cm).toBe(176);
+      expect(await sugestao(EMAILS_DEMO.gestor, c.id)).toBeNull();
+      expect(await sugestao(c.auth, c.id)).toBeNull();
+      // Auditoria só com ids e a decisão: nunca peso nem altura.
+      const aud = await p.db.query<{ detalhes: unknown }>(
+        "select detalhes from auditoria where acao = 'usar_medida_world_sailing' and entidade_id = $1",
+        [c.id],
+      );
+      expect(aud.rows.map((x) => x.detalhes)).toEqual([
+        { decisao: "usar", medidaId: r.corpo.medidaId },
+      ]);
+    });
+
+    it("a medida do perfil respeita a ordem por medido_em (peso mais novo continua valendo)", async () => {
+      const c = await novo("BRATESTE84");
+      await p.db.query(
+        `insert into medidas_corporais (atleta_id, peso_kg, medido_em, evidencia, registrado_por)
+         values ($1, 80.2, '2026-11-01T12:00:00Z', 'Pesagem validada', $2)`,
+        [c.id, treinadora],
+      );
+      expect((await decidir(EMAILS_DEMO.gestor, c.id, "usar")).status).toBe(200);
+      // O peso de 1/11 é mais novo que o do perfil (15/10); a altura só existe na medida do perfil.
+      expect(await classFit(c.id)).toMatchObject({ pesoKg: 80.2, alturaCm: 176 });
+    });
+
+    it("dispensar tira a sugestão, não cria medida e audita sem valores", async () => {
+      const c = await novo("BRATESTE85");
+      const r = await decidir(EMAILS_DEMO.gestor, c.id, "dispensar");
+      expect(r).toEqual({ status: 200, corpo: { decisao: "dispensar", medidaId: null } });
+      expect(await sugestao(EMAILS_DEMO.gestor, c.id)).toBeNull();
+      expect(await medidas(c.id)).toHaveLength(0);
+      expect(await classFit(c.id)).toBeNull();
+      const aud = await p.db.query<{ detalhes: unknown }>(
+        "select detalhes from auditoria where acao = 'dispensar_medida_world_sailing' and entidade_id = $1",
+        [c.id],
+      );
+      expect(aud.rows.map((x) => x.detalhes)).toEqual([{ decisao: "dispensar", medidaId: null }]);
+    });
+
+    it("repetir a decisão dá 409", async () => {
+      const c = await novo("BRATESTE86");
+      expect((await decidir(EMAILS_DEMO.gestor, c.id, "usar")).status).toBe(200);
+      const outra = await decidir(EMAILS_DEMO.gestor, c.id, "usar");
+      expect(outra.status).toBe(409);
+      expect(outra.corpo.mensagem).toMatch(/medida sugerida/i);
+      expect((await decidir(treinadoraAuth, c.id, "dispensar")).status).toBe(409);
+      expect(await medidas(c.id)).toHaveLength(1);
+    });
+
+    it("decisão inválida dá 400; sem peso nem altura no perfil não há sugestão (409)", async () => {
+      const c = await novo("BRATESTE87");
+      expect((await decidir(EMAILS_DEMO.gestor, c.id, "talvez")).status).toBe(400);
+      await p.db.query(
+        "update world_sailing_perfis set peso_kg = null, altura_cm = null where atleta_id = $1",
+        [c.id],
+      );
+      expect(await sugestao(EMAILS_DEMO.gestor, c.id)).toBeNull();
+      expect((await decidir(EMAILS_DEMO.gestor, c.id, "usar")).status).toBe(409);
+    });
+
+    it("nova importação com updatedAt diferente oferece de novo; com o mesmo, não", async () => {
+      const c = await novo("BRATESTE88");
+      expect((await decidir(EMAILS_DEMO.gestor, c.id, "dispensar")).status).toBe(200);
+
+      // Mesmo updatedAt: a decisão vale.
+      expect((await buscarDeNovo(c.id)).status).toBe(200);
+      expect(await sugestao(EMAILS_DEMO.gestor, c.id)).toBeNull();
+
+      // O velejador atualizou o perfil: oferece de novo, com os valores novos.
+      ajusteDoPerfil = { atualizadoEm: "2026-11-03", pesoKg: 72.4 };
+      expect((await buscarDeNovo(c.id)).status).toBe(200);
+      expect(await sugestao(EMAILS_DEMO.gestor, c.id)).toEqual({
+        pesoKg: 72.4,
+        alturaCm: 176,
+        informadoEm: "2026-11-03",
+        podeDecidir: true,
+      });
+      expect((await decidir(EMAILS_DEMO.gestor, c.id, "usar")).status).toBe(200);
+      expect(await classFit(c.id)).toMatchObject({ pesoKg: 72.4, alturaCm: 176 });
+      expect(await medidas(c.id)).toHaveLength(1);
+
+      // Mesma data de novo: não oferece.
+      expect((await buscarDeNovo(c.id)).status).toBe(200);
+      expect(await sugestao(EMAILS_DEMO.gestor, c.id)).toBeNull();
+    });
+
+    it("sem data de atualização no perfil, a medida vale como de agora", async () => {
+      ajusteDoPerfil = { atualizadoEm: null };
+      const c = await novo("BRATESTE89");
+      expect(await sugestao(EMAILS_DEMO.gestor, c.id)).toMatchObject({ informadoEm: null });
+      expect((await decidir(EMAILS_DEMO.gestor, c.id, "usar")).status).toBe(200);
+      const m = (await medidas(c.id))[0]!;
+      expect(m.evidencia).toBe("Perfil World Sailing (autodeclarado)");
+      expect(m.medido_em.toISOString()).toBe(agora.toISOString());
+    });
+
+    it("atleta e IBVAR recebem 403 no POST; outro treinador e atleta inexistente, 404", async () => {
+      const c = await novo("BRATESTE90");
+      expect((await decidir(c.auth, c.id, "usar")).status).toBe(403);
+      expect((await decidir(EMAILS_DEMO.ibvar, c.id, "usar")).status).toBe(403);
+      expect((await decidir(EMAILS_DEMO.atleta, c.id, "usar")).status).toBe(403);
+      expect((await decidir(await tokenDoOutroTreinador(), c.id, "usar")).status).toBe(404);
+      expect((await decidir(null, c.id, "usar")).status).toBe(401);
+      expect((await decidir(EMAILS_DEMO.gestor, crypto.randomUUID(), "usar")).status).toBe(404);
+      expect(await sugestao(EMAILS_DEMO.gestor, c.id)).not.toBeNull();
+      expect(await medidas(c.id)).toHaveLength(0);
+    });
+
+    it("atleta anonimizado recebe 409; a sugestão sai e a medida criada fica na série histórica", async () => {
+      const c = await novo("BRATESTE91");
+      expect((await decidir(EMAILS_DEMO.gestor, c.id, "usar")).status).toBe(200);
+      const outro = await novo("BRATESTE92");
+      for (const alvo of [c.id, outro.id]) {
+        expect((await anonimizar(alvo)).status).toBe(200);
+        expect(await contar("world_sailing_perfis where atleta_id = $1", [alvo])).toBe(0);
+        expect((await decidir(EMAILS_DEMO.gestor, alvo, "usar")).status).toBe(409);
+        expect((await decidir(EMAILS_DEMO.gestor, alvo, "dispensar")).status).toBe(409);
+      }
+      const m = await medidas(c.id);
+      expect(m).toHaveLength(1);
+      expect(m[0]!.evidencia).not.toMatch(/World Sailing/);
+      expect(await medidas(outro.id)).toHaveLength(0);
+    });
+
+    it("o titular recebe o peso e a altura sugeridos na exportação", async () => {
+      const c = await novo("BRATESTE93");
+      const r = await chamar(c.auth, "GET", "/meus-dados");
+      expect(r.status).toBe(200);
+      expect(r.corpo.worldSailing.sugestao).toMatchObject({
+        pesoKg: 71.5,
+        alturaCm: 176,
+        perfilAtualizadoEm: "2026-10-15",
+        medidaDecididaEm: null,
+      });
+    });
+
+    it("o log nunca mostra peso nem altura", async () => {
+      const c = await novo("BRATESTE94");
+      const antes = logs.length;
+      await decidir(EMAILS_DEMO.gestor, c.id, "usar");
+      await chamar(EMAILS_DEMO.gestor, "GET", `/atletas/${c.id}/world-sailing`);
+      await chamar(EMAILS_DEMO.gestor, "GET", `/atletas/${c.id}`);
+      expect(logs.length).toBeGreaterThan(antes);
+      expect(logs.slice(antes).join("\n")).not.toMatch(/71\.5|pesoKg|alturaCm|"176/);
     });
   });
 
