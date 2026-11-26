@@ -171,15 +171,18 @@ export async function importarWorldSailing(
       rankingNovos += ins.rows.length;
     }
 
-    // Sugestão de cadastro, foto e bio. A decisão sobre foto e bio (`foto_bio_decidida_em`) não muda.
+    // Sugestão de cadastro, foto, bio e medida (D20). As decisões (`foto_bio_decidida_em` e as colunas
+    // `medida_*`) não mudam: a medida volta a ser oferecida só se `perfil_atualizado_em` mudar.
     await tx.query(
       `insert into world_sailing_perfis
-         (atleta_id, ws_sailor_id, nome, genero, data_nascimento, foto_url, bio, importado_em)
-       values ($1::uuid, $2, $3, $4, $5::date, $6, $7, $8)
+         (atleta_id, ws_sailor_id, nome, genero, data_nascimento, foto_url, bio, importado_em,
+          peso_kg, altura_cm, perfil_atualizado_em)
+       values ($1::uuid, $2, $3, $4, $5::date, $6, $7, $8, $9, $10, $11::date)
        on conflict (atleta_id) do update
          set ws_sailor_id = excluded.ws_sailor_id, nome = excluded.nome, genero = excluded.genero,
              data_nascimento = excluded.data_nascimento, foto_url = excluded.foto_url,
-             bio = excluded.bio, importado_em = excluded.importado_em`,
+             bio = excluded.bio, importado_em = excluded.importado_em, peso_kg = excluded.peso_kg,
+             altura_cm = excluded.altura_cm, perfil_atualizado_em = excluded.perfil_atualizado_em`,
       [
         atletaId,
         perfil.sailorId,
@@ -189,6 +192,9 @@ export async function importarWorldSailing(
         perfil.fotoUrl,
         perfil.bio,
         agora,
+        perfil.pesoKg,
+        perfil.alturaCm,
+        perfil.atualizadoEm,
       ],
     );
 

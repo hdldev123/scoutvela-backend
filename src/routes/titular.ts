@@ -100,7 +100,7 @@ const esquemaExportacao = z.object({
         .record(z.string(), z.unknown())
         .nullable()
         .describe(
-          "Perfil importado da World Sailing como sugestão: nome, gênero, nascimento, foto, bio, quando importou e quando decidiu sobre foto e bio",
+          "Perfil importado da World Sailing como sugestão: nome, gênero, nascimento, foto, bio, peso e altura autodeclarados, quando importou e quando decidiu sobre foto, bio e medida",
         ),
       ranking: registros.describe("Histórico de ranking importado da World Sailing"),
       buscas: registros.describe(
@@ -381,7 +381,9 @@ export async function rotasTitular(app: FastifyInstance): Promise<void> {
         caminhoDaFotoDoAtleta(app.db, id),
         q<Record<string, unknown>>(
           `select p.nome, p.genero, p.data_nascimento::text as "dataNascimento", p.foto_url as "fotoUrl", p.bio,
-                    p.importado_em as "importadoEm", p.foto_bio_decidida_em as "fotoBioDecididaEm"
+                    p.importado_em as "importadoEm", p.foto_bio_decidida_em as "fotoBioDecididaEm",
+                    p.peso_kg::float8 as "pesoKg", p.altura_cm::float8 as "alturaCm",
+                    p.perfil_atualizado_em::text as "perfilAtualizadoEm", p.medida_decidida_em as "medidaDecididaEm"
                from world_sailing_perfis p where p.atleta_id = $1::uuid`,
         ),
         q<Record<string, unknown>>(

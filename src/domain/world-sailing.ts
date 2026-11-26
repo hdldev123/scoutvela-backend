@@ -2,8 +2,9 @@ import type { NivelCompeticao } from "./tipos.js";
 
 /**
  * Perfil público da World Sailing, já normalizado (D19). Só o que pontua ou decide: nome, gênero e
- * nascimento viram sugestão de cadastro; foto e bio, sugestão de perfil. Estado civil, local de
- * nascimento, altura, peso, redes sociais e dados de outros velejadores nunca entram aqui.
+ * nascimento viram sugestão de cadastro; foto e bio, sugestão de perfil; peso e altura autodeclarados,
+ * sugestão de medida (D20) que o treinador ou o gestor confirma. Estado civil, local de nascimento,
+ * redes sociais e dados de outros velejadores nunca entram aqui.
  */
 export interface PerfilWorldSailing {
   /** Identificador do velejador na World Sailing (UUID); chave da busca de ranking. */
@@ -16,6 +17,12 @@ export interface PerfilWorldSailing {
   /** Só `https://assets.sailing.org/...`. */
   fotoUrl: string | null;
   bio: string | null;
+  /** Peso autodeclarado no perfil (30 a 160 kg, uma casa); nulo se ausente ou fora da faixa. */
+  pesoKg: number | null;
+  /** Altura autodeclarada no perfil (120 a 230 cm, uma casa); nula se ausente ou fora da faixa. */
+  alturaCm: number | null;
+  /** AAAA-MM-DD: quando o velejador atualizou o perfil (`updatedAt`). */
+  atualizadoEm: string | null;
   resultados: ResultadoWs[];
   ranking: RankingWs[];
 }

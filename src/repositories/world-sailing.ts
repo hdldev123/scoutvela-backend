@@ -76,3 +76,58 @@ export async function ultimaImportacaoWorldSailing(
   );
   return r.rows[0] ?? null;
 }
+
+export interface MedidaSugeridaWs {
+  pesoKg: number | null;
+  alturaCm: number | null;
+  /** AAAA-MM-DD: quando o velejador atualizou o perfil na World Sailing. */
+  informadoEm: string | null;
+}
+
+/** Texto SQL da sugestão pendente (D20): há peso ou altura, e nunca foi decidida ou o perfil mudou depois. */
+const SQL_MEDIDA_PENDENTE = `(p.peso_kg is not null or p.altura_cm is not null)
+  and (p.medida_decidida_em is null or p.medida_decidida_ref is distinct from p.perfil_atualizado_em)`;
+
+interface LinhaMedidaSugerida {
+  peso_kg: string | null;
+  altura_cm: string | null;
+  informado_em: string | null;
+}
+
+const paraMedidaSugerida = (l: LinhaMedidaSugerida): MedidaSugeridaWs => ({
+  pesoKg: l.peso_kg === null ? null : Number(l.peso_kg),
+  alturaCm: l.altura_cm === null ? null : Number(l.altura_cm),
+  informadoEm: l.informado_em,
+});
+
+/**
+ * Sugestão de medida (D20) ainda não decidida do atleta, ou nulo. O acesso ao atleta já foi conferido por
+ * `buscarAtletaParaWorldSailing`. Peso e altura são dado sensível: nunca vão para log nem para auditoria.
+ */
+export async function buscarMedidaSugerida(
+  db: Db,
+  atletaId: string,
+): Promise<MedidaSugeridaWs | null> {
+  const r = await db.query<LinhaMedidaSugerida>(
+    `select p.peso_kg, p.altura_cm, p.perfil_atualizado_em::text as informado_em
+       from world_sailing_perfis p
+      where p.atleta_id = $1::uuid and ${SQL_MEDIDA_PENDENTE}`,
+    [atletaId],
+  );
+  return r.rows[0] ? paraMedidaSugerida(r.rows[0]) : null;
+}
+
+/** Igual a `buscarMedidaSugerida`, mas trava a linha para a decisão (usar ou dispensar) numa transação. */
+export async function travarMedidaSugerida(
+  tx: Db,
+  atletaId: string,
+): Promise<MedidaSugeridaWs | null> {
+  const r = await tx.query<LinhaMedidaSugerida>(
+    `select p.peso_kg, p.altura_cm, p.perfil_atualizado_em::text as informado_em
+       from world_sailing_perfis p
+      where p.atleta_id = $1::uuid and ${SQL_MEDIDA_PENDENTE}
+        for update of p`,
+    [atletaId],
+  );
+  return r.rows[0] ? paraMedidaSugerida(r.rows[0]) : null;
+}
