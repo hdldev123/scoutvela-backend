@@ -30,7 +30,16 @@ Investigação feita em 24/11/2026, a partir da reunião de alinhamento IBVAR de
   - só nome, gênero e data de nascimento, como sugestão do primeiro acesso (o VelaID tem prioridade);
   - foto e bio também como sugestão, que o atleta aceita ou dispensa no perfil;
   - a foto é baixada pelo servidor, só de `https://assets.sailing.org/`, e passa pela limpeza de metadados.
-  - Nunca entram estado civil, local de nascimento, altura, peso, perguntas do perfil, redes sociais ou categorização.
+  - peso e altura (decisão de 26/11/2026, D20) entram só como sugestão de medida, ver abaixo;
+  - nunca entram estado civil, local de nascimento, perguntas do perfil, redes sociais ou categorização.
+- **Peso e altura como sugestão de medida (D20, decisão de 26/11/2026):**
+  - o perfil traz `height` (cm) e `weight` (kg) autodeclarados e `updatedAt`. O parse aceita número ou texto numérico, só de 30 a 160 kg e de 120 a 230 cm, com uma casa; fora da faixa ou inválido vira nulo;
+  - ficam em `world_sailing_perfis` (`peso_kg`, `altura_cm`, `perfil_atualizado_em`). São dado sensível: o IBVAR nunca vê (403 na rota) e nada entra no Class Fit sozinho;
+  - `GET /atletas/:id/world-sailing` traz `medidaSugerida { pesoKg, alturaCm, informadoEm, podeDecidir }`, ou nulo sem pendência. A ficha mostra "Informado na World Sailing em <data>: X kg, Y cm". O atleta vê a sugestão, mas `podeDecidir` é falso para ele;
+  - `POST /atletas/:id/world-sailing/medida` com `{ decisao: "usar" | "dispensar" }` (gestor ou treinador do atleta). "Usar" cria uma medida validada em `medidas_corporais` (`medido_em` = data do perfil às 12:00 UTC, evidência "Perfil World Sailing (autodeclarado), atualizado em DD/MM/AAAA", `registrado_por` = quem decidiu), que vale no Class Fit e na altura da ficha pela ordem de `medido_em`, como qualquer medida. "Dispensar" só registra a decisão;
+  - pendente = há peso ou altura e (nunca decidiu ou `medida_decidida_ref` difere de `perfil_atualizado_em`). Se o velejador atualizar o perfil, a sugestão volta a ser oferecida; a importação nunca mexe nas colunas de decisão;
+  - auditoria `usar_medida_world_sailing` e `dispensar_medida_world_sailing`, só com ids e a decisão (sem peso nem altura); o log também não mostra os valores;
+  - LGPD: a anonimização apaga a linha de `world_sailing_perfis`; a medida criada segue a regra de `medidas_corporais` (série histórica, evidência anonimizada). A exportação do titular traz o peso e a altura sugeridos.
 - **Histórico de ranking:** só informação, sem entrar na nota, em `world_sailing_ranking`.
 - **Nível da regata (regra provisória P13, `WS_NIVEIS`, editável em Parâmetros):**
 
@@ -45,7 +54,7 @@ Investigação feita em 24/11/2026, a partir da reunião de alinhamento IBVAR de
   | Modo | Comportamento |
   | --- | --- |
   | `desligado` | Padrão em produção. A busca não roda |
-  | `simulado` | Padrão em desenvolvimento e homologação. Usa dados fictícios: `BRATESTE01` com resultados e ranking, `BRATESTE02` vazio e `BRASPT08` (Davi Moretto, atleta do seed) com o mesmo perfil do `BRATESTE01`. É recusado em produção |
+  | `simulado` | Padrão em desenvolvimento e homologação. Usa dados fictícios: `BRATESTE01` com resultados, ranking, 71,5 kg e 176 cm (perfil atualizado em 15/10/2026), `BRATESTE02` vazio e sem peso nem altura e `BRASPT08` (Davi Moretto, atleta do seed) com o mesmo perfil do `BRATESTE01`. É recusado em produção |
   | `real` | Chama o site. Fora da produção gera um aviso no log |
 
 - **Validação com dado real:** um teste pontual com GBRHM15 no ambiente local, a pedido do usuário. Depois o ambiente volta ao simulador e o banco local é recriado.
@@ -56,7 +65,7 @@ Investigação feita em 24/11/2026, a partir da reunião de alinhamento IBVAR de
   - no máximo uma busca por atleta a cada 60 s.
 - **Rastro:**
   - cada busca fica em `world_sailing_importacoes` e na auditoria (`importar_world_sailing`), só com o modo, o status e as contagens;
-  - a anonimização apaga o ranking e a sugestão e zera a referência externa dos resultados.
+  - a anonimização apaga o ranking e a sugestão (inclusive peso e altura) e zera a referência externa dos resultados.
 - **Limitação:** a World Sailing não informa o tamanho da frota. Por isso o resultado importado não entra na fração colocação/frota do G2; pontua só pela colocação, na P12.
 
 ### Pendente
